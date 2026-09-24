@@ -1,0 +1,340 @@
+<script lang="ts">
+  import type { VaultConfig, VaultItem } from '../types';
+  import {
+    createNote,
+    createFolder,
+    deleteItem,
+    renameItem,
+    pickVaultDirectory,
+    selectVault,
+    networkSyncNow,
+  } from '../api';
+
+  let {
+    activeVault = null,
+    vaults = [],
+    items = [],
+    selectedPath = '',
+    syncStatus = 'idle',
+    peerCount = 0,
+    onSelectNote,
+    onVaultChange,
+    onOpenPairModal,
+    onRefreshItems,
+  } = $props<{
+    activeVault: VaultConfig | null;
+    vaults: VaultConfig[];
+    items: VaultItem[];
+    selectedPath: string;
+    syncStatus: 'idle' | 'syncing' | 'synced' | 'error';
+    peerCount: number;
+    onSelectNote: (path: string) => void;
+    onVaultChange: (vault: VaultConfig) => void;
+    onOpenPairModal: () => void;
+    onRefreshItems: () => void;
+  }>();
+
+  let searchQuery = $state('');
+  let isVaultDropdownOpen = $state(false);
+  let isCreatingNote = $state(false);
+  let newNoteName = $state('');
+  let isCreatingFolder = $state(false);
+  let newFolderName = $state('');
+
+  let filteredItems = $derived(
+    items.filter((item: VaultItem) => {
+      if (item.is_dir) return false; // Show flat list of notes in search or filter
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      return (
+        item.title.toLowerCase().includes(q) ||
+        item.path.toLowerCase().includes(q)
+      );
+    })
+  );
+
+  async function handleOpenFolder() {
+    isVaultDropdownOpen = false;
+    const path = await pickVaultDirectory();
+    if (path) {
+      const res = await selectVault(path);
+      if (res.active_vault) {
+        onVaultChange(res.active_vault);
+      }
+    }
+  }
+
+  async function handleSelectVault(v: VaultConfig) {
+    isVaultDropdownOpen = false;
+    const res = await selectVault(v.path);
+    if (res.active_vault) {
+      onVaultChange(res.active_vault);
+    }
+  }
+
+  async function submitNewNote() {
+    if (!newNoteName.trim()) return;
+    try {
+      const path = await createNote(newNoteName.trim(), newNoteName.trim());
+      isCreatingNote = false;
+      newNoteName = '';
+      onRefreshItems();
+      onSelectNote(path);
+    } catch (e: any) {
+      alert(typeof e === 'string' ? e : e.message || 'Erro ao criar nota');
+    }
+  }
+
+  async function submitNewFolder() {
+    if (!newFolderName.trim()) return;
+    try {
+      await createFolder(newFolderName.trim());
+      isCreatingFolder = false;
+      newFolderName = '';
+      onRefreshItems();
+    } catch (e: any) {
+      alert(typeof e === 'string' ? e : e.message || 'Erro ao criar pasta');
+    }
+  }
+
+  async function handleDelete(path: string, event: MouseEvent) {
+    event.stopPropagation();
+    if (confirm(`Deseja realmente excluir "${path}"?`)) {
+      try {
+        await deleteItem(path);
+        onRefreshItems();
+      } catch (e) {
+        console.error('Erro ao deletar:', e);
+      }
+    }
+  }
+
+  async function handleRename(oldPath: string, event: MouseEvent) {
+    event.stopPropagation();
+    const newName = prompt('Novo nome:', oldPath);
+    if (newName && newName !== oldPath) {
+      try {
+        await renameItem(oldPath, newName);
+        onRefreshItems();
+        if (selectedPath === oldPath) {
+          onSelectNote(newName);
+        }
+      } catch (e: any) {
+        alert(typeof e === 'string' ? e : e.message || 'Erro ao renomear');
+      }
+    }
+  }
+</script>
+
+<aside class="w-64 h-full flex flex-col border-r border-[var(--border)] bg-[var(--bg-sidebar)] select-none">
+  <!-- Vault Switcher Header -->
+  <div class="relative border-b border-[var(--border)] p-3">
+    <button
+      onclick={() => (isVaultDropdownOpen = !isVaultDropdownOpen)}
+      class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-left transition group"
+    >
+      <div class="flex items-center gap-2 overflow-hidden">
+        <span class="text-[var(--accent-light)] font-bold text-sm">✦</span>
+        <span class="text-xs font-semibold text-[var(--text-main)] truncate">
+          {activeVault ? activeVault.name : 'Selecionar Vault'}
+        </span>
+      </div>
+      <span class="text-[10px] text-[var(--text-dim)] group-hover:text-[var(--text-muted)]">▼</span>
+    </button>
+
+    <!-- Vault Dropdown -->
+    {#if isVaultDropdownOpen}
+      <div class="absolute top-full left-2 right-2 mt-1 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg shadow-xl py-1.5 z-40 animate-fadeIn">
+        <div class="px-3 py-1 text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
+          Seus Vaults
+        </div>
+        {#each vaults as v}
+          <button
+            onclick={() => handleSelectVault(v)}
+            class="w-full flex items-center justify-between px-3 py-1.5 text-xs text-left text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition {activeVault?.id === v.id ? 'text-[var(--accent-light)] font-medium' : ''}"
+          >
+            <span class="truncate">{v.name}</span>
+            {#if activeVault?.id === v.id}
+              <span class="text-[10px] text-[var(--accent-light)]">ativo</span>
+            {/if}
+          </button>
+        {/each}
+        <div class="h-[1px] bg-[var(--border)] my-1"></div>
+        <button
+          onclick={handleOpenFolder}
+          class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--accent-light)] hover:bg-[var(--bg-hover)] transition font-medium"
+        >
+          <span>+</span>
+          <span>Abrir Pasta do Computador</span>
+        </button>
+      </div>
+    {/if}
+  </div>
+
+  <!-- Search & Actions -->
+  <div class="p-3 flex flex-col gap-2 border-b border-[var(--border)]">
+    <div class="relative">
+      <input
+        type="text"
+        bind:value={searchQuery}
+        placeholder="Buscar notas..."
+        class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-md px-2.5 py-1 text-xs text-[var(--text-main)] placeholder-[var(--text-dim)] focus:outline-none focus:border-[var(--accent)]"
+      />
+      {#if searchQuery}
+        <button
+          onclick={() => (searchQuery = '')}
+          class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-[var(--text-dim)] hover:text-[var(--text-main)]"
+        >
+          ✕
+        </button>
+      {/if}
+    </div>
+
+    <!-- Quick Buttons -->
+    <div class="flex gap-1.5">
+      <button
+        onclick={() => (isCreatingNote = true)}
+        class="flex-1 py-1 px-2 text-xs font-medium rounded bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition text-center"
+      >
+        + Nova Nota
+      </button>
+      <button
+        onclick={() => (isCreatingFolder = true)}
+        class="py-1 px-2 text-xs font-medium rounded bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
+        title="Nova Pasta"
+      >
+        📁+
+      </button>
+    </div>
+
+    <!-- Inline Create Note Form -->
+    {#if isCreatingNote}
+      <form
+        onsubmit={(e) => { e.preventDefault(); submitNewNote(); }}
+        class="flex flex-col gap-1.5 p-2 bg-[var(--bg-card)] border border-[var(--accent)] rounded-md"
+      >
+        <input
+          type="text"
+          bind:value={newNoteName}
+          placeholder="Nome da nota (ex: Ideias)"
+          class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text-main)] focus:outline-none"
+        />
+        <div class="flex justify-end gap-1">
+          <button
+            type="button"
+            onclick={() => (isCreatingNote = false)}
+            class="px-2 py-0.5 text-[11px] text-[var(--text-dim)] hover:text-[var(--text-main)]"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            class="px-2 py-0.5 text-[11px] bg-[var(--accent)] text-black font-semibold rounded"
+          >
+            Criar
+          </button>
+        </div>
+      </form>
+    {/if}
+
+    <!-- Inline Create Folder Form -->
+    {#if isCreatingFolder}
+      <form
+        onsubmit={(e) => { e.preventDefault(); submitNewFolder(); }}
+        class="flex flex-col gap-1.5 p-2 bg-[var(--bg-card)] border border-[var(--accent)] rounded-md"
+      >
+        <input
+          type="text"
+          bind:value={newFolderName}
+          placeholder="Nome da pasta"
+          class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text-main)] focus:outline-none"
+        />
+        <div class="flex justify-end gap-1">
+          <button
+            type="button"
+            onclick={() => (isCreatingFolder = false)}
+            class="px-2 py-0.5 text-[11px] text-[var(--text-dim)] hover:text-[var(--text-main)]"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            class="px-2 py-0.5 text-[11px] bg-[var(--accent)] text-black font-semibold rounded"
+          >
+            Criar Pasta
+          </button>
+        </div>
+      </form>
+    {/if}
+  </div>
+
+  <!-- Note List -->
+  <div class="flex-1 overflow-y-auto px-2 py-2 flex flex-col gap-0.5">
+    {#if filteredItems.length === 0}
+      <div class="text-center py-8 text-xs text-[var(--text-dim)]">
+        {searchQuery ? 'Nenhuma nota encontrada' : 'Nenhuma nota neste vault'}
+      </div>
+    {:else}
+      {#each filteredItems as item}
+        <div
+          role="button"
+          tabindex="0"
+          onclick={() => onSelectNote(item.path)}
+          onkeydown={(e) => { if (e.key === 'Enter') onSelectNote(item.path); }}
+          class="group w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs text-left cursor-pointer transition {selectedPath === item.path ? 'bg-[var(--bg-active)] text-[var(--accent-light)] font-medium' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)]'}"
+        >
+          <div class="flex items-center gap-2 overflow-hidden flex-1">
+            <span class="text-[var(--text-dim)] text-[11px]">📄</span>
+            <span class="truncate">{item.title}</span>
+          </div>
+
+          <!-- Hover actions -->
+          <div class="hidden group-hover:flex items-center gap-1 opacity-80">
+            <button
+              onclick={(e) => handleRename(item.path, e)}
+              class="w-4 h-4 flex items-center justify-center text-[10px] text-[var(--text-dim)] hover:text-[var(--text-main)]"
+              title="Renomear"
+            >
+              ✎
+            </button>
+            <button
+              onclick={(e) => handleDelete(item.path, e)}
+              class="w-4 h-4 flex items-center justify-center text-[10px] text-[var(--text-dim)] hover:text-red-400"
+              title="Excluir"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      {/each}
+    {/if}
+  </div>
+
+  <!-- P2P Status Footer -->
+  <div class="p-3 border-t border-[var(--border)] bg-[var(--bg-card)] flex items-center justify-between">
+    <button
+      onclick={onOpenPairModal}
+      class="flex items-center gap-2 text-xs text-left hover:opacity-90 transition group"
+    >
+      <span
+        class="inline-block w-2.5 h-2.5 rounded-full {syncStatus === 'syncing' ? 'bg-[var(--accent)] animate-pulse' : peerCount > 0 ? 'bg-[var(--success)]' : 'bg-gray-500'}"
+      ></span>
+      <div class="flex flex-col">
+        <span class="font-medium text-[var(--text-main)] leading-none text-[11px]">
+          {peerCount > 0 ? `${peerCount} pareado${peerCount > 1 ? 's' : ''}` : 'P2P Offline'}
+        </span>
+        <span class="text-[10px] text-[var(--text-dim)] group-hover:text-[var(--accent-light)]">
+          Gerenciar Conexões
+        </span>
+      </div>
+    </button>
+
+    <button
+      onclick={() => networkSyncNow().catch(console.error)}
+      class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--accent-light)] transition"
+      title="Sincronizar agora com peers"
+    >
+      ↻
+    </button>
+  </div>
+</aside>
