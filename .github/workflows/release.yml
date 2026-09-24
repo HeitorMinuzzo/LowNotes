@@ -106,7 +106,8 @@ jobs:
             Copy-Item "README.md" $portableDir
             Copy-Item "LICENSE" $portableDir
             $portableZip = "dist/LowNotes-$env:VERSION-windows-x64-portable.zip"
-            Compress-Archive -Path $portableDir -DestinationPath $portableZip -Force
+            Compress-Archive -Path "$portableDir/*" -DestinationPath $portableZip -Force
+            Remove-Item -Recurse -Force $portableDir
             $zipHash = (Get-FileHash $portableZip -Algorithm SHA256).Hash.ToLowerInvariant()
             "$zipHash  LowNotes-$env:VERSION-windows-x64-portable.zip" | Set-Content "$portableZip.sha256" -Encoding ascii -NoNewline
           }
@@ -115,7 +116,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lownotes-windows
-          path: dist/*
+          path: dist/*.*
           if-no-files-found: error
 
   linux:
@@ -182,7 +183,8 @@ jobs:
             cp "src-tauri/target/release/lownotes" "$portable_dir/LowNotes"
             chmod +x "$portable_dir/LowNotes"
             cp README.md LICENSE "$portable_dir/"
-            tar -czf "dist/LowNotes-${VERSION}-linux-x64-portable.tar.gz" -C dist "LowNotes-${VERSION}-linux-x64-portable"
+            tar -czf "dist/LowNotes-${VERSION}-linux-x64-portable.tar.gz" -C "$portable_dir" .
+            rm -rf "$portable_dir"
             (cd dist && sha256sum "LowNotes-${VERSION}-linux-x64-portable.tar.gz" > "LowNotes-${VERSION}-linux-x64-portable.tar.gz.sha256")
           fi
 
@@ -190,7 +192,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: lownotes-linux
-          path: dist/*
+          path: dist/*.*
           if-no-files-found: error
 
   publish:
@@ -215,12 +217,18 @@ jobs:
           VERSION: ${{ needs.verify.outputs.version }}
         run: |
           set -euo pipefail
+          mapfile -t files < <(find release-assets -maxdepth 1 -type f)
+          if [[ ${#files[@]} -eq 0 ]]; then
+            echo "Nenhum arquivo encontrado em release-assets." >&2
+            exit 1
+          fi
+
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" release-assets/* \
+            gh release upload "$RELEASE_TAG" "${files[@]}" \
               --repo "$GITHUB_REPOSITORY" \
               --clobber
           else
-            gh release create "$RELEASE_TAG" release-assets/* \
+            gh release create "$RELEASE_TAG" "${files[@]}" \
               --repo "$GITHUB_REPOSITORY" \
               --verify-tag \
               --generate-notes \
