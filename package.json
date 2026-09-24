@@ -21,6 +21,7 @@
     "codemirror": "^6.0.2",
     "lucide-svelte": "^1.0.1",
     "marked": "^18.0.14",
+    "mermaid": "^12.0.0",
     "y-codemirror.next": "^0.3.6",
     "yjs": "^13.6.33"
   },

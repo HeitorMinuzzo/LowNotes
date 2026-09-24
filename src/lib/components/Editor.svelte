@@ -6,8 +6,38 @@
   import * as Y from 'yjs';
   import { yCollab } from 'y-codemirror.next';
   import { marked } from 'marked';
+  import mermaid from 'mermaid';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { crdtApplyClientUpdate, saveNote } from '../api';
+
+  mermaid.initialize({
+    startOnLoad: false,
+    theme: 'dark',
+    themeVariables: {
+      darkMode: true,
+      background: '#151b26',
+      primaryColor: '#d97706',
+      primaryTextColor: '#f1f5f9',
+      primaryBorderColor: '#232d3d',
+      lineColor: '#8e9bb0',
+      secondaryColor: '#1c2433',
+      tertiaryColor: '#0f141c',
+    },
+    fontFamily: 'inherit',
+    securityLevel: 'loose',
+  });
+
+  marked.use({
+    renderer: {
+      code(token: { text: string; lang?: string }) {
+        if (token.lang === 'mermaid') {
+          const encoded = encodeURIComponent(token.text);
+          return `<div class="mermaid-block my-4 p-4 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-x-auto flex flex-col items-center justify-center transition-all" data-mermaid="${encoded}"><div class="mermaid-svg flex justify-center w-full"></div></div>`;
+        }
+        return false;
+      },
+    },
+  });
 
   let {
     notePath,
@@ -22,6 +52,7 @@
   }>();
 
   let editorContainer: HTMLDivElement | null = $state(null);
+  let previewContainer: HTMLDivElement | null = $state(null);
   let viewMode = $state<'edit' | 'split' | 'preview'>('edit');
   let saveStatus = $state<'saved' | 'saving'>('saved');
   let currentContent = $state('');
@@ -34,6 +65,30 @@
   let yDoc: Y.Doc | null = null;
   let unlistenCrdt: UnlistenFn | null = null;
   let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let mermaidCounter = 0;
+  let mermaidDebounce: ReturnType<typeof setTimeout> | null = null;
+
+  async function renderMermaidBlocks() {
+    if (!previewContainer) return;
+    const blocks = previewContainer.querySelectorAll<HTMLDivElement>('.mermaid-block');
+    if (blocks.length === 0) return;
+
+    for (const block of blocks) {
+      const raw = block.getAttribute('data-mermaid');
+      if (!raw) continue;
+      const code = decodeURIComponent(raw).trim();
+      const svgTarget = block.querySelector<HTMLDivElement>('.mermaid-svg');
+      if (!svgTarget) continue;
+
+      const id = `mermaid-${Date.now()}-${mermaidCounter++}`;
+      try {
+        const { svg } = await mermaid.render(id, code);
+        svgTarget.innerHTML = svg;
+      } catch {
+        svgTarget.innerHTML = `<pre class="text-xs text-amber-400/90 font-mono text-left w-full p-2 bg-[var(--bg-main)] rounded border border-amber-900/40 overflow-x-auto whitespace-pre-wrap">${code}</pre>`;
+      }
+    }
+  }
 
   function base64ToUint8Array(base64: string): Uint8Array {
     let clean = base64.replace(/-/g, '+').replace(/_/g, '/');
@@ -161,12 +216,21 @@
     if (yDoc) yDoc.destroy();
     if (unlistenCrdt) unlistenCrdt();
     if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
+    if (mermaidDebounce) clearTimeout(mermaidDebounce);
   });
-
   $effect(() => {
     // Re-initialize if notePath changes
     if (notePath) {
       initEditor();
+    }
+  });
+
+  $effect(() => {
+    if ((viewMode === 'split' || viewMode === 'preview') && previewContainer && currentContent) {
+      if (mermaidDebounce) clearTimeout(mermaidDebounce);
+      mermaidDebounce = setTimeout(() => {
+        renderMermaidBlocks();
+      }, 60);
     }
   });
 </script>
@@ -286,7 +350,10 @@
 
     <!-- Rendered Markdown Container -->
     {#if viewMode === 'split' || viewMode === 'preview'}
-      <div class="h-full overflow-y-auto px-8 py-6 select-text {viewMode === 'preview' ? 'w-full max-w-4xl mx-auto' : 'w-1/2'}">
+      <div
+        bind:this={previewContainer}
+        class="h-full overflow-y-auto px-8 py-6 select-text {viewMode === 'preview' ? 'w-full max-w-4xl mx-auto' : 'w-1/2'}"
+      >
         <article class="prose prose-invert max-w-none text-[var(--text-main)]">
           <!-- Rendered HTML from marked -->
           {@html marked.parse(currentContent)}
