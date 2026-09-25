@@ -52,7 +52,6 @@
   let baseUrlInput = $state('');
   let selectedModelInput = $state('');
   let availableModels = $state<string[]>([]);
-  let modelSearchFilter = $state('');
   let isFetchingModels = $state(false);
   let showApiKey = $state(false);
 
@@ -60,11 +59,16 @@
   let isAddingCustom = $state(false);
   let customName = $state('');
   let customUrl = $state('');
+  // Unified Combobox State
+  let isModelDropdownOpen = $state(false);
+  let modelSearchQuery = $state('');
 
   let filteredModels = $derived(
-    availableModels.filter((m) =>
-      m.toLowerCase().includes(modelSearchFilter.toLowerCase())
-    )
+    availableModels.filter((m: string) => {
+      const q = modelSearchQuery.trim().toLowerCase();
+      if (!q) return true;
+      return m.toLowerCase().includes(q);
+    })
   );
 
   function syncSettingsInputs(prov?: AiProviderConfig) {
@@ -74,7 +78,8 @@
       baseUrlInput = target.base_url;
       selectedModelInput = target.selected_model;
       availableModels = [];
-      modelSearchFilter = '';
+      isModelDropdownOpen = false;
+      modelSearchQuery = '';
     }
   }
 
@@ -115,6 +120,8 @@
     try {
       const models = await fetchAiModels(selectedProviderId, baseUrlInput, apiKeyInput);
       availableModels = models;
+      isModelDropdownOpen = true;
+      modelSearchQuery = '';
       if (models.length > 0 && !selectedModelInput) {
         selectedModelInput = models[0];
       }
@@ -381,10 +388,12 @@
         </div>
 
         <!-- Model Selection & Fetching -->
-        <div class="flex flex-col gap-1.5">
+        <!-- Model Selection Combobox -->
+        <div class="flex flex-col gap-1.5 relative">
           <div class="flex items-center justify-between">
             <label for="ai-model-input" class="text-xs text-[var(--text-dim)] font-medium">Modelo Selecionado:</label>
             <button
+              type="button"
               onclick={handleFetchModels}
               disabled={isFetchingModels}
               class="text-[11px] text-[var(--accent-light)] hover:underline flex items-center gap-1 disabled:opacity-50"
@@ -393,60 +402,118 @@
               <span>{isFetchingModels ? 'Buscando...' : 'Listar Modelos'}</span>
             </button>
           </div>
-          <input
-            id="ai-model-input"
-            type="text"
-            bind:value={selectedModelInput}
-            list="ai-models-datalist"
-            placeholder="ex: qwen2.5:1.5b ou gpt-4o-mini"
-            class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-xs font-mono text-[var(--text-main)] focus:outline-none focus:border-[var(--accent)]"
-          />
 
-          <!-- Native Autocomplete Datalist -->
-          <datalist id="ai-models-datalist">
-            {#each availableModels as mod}
-              <option value={mod}>{mod}</option>
-            {/each}
-          </datalist>
+          <!-- Main Unified Input / Combobox Trigger -->
+          <div class="relative flex items-center">
+            <input
+              id="ai-model-input"
+              type="text"
+              bind:value={selectedModelInput}
+              onfocus={() => { if (availableModels.length > 0) isModelDropdownOpen = true; }}
+              placeholder="ex: qwen2.5:1.5b ou gpt-4o-mini"
+              class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-md pl-2.5 pr-14 py-1.5 text-xs font-mono text-[var(--text-main)] focus:outline-none focus:border-[var(--accent)]"
+            />
 
-          {#if availableModels.length > 0}
-            <div class="mt-1 flex flex-col gap-1.5 p-2.5 bg-[var(--bg-main)] border border-[var(--border)] rounded-lg">
-              <div class="flex items-center justify-between text-[11px]">
-                <span class="text-emerald-400 font-medium">✓ {availableModels.length} modelos disponíveis</span>
-                <span class="text-[10px] text-[var(--text-dim)]">Selecione ou digite acima</span>
-              </div>
+            <div class="absolute right-1.5 flex items-center gap-1">
+              {#if selectedModelInput}
+                <button
+                  type="button"
+                  onclick={() => { selectedModelInput = ''; modelSearchQuery = ''; }}
+                  class="w-4 h-4 flex items-center justify-center text-[10px] text-[var(--text-dim)] hover:text-[var(--text-main)]"
+                  title="Limpar"
+                >
+                  ✕
+                </button>
+              {/if}
 
-              <!-- Search Filter Input -->
-              <div class="relative">
+              {#if availableModels.length > 0}
+                <button
+                  type="button"
+                  onclick={() => (isModelDropdownOpen = !isModelDropdownOpen)}
+                  class="w-5 h-5 flex items-center justify-center rounded text-[10px] text-[var(--text-dim)] hover:text-[var(--accent-light)] hover:bg-[var(--bg-hover)] transition"
+                  title="Abrir lista de modelos"
+                >
+                  {isModelDropdownOpen ? '▲' : '▼'}
+                </button>
+              {/if}
+            </div>
+          </div>
+
+          <!-- Floating Dropdown Popover for Model Search & Selection -->
+          {#if isModelDropdownOpen && availableModels.length > 0}
+            <div class="mt-1 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg shadow-2xl overflow-hidden flex flex-col z-50 animate-fadeIn">
+              <!-- Internal Fast Filter Search Bar -->
+              <div class="p-2 border-b border-[var(--border)] bg-[var(--bg-main)] flex items-center gap-2">
+                <span class="text-xs text-[var(--text-dim)]">🔍</span>
                 <input
                   type="text"
-                  bind:value={modelSearchFilter}
-                  placeholder="Filtrar modelos (ex: llama, claude, gpt, free)..."
-                  class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text-main)] placeholder-[var(--text-dim)] focus:outline-none focus:border-[var(--accent)]"
+                  bind:value={modelSearchQuery}
+                  placeholder="Pesquisar nos {availableModels.length} modelos..."
+                  class="flex-1 bg-transparent text-xs text-[var(--text-main)] placeholder-[var(--text-dim)] focus:outline-none"
                 />
-                {#if modelSearchFilter}
+                {#if modelSearchQuery}
                   <button
-                    onclick={() => (modelSearchFilter = '')}
-                    class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-[var(--text-dim)] hover:text-[var(--text-main)]"
+                    type="button"
+                    onclick={() => (modelSearchQuery = '')}
+                    class="text-[11px] text-[var(--text-dim)] hover:text-[var(--text-main)]"
                   >
                     ✕
                   </button>
                 {/if}
+                <button
+                  type="button"
+                  onclick={() => (isModelDropdownOpen = false)}
+                  class="text-[11px] text-[var(--text-dim)] hover:text-[var(--text-main)] ml-1"
+                  title="Fechar lista"
+                >
+                  Pronto
+                </button>
               </div>
 
-              <!-- Select Dropdown with Filtered Models -->
-              <select
-                value={selectedModelInput}
-                onchange={(e) => (selectedModelInput = e.currentTarget.value)}
-                class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-xs font-mono text-[var(--text-main)] focus:outline-none focus:border-[var(--accent)] cursor-pointer"
-              >
-                <option value="" disabled>-- Selecione um modelo da lista ({filteredModels.length}) --</option>
-                {#each filteredModels as mod}
-                  <option value={mod} selected={selectedModelInput === mod}>
-                    {mod}
-                  </option>
-                {/each}
-              </select>
+              <!-- Models List -->
+              <div class="max-h-52 overflow-y-auto p-1 flex flex-col gap-0.5">
+                {#if modelSearchQuery.trim() && !availableModels.includes(modelSearchQuery.trim())}
+                  <button
+                    type="button"
+                    onclick={() => {
+                      selectedModelInput = modelSearchQuery.trim();
+                      isModelDropdownOpen = false;
+                    }}
+                    class="w-full text-left px-2.5 py-1.5 rounded-md text-xs font-mono text-[var(--accent-light)] hover:bg-[var(--bg-hover)] flex items-center gap-1.5 transition border-b border-[var(--border)]"
+                  >
+                    <span>➕</span>
+                    <span class="truncate">Usar "{modelSearchQuery.trim()}" (Personalizado)</span>
+                  </button>
+                {/if}
+
+                {#if filteredModels.length === 0}
+                  <div class="p-4 text-center text-xs text-[var(--text-dim)]">
+                    Nenhum modelo encontrado para "{modelSearchQuery}"
+                  </div>
+                {:else}
+                  {#each filteredModels as mod}
+                    <button
+                      type="button"
+                      onclick={() => {
+                        selectedModelInput = mod;
+                        isModelDropdownOpen = false;
+                      }}
+                      class="w-full text-left px-2.5 py-1.5 rounded-md text-xs font-mono transition flex items-center justify-between {selectedModelInput === mod ? 'bg-[var(--bg-active)] text-[var(--accent-light)] font-semibold' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)]'}"
+                    >
+                      <span class="truncate">{mod}</span>
+                      {#if selectedModelInput === mod}
+                        <span class="text-xs text-[var(--accent-light)]">✓</span>
+                      {/if}
+                    </button>
+                  {/each}
+                {/if}
+              </div>
+
+              <!-- Footer with count -->
+              <div class="px-3 py-1.5 border-t border-[var(--border)] bg-[var(--bg-main)] text-[10px] text-[var(--text-dim)] flex items-center justify-between">
+                <span>{filteredModels.length} de {availableModels.length} modelos</span>
+                <span class="text-emerald-400">Disponíveis</span>
+              </div>
             </div>
           {/if}
         </div>

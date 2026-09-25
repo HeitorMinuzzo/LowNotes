@@ -30,7 +30,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - name: Baixar código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ env.RELEASE_TAG }}
 
@@ -58,7 +58,7 @@ jobs:
       VERSION: ${{ needs.verify.outputs.version }}
     steps:
       - name: Baixar código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ env.RELEASE_TAG }}
 
@@ -113,7 +113,7 @@ jobs:
           }
 
       - name: Guardar artefatos
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lownotes-windows
           path: dist/*.*
@@ -127,7 +127,7 @@ jobs:
       VERSION: ${{ needs.verify.outputs.version }}
     steps:
       - name: Baixar código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ env.RELEASE_TAG }}
 
@@ -189,7 +189,7 @@ jobs:
           fi
 
       - name: Guardar artefatos
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lownotes-linux
           path: dist/*.*
@@ -201,7 +201,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Baixar todos os artefatos
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: release-assets
           merge-multiple: true
