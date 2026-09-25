@@ -397,26 +397,56 @@
             id="ai-model-input"
             type="text"
             bind:value={selectedModelInput}
+            list="ai-models-datalist"
             placeholder="ex: qwen2.5:1.5b ou gpt-4o-mini"
-            class="bg-[var(--bg-main)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-xs font-mono text-[var(--text-main)] focus:outline-none focus:border-[var(--accent)]"
+            class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-xs font-mono text-[var(--text-main)] focus:outline-none focus:border-[var(--accent)]"
           />
 
+          <!-- Native Autocomplete Datalist -->
+          <datalist id="ai-models-datalist">
+            {#each availableModels as mod}
+              <option value={mod}>{mod}</option>
+            {/each}
+          </datalist>
+
           {#if availableModels.length > 0}
-            <div class="mt-1 flex flex-col gap-1 p-2 bg-[var(--bg-main)] border border-[var(--border)] rounded-md max-h-36 overflow-y-auto">
-              <input
-                type="text"
-                bind:value={modelSearchFilter}
-                placeholder="Filtrar modelos disponíveis..."
-                class="bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1 text-[11px] text-[var(--text-main)] mb-1 focus:outline-none"
-              />
-              {#each filteredModels as mod}
-                <button
-                  onclick={() => (selectedModelInput = mod)}
-                  class="text-left px-2 py-1 text-[11px] font-mono rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] truncate {selectedModelInput === mod ? 'bg-[var(--bg-active)] text-[var(--accent-light)]' : ''}"
-                >
-                  {mod}
-                </button>
-              {/each}
+            <div class="mt-1 flex flex-col gap-1.5 p-2.5 bg-[var(--bg-main)] border border-[var(--border)] rounded-lg">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="text-emerald-400 font-medium">✓ {availableModels.length} modelos disponíveis</span>
+                <span class="text-[10px] text-[var(--text-dim)]">Selecione ou digite acima</span>
+              </div>
+
+              <!-- Search Filter Input -->
+              <div class="relative">
+                <input
+                  type="text"
+                  bind:value={modelSearchFilter}
+                  placeholder="Filtrar modelos (ex: llama, claude, gpt, free)..."
+                  class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text-main)] placeholder-[var(--text-dim)] focus:outline-none focus:border-[var(--accent)]"
+                />
+                {#if modelSearchFilter}
+                  <button
+                    onclick={() => (modelSearchFilter = '')}
+                    class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-[var(--text-dim)] hover:text-[var(--text-main)]"
+                  >
+                    ✕
+                  </button>
+                {/if}
+              </div>
+
+              <!-- Select Dropdown with Filtered Models -->
+              <select
+                value={selectedModelInput}
+                onchange={(e) => (selectedModelInput = e.currentTarget.value)}
+                class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1.5 text-xs font-mono text-[var(--text-main)] focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+              >
+                <option value="" disabled>-- Selecione um modelo da lista ({filteredModels.length}) --</option>
+                {#each filteredModels as mod}
+                  <option value={mod} selected={selectedModelInput === mod}>
+                    {mod}
+                  </option>
+                {/each}
+              </select>
             </div>
           {/if}
         </div>
