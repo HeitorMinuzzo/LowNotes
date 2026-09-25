@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import { marked } from 'marked';
   import type {
     AiProviderConfig,
@@ -43,7 +43,7 @@
   let messagesContainer: HTMLDivElement | null = $state(null);
 
   // Settings state
-  let selectedProviderId = $state('ollama');
+  let selectedProviderId = $state(aiSettings.active_provider_id || 'ollama');
   let currentProvider = $derived(
     aiSettings.providers.find((p: AiProviderConfig) => p.id === selectedProviderId) || aiSettings.providers[0]
   );
@@ -67,32 +67,45 @@
     )
   );
 
-  function syncSettingsInputs() {
-    if (currentProvider) {
-      apiKeyInput = currentProvider.api_key;
-      baseUrlInput = currentProvider.base_url;
-      selectedModelInput = currentProvider.selected_model;
-      availableModels = [];
-      modelSearchFilter = '';
-    }
-  }
-
-  $effect(() => {
-    if (aiSettings && aiSettings.active_provider_id) {
-      selectedProviderId = aiSettings.active_provider_id;
-      syncSettingsInputs();
-    }
-  });
-
-  function handleProviderChange(id: string) {
-    selectedProviderId = id;
-    const target = aiSettings.providers.find((p: AiProviderConfig) => p.id === id);
+  function syncSettingsInputs(prov?: AiProviderConfig) {
+    const target = prov || currentProvider;
     if (target) {
       apiKeyInput = target.api_key;
       baseUrlInput = target.base_url;
       selectedModelInput = target.selected_model;
       availableModels = [];
       modelSearchFilter = '';
+    }
+  }
+
+  let lastActiveId = '';
+  $effect(() => {
+    const active = aiSettings?.active_provider_id;
+    if (active && active !== lastActiveId) {
+      lastActiveId = active;
+      selectedProviderId = active;
+      untrack(() => {
+        const prov = aiSettings.providers.find((p: AiProviderConfig) => p.id === active);
+        syncSettingsInputs(prov);
+      });
+    }
+  });
+
+  function handleProviderChange(id: string) {
+    if (id === selectedProviderId) return;
+
+    // Save in-flight edits to the previous provider in memory
+    const prevIndex = aiSettings.providers.findIndex((p: AiProviderConfig) => p.id === selectedProviderId);
+    if (prevIndex !== -1) {
+      aiSettings.providers[prevIndex].api_key = apiKeyInput.trim();
+      aiSettings.providers[prevIndex].base_url = baseUrlInput.trim();
+      aiSettings.providers[prevIndex].selected_model = selectedModelInput.trim();
+    }
+
+    selectedProviderId = id;
+    const target = aiSettings.providers.find((p: AiProviderConfig) => p.id === id);
+    if (target) {
+      syncSettingsInputs(target);
     }
   }
 
@@ -120,6 +133,7 @@
       aiSettings.providers[pIndex].selected_model = selectedModelInput.trim();
     }
     aiSettings.active_provider_id = selectedProviderId;
+    lastActiveId = selectedProviderId;
 
     try {
       await saveAiSettings(aiSettings);
@@ -239,15 +253,31 @@
     class="w-96 h-full flex flex-col border-l border-[var(--border)] bg-[var(--bg-sidebar)] z-30 select-none shadow-2xl relative transition-all"
   >
     <!-- Top Header -->
-    <header class="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-card)]">
+    <header class="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-card)]">
       <div class="flex items-center gap-2">
         <span class="text-[var(--accent-light)] font-bold text-sm">✦</span>
-        <h3 class="text-xs font-bold text-[var(--text-main)]">Assistente LowNotes</h3>
-        <span class="text-[10px] px-1.5 py-0.5 rounded bg-[var(--bg-active)] text-[var(--text-muted)] font-mono">
-          {currentProvider?.name || 'IA'}
-        </span>
-      </div>
+        <h3 class="text-xs font-bold text-[var(--text-main)]">Assistente</h3>
 
+        <!-- Quick Provider Switcher in Header -->
+        <select
+          value={aiSettings.active_provider_id}
+          onchange={async (e) => {
+            const newId = e.currentTarget.value;
+            handleProviderChange(newId);
+            aiSettings.active_provider_id = newId;
+            lastActiveId = newId;
+            await saveAiSettings(aiSettings);
+          }}
+          class="bg-[var(--bg-main)] border border-[var(--border)] rounded px-2 py-0.5 text-[11px] font-medium text-[var(--accent-light)] focus:outline-none focus:border-[var(--accent)] cursor-pointer hover:border-[var(--accent)] transition"
+          title="Mudar provedor de IA rapidamente"
+        >
+          {#each aiSettings.providers as prov}
+            <option value={prov.id} selected={aiSettings.active_provider_id === prov.id}>
+              {prov.name}
+            </option>
+          {/each}
+        </select>
+      </div>
       <div class="flex items-center gap-1.5">
         <button
           onclick={() => (isSettingsOpen = !isSettingsOpen)}
@@ -301,16 +331,19 @@
         </div>
 
         <!-- Provider Selection -->
+        <!-- Provider Selection in Settings Drawer -->
         <div class="flex flex-col gap-1.5">
           <label for="ai-provider-select" class="text-xs text-[var(--text-dim)] font-medium">Provedor:</label>
           <select
             id="ai-provider-select"
             value={selectedProviderId}
             onchange={(e) => handleProviderChange(e.currentTarget.value)}
-            class="bg-[var(--bg-main)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent)]"
+            class="bg-[var(--bg-main)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent)] cursor-pointer"
           >
             {#each aiSettings.providers as prov}
-              <option value={prov.id}>{prov.name}</option>
+              <option value={prov.id} selected={selectedProviderId === prov.id}>
+                {prov.name}
+              </option>
             {/each}
           </select>
         </div>
