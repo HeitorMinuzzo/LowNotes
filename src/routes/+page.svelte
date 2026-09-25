@@ -3,6 +3,8 @@
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import type {
     AppSettings,
+    AppTheme,
+    ViewMode,
     VaultConfig,
     VaultItem,
     PeerConfig,
@@ -14,6 +16,8 @@
     readNote,
     pickVaultDirectory,
     selectVault,
+    saveTheme,
+    saveViewMode,
   } from '$lib/api';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import Editor from '$lib/components/Editor.svelte';
@@ -22,6 +26,8 @@
   import AiChatSidebar from '$lib/components/AiChatSidebar.svelte';
   import WelcomeModal from '$lib/components/WelcomeModal.svelte';
   let settings = $state<AppSettings | null>(null);
+  let theme = $state<AppTheme>('dark');
+  let viewMode = $state<ViewMode>('split');
   let activeVault = $state<VaultConfig | null>(null);
   let vaults = $state<VaultConfig[]>([]);
   let items = $state<VaultItem[]>([]);
@@ -44,6 +50,10 @@
     try {
       const data = await getAppState();
       settings = data.settings;
+      theme = data.settings.theme === 'light' ? 'light' : 'dark';
+      viewMode = ['edit', 'split', 'preview'].includes(data.settings.view_mode)
+        ? data.settings.view_mode
+        : 'split';
       activeVault = data.active_vault;
       vaults = data.settings.vaults;
       items = data.items;
@@ -104,6 +114,32 @@
       }
     }
   }
+
+  async function handleThemeChange() {
+    const previous = theme;
+    theme = theme === 'dark' ? 'light' : 'dark';
+    try {
+      await saveTheme(theme);
+    } catch (error) {
+      theme = previous;
+      console.error('Falha ao salvar tema:', error);
+    }
+  }
+
+  async function handleViewModeChange(next: ViewMode) {
+    const previous = viewMode;
+    viewMode = next;
+    try {
+      await saveViewMode(next);
+    } catch (error) {
+      viewMode = previous;
+      console.error('Falha ao salvar modo de visualização:', error);
+    }
+  }
+
+  $effect(() => {
+    document.documentElement.dataset.theme = theme;
+  });
 
   onMount(async () => {
     await loadInitialData();
@@ -186,6 +222,8 @@
       selectedPath={selectedNotePath}
       {syncStatus}
       peerCount={activeVault.peers.length}
+      {theme}
+      onToggleTheme={handleThemeChange}
       onSelectNote={(path) => openNote(path)}
       onVaultChange={(v) => {
         activeVault = v;
@@ -203,6 +241,9 @@
           initialContent={currentNoteContent}
           crdtUpdateBase64={currentCrdtBase64}
           {targetLine}
+          {theme}
+          {viewMode}
+          onViewModeChange={handleViewModeChange}
           {isAiChatOpen}
           onToggleAiChat={() => (isAiChatOpen = !isAiChatOpen)}
         />

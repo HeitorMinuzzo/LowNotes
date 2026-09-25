@@ -68,6 +68,8 @@ pub fn run() {
             commands::network_answer_pair,
             commands::network_remove_peer,
             commands::save_ai_settings,
+            commands::save_theme,
+            commands::save_view_mode,
             commands::fetch_ai_models,
             commands::search_vault_rag,
             commands::ai_chat_query,

@@ -625,7 +625,7 @@
               class="max-w-[92%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed {msg.role === 'user' ? 'bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--text-main)]' : 'bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-main)] shadow-sm'}"
             >
               {#if msg.role === 'assistant'}
-                <div class="prose prose-invert max-w-none text-xs leading-relaxed">
+                <div class="prose max-w-none text-xs leading-relaxed">
                   {@html marked.parse(msg.content)}
                 </div>
 

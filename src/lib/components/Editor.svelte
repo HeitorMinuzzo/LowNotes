@@ -2,48 +2,23 @@
   import { onMount, onDestroy } from 'svelte';
   import { EditorView, basicSetup } from 'codemirror';
   import { markdown } from '@codemirror/lang-markdown';
-  import { EditorState } from '@codemirror/state';
+  import { Compartment, EditorState } from '@codemirror/state';
   import * as Y from 'yjs';
   import { yCollab } from 'y-codemirror.next';
-  import { marked } from 'marked';
   import mermaid from 'mermaid';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { crdtApplyClientUpdate, saveNote } from '../api';
-
-  mermaid.initialize({
-    startOnLoad: false,
-    theme: 'dark',
-    themeVariables: {
-      darkMode: true,
-      background: '#151b26',
-      primaryColor: '#d97706',
-      primaryTextColor: '#f1f5f9',
-      primaryBorderColor: '#232d3d',
-      lineColor: '#8e9bb0',
-      secondaryColor: '#1c2433',
-      tertiaryColor: '#0f141c',
-    },
-    fontFamily: 'inherit',
-    securityLevel: 'loose',
-  });
-
-  marked.use({
-    renderer: {
-      code(token: { text: string; lang?: string }) {
-        if (token.lang === 'mermaid') {
-          const encoded = encodeURIComponent(token.text);
-          return `<div class="mermaid-block my-4 p-4 bg-[var(--bg-card)] border border-[var(--border)] rounded-xl overflow-x-auto flex flex-col items-center justify-center transition-all" data-mermaid="${encoded}"><div class="mermaid-svg flex justify-center w-full"></div></div>`;
-        }
-        return false;
-      },
-    },
-  });
+  import { renderMarkdown } from '../markdown';
+  import type { AppTheme, ViewMode } from '../types';
 
   let {
     notePath,
     initialContent,
     crdtUpdateBase64,
     targetLine,
+    theme,
+    viewMode,
+    onViewModeChange,
     isAiChatOpen = false,
     onToggleAiChat,
     onContentChange,
@@ -52,6 +27,9 @@
     initialContent: string;
     crdtUpdateBase64?: string;
     targetLine?: number;
+    theme: AppTheme;
+    viewMode: ViewMode;
+    onViewModeChange: (mode: ViewMode) => void;
     isAiChatOpen?: boolean;
     onToggleAiChat?: () => void;
     onContentChange?: (path: string, newContent: string) => void;
@@ -59,7 +37,6 @@
 
   let editorContainer: HTMLDivElement | null = $state(null);
   let previewContainer: HTMLDivElement | null = $state(null);
-  let viewMode = $state<'edit' | 'split' | 'preview'>('edit');
   let saveStatus = $state<'saved' | 'saving'>('saved');
   let currentContent = $state('');
   let wordCount = $derived(
@@ -73,11 +50,38 @@
   let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   let mermaidCounter = 0;
   let mermaidDebounce: ReturnType<typeof setTimeout> | null = null;
+  const editorTheme = new Compartment();
 
-  async function renderMermaidBlocks() {
+  function codeMirrorTheme() {
+    return EditorView.theme({
+      '&': { height: '100%', outline: 'none' },
+      '.cm-scroller': { overflow: 'auto' },
+    }, { dark: theme === 'dark' });
+  }
+
+  async function renderMermaidBlocks(activeTheme: AppTheme) {
     if (!previewContainer) return;
     const blocks = previewContainer.querySelectorAll<HTMLDivElement>('.mermaid-block');
     if (blocks.length === 0) return;
+
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: activeTheme === 'dark' ? 'dark' : 'default',
+      ...(activeTheme === 'dark' ? {
+        themeVariables: {
+          darkMode: true,
+          background: '#151b26',
+          primaryColor: '#d97706',
+          primaryTextColor: '#f1f5f9',
+          primaryBorderColor: '#232d3d',
+          lineColor: '#8e9bb0',
+          secondaryColor: '#1c2433',
+          tertiaryColor: '#0f141c',
+        },
+      } : {}),
+      fontFamily: 'inherit',
+      securityLevel: 'strict',
+    });
 
     for (const block of blocks) {
       const raw = block.getAttribute('data-mermaid');
@@ -177,10 +181,7 @@
         basicSetup,
         markdown(),
         yCollab(yText, null),
-        EditorView.theme({
-          '&': { height: '100%', outline: 'none' },
-          '.cm-scroller': { overflow: 'auto' },
-        }),
+        editorTheme.of(codeMirrorTheme()),
       ],
     });
 
@@ -254,10 +255,17 @@
   });
 
   $effect(() => {
+    if (editorView) {
+      editorView.dispatch({ effects: editorTheme.reconfigure(codeMirrorTheme()) });
+    }
+  });
+
+  $effect(() => {
     if ((viewMode === 'split' || viewMode === 'preview') && previewContainer && currentContent) {
+      const activeTheme = theme;
       if (mermaidDebounce) clearTimeout(mermaidDebounce);
       mermaidDebounce = setTimeout(() => {
-        renderMermaidBlocks();
+        renderMermaidBlocks(activeTheme);
       }, 60);
     }
   });
@@ -347,19 +355,19 @@
 
       <div class="flex items-center bg-[var(--bg-card)] p-0.5 rounded-md border border-[var(--border)]">
         <button
-          onclick={() => (viewMode = 'edit')}
+          onclick={() => onViewModeChange('edit')}
           class="px-2.5 py-1 text-xs rounded transition {viewMode === 'edit' ? 'bg-[var(--bg-active)] text-[var(--accent-light)] font-medium shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
         >
           Editor
         </button>
         <button
-          onclick={() => (viewMode = 'split')}
+          onclick={() => onViewModeChange('split')}
           class="px-2.5 py-1 text-xs rounded transition {viewMode === 'split' ? 'bg-[var(--bg-active)] text-[var(--accent-light)] font-medium shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
         >
           Dividido
         </button>
         <button
-          onclick={() => (viewMode = 'preview')}
+          onclick={() => onViewModeChange('preview')}
           class="px-2.5 py-1 text-xs rounded transition {viewMode === 'preview' ? 'bg-[var(--bg-active)] text-[var(--accent-light)] font-medium shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
         >
           Visualizar
@@ -393,9 +401,8 @@
         bind:this={previewContainer}
         class="h-full overflow-y-auto px-8 py-6 select-text {viewMode === 'preview' ? 'w-full max-w-4xl mx-auto' : 'w-1/2'}"
       >
-        <article class="prose prose-invert max-w-none text-[var(--text-main)]">
-          <!-- Rendered HTML from marked -->
-          {@html marked.parse(currentContent)}
+        <article class="prose max-w-none text-[var(--text-main)]">
+          {@html renderMarkdown(currentContent)}
         </article>
       </div>
     {/if}
@@ -460,6 +467,11 @@
     border: 1px solid var(--border);
     overflow-x: auto;
   }
+  :global(.prose pre code) {
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
   :global(.prose blockquote) {
     border-left: 3px solid var(--accent);
     padding-left: 12px;
@@ -492,5 +504,80 @@
   }
   :global(.prose th) {
     background-color: var(--bg-card);
+  }
+  :global(.prose dl) {
+    margin: 0.8rem 0 1.2rem;
+  }
+  :global(.prose dt) {
+    font-weight: 650;
+    margin-top: 0.8rem;
+  }
+  :global(.prose dd) {
+    margin: 0.2rem 0 0.7rem 1.25rem;
+    color: var(--text-muted);
+  }
+  :global(.prose dd p) {
+    margin: 0.35rem 0;
+  }
+  :global(.prose .footnotes) {
+    margin-top: 2rem;
+    border-top: 1px solid var(--border);
+    padding-top: 0.8rem;
+    color: var(--text-muted);
+    font-size: 0.9em;
+  }
+  :global(.prose .footnotes-sep) {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin-top: 2rem;
+  }
+  :global(.prose .footnote-ref), :global(.prose .footnote-backref) {
+    font-size: 0.85em;
+  }
+  :global(.prose abbr) {
+    text-decoration: underline dotted;
+    cursor: help;
+  }
+  :global(.prose mark) {
+    background: var(--accent-glow);
+    color: var(--text-main);
+    border-radius: 2px;
+  }
+  :global(.prose .warning), :global(.prose .info), :global(.prose .tip), :global(.prose .danger) {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    padding: 0.6rem 1rem;
+    margin: 1rem 0;
+  }
+  :global(.prose .danger) {
+    border-left-color: var(--danger);
+  }
+  :global(.prose .tip) {
+    border-left-color: var(--success);
+  }
+  :global(.prose .mermaid-block) {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow-x: auto;
+    text-align: center;
+  }
+  :global(.prose .mermaid-svg) {
+    display: flex;
+    justify-content: center;
+  }
+  :global(.prose img) {
+    max-width: 100%;
+  }
+  :global(.prose .task-list-item) {
+    list-style-type: none;
+  }
+  :global(.prose .task-list-item input) {
+    margin-right: 0.4rem;
+    accent-color: var(--accent);
   }
 </style>

@@ -2,12 +2,14 @@ import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import type {
   AiSettings,
+  AppTheme,
   ChatMessage,
   ChatResponse,
   InitialStateResponse,
   NoteReadResponse,
   RagChunk,
   VaultItem,
+  ViewMode,
 } from './types';
 
 export async function getAppState(): Promise<InitialStateResponse> {
@@ -84,6 +86,14 @@ export async function pickVaultDirectory(): Promise<string | null> {
 
 export async function saveAiSettings(settings: AiSettings): Promise<void> {
   return await invoke('save_ai_settings', { settings });
+}
+
+export async function saveTheme(theme: AppTheme): Promise<void> {
+  return await invoke('save_theme', { theme });
+}
+
+export async function saveViewMode(viewMode: ViewMode): Promise<void> {
+  return await invoke('save_view_mode', { viewMode });
 }
 
 export async function fetchAiModels(

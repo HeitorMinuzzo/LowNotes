@@ -34,7 +34,7 @@ jobs:
         with:
           ref: ${{ env.RELEASE_TAG }}
 
-      - name: Conferir versão no Cargo.toml
+      - name: Conferir versões do aplicativo
         id: version
         shell: bash
         run: |
@@ -48,7 +48,24 @@ jobs:
             echo "A tag $RELEASE_TAG não corresponde à versão $version do Cargo.toml." >&2
             exit 1
           fi
+          frontend_version="$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')"
+          tauri_version="$(python3 -c 'import json; print(json.load(open("src-tauri/tauri.conf.json"))["version"])')"
+          if [[ "$frontend_version" != "$version" || "$tauri_version" != "$version" ]]; then
+            echo "As versões de package.json, tauri.conf.json e Cargo.toml devem coincidir." >&2
+            exit 1
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Instalar Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Instalar dependências do frontend
+        run: bun install --frozen-lockfile
+
+      - name: Verificar frontend e Markdown
+        run: |
+          bun run check
+          bun test
 
   windows:
     name: Windows x64
@@ -69,7 +86,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Instalar dependências do frontend
-        run: bun install
+        run: bun install --frozen-lockfile
 
       - name: Compilar aplicativo com Tauri
         run: bun run tauri build
@@ -149,7 +166,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Instalar dependências do frontend
-        run: bun install
+        run: bun install --frozen-lockfile
 
       - name: Compilar aplicativo com Tauri
         run: bun run tauri build

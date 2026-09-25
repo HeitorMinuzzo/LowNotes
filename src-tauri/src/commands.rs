@@ -284,6 +284,34 @@ pub fn save_ai_settings(settings: AiSettings, state: State<'_, AppState>) -> Res
 }
 
 #[tauri::command]
+pub fn save_theme(theme: String, state: State<'_, AppState>) -> Result<(), String> {
+    if !matches!(theme.as_str(), "dark" | "light") {
+        return Err("tema inválido".to_string());
+    }
+    let mut settings = state.settings.write();
+    let previous = std::mem::replace(&mut settings.theme, theme);
+    if let Err(error) = settings.save() {
+        settings.theme = previous;
+        return Err(error.to_string());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn save_view_mode(view_mode: String, state: State<'_, AppState>) -> Result<(), String> {
+    if !matches!(view_mode.as_str(), "edit" | "split" | "preview") {
+        return Err("modo de visualização inválido".to_string());
+    }
+    let mut settings = state.settings.write();
+    let previous = std::mem::replace(&mut settings.view_mode, view_mode);
+    if let Err(error) = settings.save() {
+        settings.view_mode = previous;
+        return Err(error.to_string());
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn fetch_ai_models(
     provider_id: Option<String>,
     custom_url: Option<String>,

@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { VaultConfig, VaultItem } from '../types';
+  import type { AppTheme, VaultConfig, VaultItem } from '../types';
+  import { Moon, Sun } from 'lucide-svelte';
   import {
     createNote,
     createFolder,
@@ -17,6 +18,8 @@
     selectedPath = '',
     syncStatus = 'idle',
     peerCount = 0,
+    theme = 'dark',
+    onToggleTheme,
     onSelectNote,
     onVaultChange,
     onOpenPairModal,
@@ -28,6 +31,8 @@
     selectedPath: string;
     syncStatus: 'idle' | 'syncing' | 'synced' | 'error';
     peerCount: number;
+    theme: AppTheme;
+    onToggleTheme: () => void;
     onSelectNote: (path: string) => void;
     onVaultChange: (vault: VaultConfig) => void;
     onOpenPairModal: () => void;
@@ -329,12 +334,23 @@
       </div>
     </button>
 
-    <button
-      onclick={() => networkSyncNow().catch(console.error)}
-      class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--accent-light)] transition"
-      title="Sincronizar agora com peers"
-    >
-      ↻
-    </button>
+    <div class="flex items-center gap-1">
+      <button
+        onclick={onToggleTheme}
+        class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--accent-light)] transition"
+        title={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
+        aria-label={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
+      >
+        {#if theme === 'dark'}<Moon size={15} />{:else}<Sun size={15} />{/if}
+      </button>
+      <button
+        onclick={() => networkSyncNow().catch(console.error)}
+        class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--accent-light)] transition"
+        title="Sincronizar agora com peers"
+        aria-label="Sincronizar agora com peers"
+      >
+        ↻
+      </button>
+    </div>
   </div>
 </aside>

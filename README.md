@@ -40,7 +40,7 @@ graph TD
 - **CRDT / Colaboração:** [Yrs](https://github.com/y-crdt/y-crdt) (Rust) & [Yjs](https://yjs.dev/) (TypeScript)
 - **Frontend:** Svelte 5 (Runes), TypeScript, Tailwind CSS v4
 - **Editor de Texto:** CodeMirror 6 (`@codemirror/lang-markdown`, `y-codemirror.next`)
-- **Renderizador de Markdown & Diagramas:** Marked + [Mermaid 12](https://mermaid.js.org/)
+- **Renderizador de Markdown & Diagramas:** markdown-it com extensões para listas de definição, notas de rodapé, abreviações, contêineres, emoji e listas de tarefas + [Mermaid 12](https://mermaid.js.org/)
 - **Assistente IA & RAG:** RAG local no Rust compatível com APIs OpenAI (Ollama local, OpenAI, OpenRouter, Groq, LM Studio, etc.)
 
 ---
@@ -70,6 +70,8 @@ Gera o executável nativo otimizado:
 ```bash
 bun run tauri build
 ```
+
+O modo **Dividido** é o padrão. O tema e o modo de visualização escolhidos são salvos em `settings.json` no diretório de configuração do LowNotes, junto das demais preferências.
 
 ---
 

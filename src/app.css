@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: dark;
   --bg-main: #0f141c;
   --bg-sidebar: #0a0d14;
   --bg-card: #151b26;
@@ -15,6 +16,28 @@
   --accent-glow: rgba(245, 158, 11, 0.15);
   --success: #10b981;
   --danger: #ef4444;
+  --line-highlight: rgba(255, 255, 255, 0.02);
+  --selection: rgba(245, 158, 11, 0.25);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg-main: #ffffff;
+  --bg-sidebar: #f7f8fa;
+  --bg-card: #f0f2f5;
+  --bg-hover: #e7ebf0;
+  --bg-active: #ffedd1;
+  --border: #d8dee7;
+  --text-main: #1d2938;
+  --text-muted: #4a596c;
+  --text-dim: #68788c;
+  --accent: #bd6808;
+  --accent-light: #995000;
+  --accent-glow: rgba(189, 104, 8, 0.12);
+  --success: #078760;
+  --danger: #cf3442;
+  --line-highlight: rgba(29, 41, 56, 0.045);
+  --selection: rgba(189, 104, 8, 0.2);
 }
 
 * {
@@ -74,7 +97,7 @@ body {
 }
 
 .cm-activeLine {
-  background-color: rgba(255, 255, 255, 0.02) !important;
+  background-color: var(--line-highlight) !important;
 }
 
 .cm-activeLineGutter {
@@ -89,5 +112,5 @@ body {
 }
 
 .cm-selectionBackground, ::selection {
-  background-color: rgba(245, 158, 11, 0.25) !important;
+  background-color: var(--selection) !important;
 }

@@ -38,12 +38,16 @@ export interface AiSettings {
 
 export interface AppSettings {
   device_name: string;
-  theme: string;
+  theme: AppTheme;
+  view_mode: ViewMode;
   active_vault_id: string | null;
   vaults: VaultConfig[];
   ai: AiSettings;
   has_seen_welcome: boolean;
 }
+
+export type AppTheme = 'dark' | 'light';
+export type ViewMode = 'edit' | 'split' | 'preview';
 
 export interface RagChunk {
   note_path: string;

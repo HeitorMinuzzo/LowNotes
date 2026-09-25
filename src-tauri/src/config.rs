@@ -167,7 +167,10 @@ impl Default for AiSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     pub device_name: String,
+    #[serde(default = "default_theme")]
     pub theme: String,
+    #[serde(default = "default_view_mode")]
+    pub view_mode: String,
     pub active_vault_id: Option<String>,
     pub vaults: Vec<VaultConfig>,
     #[serde(default)]
@@ -185,13 +188,22 @@ impl Default for AppSettings {
 
         Self {
             device_name: host,
-            theme: "dark".to_string(),
+            theme: default_theme(),
+            view_mode: default_view_mode(),
             active_vault_id: None,
             vaults: Vec::new(),
             ai: AiSettings::default(),
             has_seen_welcome: false,
         }
     }
+}
+
+fn default_theme() -> String {
+    "dark".to_string()
+}
+
+fn default_view_mode() -> String {
+    "split".to_string()
 }
 
 impl AppSettings {
@@ -258,4 +270,19 @@ pub fn decode_pair_code(code: &str) -> anyhow::Result<PairInvite> {
     let json = URL_SAFE_NO_PAD.decode(body)?;
     let invite = serde_json::from_slice(&json)?;
     Ok(invite)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AppSettings;
+
+    #[test]
+    fn existing_settings_without_view_mode_open_split() {
+        let mut saved = serde_json::to_value(AppSettings::default()).unwrap();
+        saved.as_object_mut().unwrap().remove("view_mode");
+
+        let restored: AppSettings = serde_json::from_value(saved).unwrap();
+        assert_eq!(restored.view_mode, "split");
+        assert_eq!(restored.theme, "dark");
+    }
 }
