@@ -96,11 +96,84 @@ impl VaultConfig {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AiProviderConfig {
+    pub id: String,
+    pub name: String,
+    pub base_url: String,
+    #[serde(default)]
+    pub api_key: String,
+    #[serde(default)]
+    pub selected_model: String,
+    #[serde(default)]
+    pub is_custom: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AiSettings {
+    pub active_provider_id: String,
+    pub providers: Vec<AiProviderConfig>,
+}
+
+impl Default for AiSettings {
+    fn default() -> Self {
+        Self {
+            active_provider_id: "ollama".to_string(),
+            providers: vec![
+                AiProviderConfig {
+                    id: "ollama".to_string(),
+                    name: "Ollama (Local)".to_string(),
+                    base_url: "http://localhost:11434/v1".to_string(),
+                    api_key: String::new(),
+                    selected_model: "qwen2.5:1.5b".to_string(),
+                    is_custom: false,
+                },
+                AiProviderConfig {
+                    id: "openai".to_string(),
+                    name: "OpenAI".to_string(),
+                    base_url: "https://api.openai.com/v1".to_string(),
+                    api_key: String::new(),
+                    selected_model: "gpt-4o-mini".to_string(),
+                    is_custom: false,
+                },
+                AiProviderConfig {
+                    id: "openrouter".to_string(),
+                    name: "OpenRouter".to_string(),
+                    base_url: "https://openrouter.ai/api/v1".to_string(),
+                    api_key: String::new(),
+                    selected_model: "meta-llama/llama-3.3-70b-instruct:free".to_string(),
+                    is_custom: false,
+                },
+                AiProviderConfig {
+                    id: "groq".to_string(),
+                    name: "Groq".to_string(),
+                    base_url: "https://api.groq.com/openai/v1".to_string(),
+                    api_key: String::new(),
+                    selected_model: "llama-3.3-70b-versatile".to_string(),
+                    is_custom: false,
+                },
+                AiProviderConfig {
+                    id: "lmstudio".to_string(),
+                    name: "LM Studio (Local)".to_string(),
+                    base_url: "http://localhost:1234/v1".to_string(),
+                    api_key: String::new(),
+                    selected_model: "local-model".to_string(),
+                    is_custom: false,
+                },
+            ],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     pub device_name: String,
     pub theme: String,
     pub active_vault_id: Option<String>,
     pub vaults: Vec<VaultConfig>,
+    #[serde(default)]
+    pub ai: AiSettings,
+    #[serde(default)]
+    pub has_seen_welcome: bool,
 }
 
 impl Default for AppSettings {
@@ -115,6 +188,8 @@ impl Default for AppSettings {
             theme: "dark".to_string(),
             active_vault_id: None,
             vaults: Vec::new(),
+            ai: AiSettings::default(),
+            has_seen_welcome: false,
         }
     }
 }

@@ -9,9 +9,10 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
 use crate::{
-    config::{AppSettings, VaultConfig, decode_pair_code},
+    config::{AiSettings, AppSettings, VaultConfig, decode_pair_code},
     crdt::CrdtManager,
     network::{NetworkIdentity, NetworkService},
+    rag::{self, ChatMessage, ChatResponse, RagChunk},
     vault::{self, VaultItem},
 };
 
@@ -273,6 +274,144 @@ pub fn network_remove_peer(
         }
     }
     Ok(())
+}
+
+#[tauri::command]
+pub fn save_ai_settings(settings: AiSettings, state: State<'_, AppState>) -> Result<(), String> {
+    let mut s = state.settings.write();
+    s.ai = settings;
+    s.save().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn fetch_ai_models(
+    provider_id: Option<String>,
+    custom_url: Option<String>,
+    custom_key: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<String>, String> {
+    let (base_url, api_key) = if let Some(url) = custom_url {
+        (url, custom_key.unwrap_or_default())
+    } else {
+        let settings = state.settings.read();
+        let p_id = provider_id.unwrap_or_else(|| settings.ai.active_provider_id.clone());
+        let provider = settings
+            .ai
+            .providers
+            .iter()
+            .find(|p| p.id == p_id)
+            .ok_or_else(|| "provedor não encontrado".to_string())?;
+        (provider.base_url.clone(), provider.api_key.clone())
+    };
+
+    rag::fetch_models(&base_url, &api_key)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn search_vault_rag(
+    query: String,
+    limit: Option<usize>,
+    state: State<'_, AppState>,
+) -> Result<Vec<RagChunk>, String> {
+    let settings = state.settings.read();
+    let vault = settings.active_vault().ok_or("nenhum vault ativo")?;
+    rag::index_and_search_vault(&vault.path, &query, limit.unwrap_or(5))
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn ai_chat_query(
+    prompt: String,
+    note_path_scope: Option<String>,
+    conversation: Vec<ChatMessage>,
+    state: State<'_, AppState>,
+) -> Result<ChatResponse, String> {
+    let (provider, vault_path) = {
+        let settings = state.settings.read();
+        let vault = settings.active_vault().ok_or("nenhum vault ativo")?;
+        let p = settings
+            .ai
+            .providers
+            .iter()
+            .find(|p| p.id == settings.ai.active_provider_id)
+            .cloned()
+            .ok_or("nenhum provedor de IA selecionado")?;
+        (p, vault.path.clone())
+    };
+
+    let (sources, context_text) = if let Some(path) = &note_path_scope {
+        let content = vault::read_note(&vault_path, path).map_err(|e| e.to_string())?;
+        let chunk = RagChunk {
+            note_path: path.clone(),
+            note_title: path.clone(),
+            section_title: "Nota Aberta".to_string(),
+            line_number: 1,
+            content: content.clone(),
+            score: 1.0,
+        };
+        let context = format!("---\n[Nota Aberta: {path} (Linha: 1)]\n{content}\n---");
+        (vec![chunk], context)
+    } else {
+        let chunks = rag::index_and_search_vault(&vault_path, &prompt, 5)
+            .map_err(|e| e.to_string())?;
+
+        let mut parts = Vec::new();
+        for chunk in &chunks {
+            parts.push(format!(
+                "---\n[Nota: {} ({}), Seção: {}, Linha: {}]\n{}\n---",
+                chunk.note_title, chunk.note_path, chunk.section_title, chunk.line_number, chunk.content
+            ));
+        }
+        let context = parts.join("\n\n");
+        (chunks, context)
+    };
+
+    let system_prompt = format!(
+        "Você é o assistente inteligente de notas do LowNotes.\n\
+        Responda à dúvida do usuário de forma clara, prestativa e concisa, baseando-se estritamente nas notas do usuário fornecidas no contexto abaixo.\n\n\
+        DIRETRIZ DE LINKAGEM OBRIGATÓRIA:\n\
+        Sempre que você citar ou referenciar um trecho ou informação de uma nota, use links no formato Markdown:\n\
+        [Nome da Nota](lownotes://open?path=<caminho_relativo>&line=<numero_da_linha>)\n\
+        Exemplo: 'Conforme registrado em [Ideias](lownotes://open?path=Ideias.md&line=12), a arquitetura...'\n\
+        Se a resposta não constar no contexto das notas, responda com honestidade informando que não encontrou registro nas notas.\n\n\
+        CONTEXTO DAS NOTAS DO USUÁRIO:\n\
+        {context_text}"
+    );
+
+    let mut messages = Vec::new();
+    messages.push(ChatMessage {
+        role: "system".to_string(),
+        content: system_prompt,
+    });
+
+    // Add recent conversation history (max 8 messages)
+    let history_slice = if conversation.len() > 8 {
+        &conversation[conversation.len() - 8..]
+    } else {
+        &conversation[..]
+    };
+    messages.extend_from_slice(history_slice);
+
+    // Add current user prompt
+    messages.push(ChatMessage {
+        role: "user".to_string(),
+        content: prompt,
+    });
+
+    let answer = rag::generate_chat_completion(&provider, &messages, 0.3)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(ChatResponse { answer, sources })
+}
+
+#[tauri::command]
+pub fn mark_welcome_seen(state: State<'_, AppState>) -> Result<(), String> {
+    let mut s = state.settings.write();
+    s.has_seen_welcome = true;
+    s.save().map_err(|e| e.to_string())
 }
 
 fn restart_network_service(

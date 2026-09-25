@@ -22,11 +22,46 @@ export interface VaultConfig {
   peers: PeerConfig[];
 }
 
+export interface AiProviderConfig {
+  id: string;
+  name: string;
+  base_url: string;
+  api_key: string;
+  selected_model: string;
+  is_custom: boolean;
+}
+
+export interface AiSettings {
+  active_provider_id: string;
+  providers: AiProviderConfig[];
+}
+
 export interface AppSettings {
   device_name: string;
   theme: string;
   active_vault_id: string | null;
   vaults: VaultConfig[];
+  ai: AiSettings;
+  has_seen_welcome: boolean;
+}
+
+export interface RagChunk {
+  note_path: string;
+  note_title: string;
+  section_title: string;
+  line_number: number;
+  content: string;
+  score: number;
+}
+
+export interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatResponse {
+  answer: string;
+  sources: RagChunk[];
 }
 
 export interface InitialStateResponse {

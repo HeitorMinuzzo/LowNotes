@@ -43,11 +43,17 @@
     notePath,
     initialContent,
     crdtUpdateBase64,
+    targetLine,
+    isAiChatOpen = false,
+    onToggleAiChat,
     onContentChange,
   } = $props<{
     notePath: string;
     initialContent: string;
     crdtUpdateBase64?: string;
+    targetLine?: number;
+    isAiChatOpen?: boolean;
+    onToggleAiChat?: () => void;
     onContentChange?: (path: string, newContent: string) => void;
   }>();
 
@@ -183,6 +189,28 @@
       parent: editorContainer,
     });
   }
+
+  function navigateToLine(lineNumber: number) {
+    if (!editorView || lineNumber <= 0) return;
+    try {
+      const totalLines = editorView.state.doc.lines;
+      const target = Math.min(lineNumber, totalLines);
+      const line = editorView.state.doc.line(target);
+      editorView.dispatch({
+        selection: { anchor: line.from },
+        scrollIntoView: true,
+      });
+      editorView.focus();
+    } catch (e) {
+      console.error('Falha ao navegar para linha:', e);
+    }
+  }
+
+  $effect(() => {
+    if (targetLine && targetLine > 0 && editorView) {
+      navigateToLine(targetLine);
+    }
+  });
 
   function applyFormatting(prefix: string, suffix: string = '') {
     if (!editorView) return;
@@ -337,6 +365,17 @@
           Visualizar
         </button>
       </div>
+
+      {#if onToggleAiChat}
+        <button
+          onclick={onToggleAiChat}
+          class="px-2.5 py-1 text-xs rounded transition flex items-center gap-1.5 border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-light)] {isAiChatOpen ? 'border-[var(--accent)] text-[var(--accent-light)] font-medium shadow-sm bg-[var(--bg-active)]' : ''}"
+          title="Abrir Assistente de IA (Chat & RAG)"
+        >
+          <span>💬</span>
+          <span class="font-medium">Assistente</span>
+        </button>
+      {/if}
     </div>
   </header>
 

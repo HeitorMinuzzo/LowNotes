@@ -19,7 +19,8 @@
   import Editor from '$lib/components/Editor.svelte';
   import PairModal from '$lib/components/PairModal.svelte';
   import IncomingPairDialog from '$lib/components/IncomingPairDialog.svelte';
-
+  import AiChatSidebar from '$lib/components/AiChatSidebar.svelte';
+  import WelcomeModal from '$lib/components/WelcomeModal.svelte';
   let settings = $state<AppSettings | null>(null);
   let activeVault = $state<VaultConfig | null>(null);
   let vaults = $state<VaultConfig[]>([]);
@@ -34,7 +35,9 @@
 
   let isPairModalOpen = $state(false);
   let incomingRequest = $state<{ request_id: string; peer: PeerConfig } | null>(null);
-
+  let isAiChatOpen = $state(false);
+  let isWelcomeOpen = $state(false);
+  let targetLine = $state<number | undefined>(undefined);
   let unlisteners: UnlistenFn[] = [];
 
   async function loadInitialData() {
@@ -44,6 +47,10 @@
       activeVault = data.active_vault;
       vaults = data.settings.vaults;
       items = data.items;
+
+      if (!data.settings.has_seen_welcome) {
+        isWelcomeOpen = true;
+      }
 
       if (items.length > 0 && !selectedNotePath) {
         const firstNote = items.find((i) => !i.is_dir);
@@ -73,6 +80,13 @@
     } catch (e) {
       console.error('Falha ao abrir nota:', e);
     }
+  }
+
+  async function handleNavigateToSource(path: string, line: number) {
+    if (selectedNotePath !== path) {
+      await openNote(path);
+    }
+    targetLine = line;
   }
 
   async function handleOpenVaultFolder() {
@@ -188,14 +202,34 @@
           notePath={selectedNotePath}
           initialContent={currentNoteContent}
           crdtUpdateBase64={currentCrdtBase64}
+          {targetLine}
+          {isAiChatOpen}
+          onToggleAiChat={() => (isAiChatOpen = !isAiChatOpen)}
         />
       {:else}
-        <div class="flex-1 flex flex-col items-center justify-center text-center p-8 select-none text-[var(--text-dim)]">
+        <div class="flex-1 flex flex-col items-center justify-center text-center p-8 select-none text-[var(--text-dim)] relative">
+          <button
+            onclick={() => (isAiChatOpen = !isAiChatOpen)}
+            class="absolute top-3 right-4 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-xs text-[var(--text-muted)] hover:text-[var(--accent-light)] flex items-center gap-1.5 transition shadow"
+          >
+            <span>💬</span>
+            <span>Abrir Assistente IA</span>
+          </button>
           <span class="text-4xl mb-3 opacity-60">📄</span>
           <p class="text-sm">Selecione uma nota na barra lateral ou crie uma nova para começar.</p>
         </div>
       {/if}
     </div>
+
+    <!-- AI Chat Sidebar on the Right -->
+    {#if settings}
+      <AiChatSidebar
+        bind:isOpen={isAiChatOpen}
+        bind:aiSettings={settings.ai}
+        currentNotePath={selectedNotePath}
+        onNavigateToSource={handleNavigateToSource}
+      />
+    {/if}
   {/if}
 
   <!-- Modals -->
@@ -215,6 +249,13 @@
     request={incomingRequest}
     onAnswer={() => {
       incomingRequest = null;
+    }}
+  />
+
+  <WelcomeModal
+    bind:isOpen={isWelcomeOpen}
+    onOpenAiChat={() => {
+      isAiChatOpen = true;
     }}
   />
 </div>

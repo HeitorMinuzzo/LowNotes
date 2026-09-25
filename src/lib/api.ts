@@ -1,6 +1,14 @@
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
-import type { InitialStateResponse, NoteReadResponse, VaultItem } from './types';
+import type {
+  AiSettings,
+  ChatMessage,
+  ChatResponse,
+  InitialStateResponse,
+  NoteReadResponse,
+  RagChunk,
+  VaultItem,
+} from './types';
 
 export async function getAppState(): Promise<InitialStateResponse> {
   return await invoke('get_app_state');
@@ -72,4 +80,32 @@ export async function pickVaultDirectory(): Promise<string | null> {
     return selected;
   }
   return null;
+}
+
+export async function saveAiSettings(settings: AiSettings): Promise<void> {
+  return await invoke('save_ai_settings', { settings });
+}
+
+export async function fetchAiModels(
+  providerId?: string,
+  customUrl?: string,
+  customKey?: string
+): Promise<string[]> {
+  return await invoke('fetch_ai_models', { providerId, customUrl, customKey });
+}
+
+export async function searchVaultRag(query: string, limit?: number): Promise<RagChunk[]> {
+  return await invoke('search_vault_rag', { query, limit });
+}
+
+export async function aiChatQuery(
+  prompt: string,
+  notePathScope?: string,
+  conversation: ChatMessage[] = []
+): Promise<ChatResponse> {
+  return await invoke('ai_chat_query', { prompt, notePathScope, conversation });
+}
+
+export async function markWelcomeSeen(): Promise<void> {
+  return await invoke('mark_welcome_seen');
 }

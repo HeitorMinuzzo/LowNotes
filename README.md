@@ -10,7 +10,8 @@ Editor de notas Markdown desktop **local-first**, ultra-rápido, com **sincroniz
 - **100% Compatível com Markdown:** Suas notas permanecem como arquivos `.md` limpos no seu disco rígido, acessíveis por qualquer editor (VS Code, Obsidian, Notepad).
 - **Sem Servidor Central:** Sincronização direta de máquina para máquina via **Iroh** (QUIC ponta a ponta com criptografia ed25519 e transposição NAT/DERP).
 - **Colaboração em Tempo Real (CRDT):** Mais de um usuário pode editar a mesma nota simultaneamente sem conflitos, unindo **CodeMirror 6 + Yjs** no frontend e **Yrs** no backend em Rust.
-
+- **RAG Local & Assistente de IA:** Chat integrado na barra lateral direita compatível com qualquer provedor OpenAI (Ollama, OpenAI, OpenRouter, Groq, LM Studio ou Custom), com busca semântica local e citações clicáveis que abrem a nota na linha exata.
+- **Visualização de Diagramas Mermaid:** Renderização vetorial SVG interativa em tempo real de fluxogramas, gráficos de pizza e sequências no Markdown.
 ---
 
 ## 🏗️ Arquitetura
@@ -39,7 +40,8 @@ graph TD
 - **CRDT / Colaboração:** [Yrs](https://github.com/y-crdt/y-crdt) (Rust) & [Yjs](https://yjs.dev/) (TypeScript)
 - **Frontend:** Svelte 5 (Runes), TypeScript, Tailwind CSS v4
 - **Editor de Texto:** CodeMirror 6 (`@codemirror/lang-markdown`, `y-codemirror.next`)
-- **Renderizador de Markdown:** Marked
+- **Renderizador de Markdown & Diagramas:** Marked + [Mermaid 12](https://mermaid.js.org/)
+- **Assistente IA & RAG:** RAG local no Rust compatível com APIs OpenAI (Ollama local, OpenAI, OpenRouter, Groq, LM Studio, etc.)
 
 ---
 
