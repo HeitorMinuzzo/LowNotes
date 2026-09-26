@@ -18,6 +18,7 @@
     selectVault,
     saveTheme,
     saveViewMode,
+    networkGetPairInfo,
   } from '$lib/api';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import Editor from '$lib/components/Editor.svelte';
@@ -57,7 +58,10 @@
       activeVault = data.active_vault;
       vaults = data.settings.vaults;
       items = data.items;
-
+      if (data.pair_info) {
+        pairCode = data.pair_info.pair_code;
+        endpointId = data.pair_info.endpoint_id;
+      }
       if (!data.settings.has_seen_welcome) {
         isWelcomeOpen = true;
       }
@@ -107,6 +111,17 @@
       settings = res.settings;
       vaults = res.settings.vaults;
       items = res.items;
+      if (res.pair_info) {
+        pairCode = res.pair_info.pair_code;
+        endpointId = res.pair_info.endpoint_id;
+      } else {
+        networkGetPairInfo().then((info) => {
+          if (info) {
+            pairCode = info.pair_code;
+            endpointId = info.endpoint_id;
+          }
+        });
+      }
 
       if (items.length > 0) {
         const first = items.find((i) => !i.is_dir);
@@ -142,9 +157,7 @@
   });
 
   onMount(async () => {
-    await loadInitialData();
-
-    // Setup P2P event listeners
+    // Setup P2P event listeners first so no events are lost
     const u1 = await listen<NetworkEventPayload>('p2p:ready', (event) => {
       if (event.payload.type === 'Ready') {
         pairCode = event.payload.pair_code;
@@ -182,6 +195,21 @@
     });
 
     unlisteners = [u1, u2, u3, u4, u5];
+
+    await loadInitialData();
+
+    // Fallback: if pairCode is still empty after initial load, fetch it on-demand
+    if (!pairCode) {
+      try {
+        const info = await networkGetPairInfo();
+        if (info) {
+          pairCode = info.pair_code;
+          endpointId = info.endpoint_id;
+        }
+      } catch (err) {
+        console.error('Falha ao obter código P2P:', err);
+      }
+    }
   });
 
   onDestroy(() => {
@@ -227,7 +255,15 @@
       onSelectNote={(path) => openNote(path)}
       onVaultChange={(v) => {
         activeVault = v;
+        pairCode = '';
+        endpointId = '';
         refreshItems();
+        networkGetPairInfo().then((info) => {
+          if (info) {
+            pairCode = info.pair_code;
+            endpointId = info.endpoint_id;
+          }
+        });
       }}
       onOpenPairModal={() => (isPairModalOpen = true)}
       onRefreshItems={refreshItems}
@@ -276,8 +312,8 @@
   <!-- Modals -->
   <PairModal
     bind:isOpen={isPairModalOpen}
-    {pairCode}
-    {endpointId}
+    bind:pairCode
+    bind:endpointId
     vaultName={activeVault?.name || ''}
     peers={activeVault?.peers || []}
     onPeersChange={async () => {

@@ -21,6 +21,12 @@ const ALPN: &[u8] = b"lownotes/sync/1";
 const MAX_PACKET_BYTES: usize = 12 * 1024 * 1024;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PairInfo {
+    pub pair_code: String,
+    pub endpoint_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum NetworkEventPayload {
     Ready {
@@ -103,6 +109,7 @@ pub struct NetworkIdentity {
 pub struct NetworkService {
     peers: Arc<RwLock<Vec<PeerConfig>>>,
     commands: tokio::sync::mpsc::UnboundedSender<NetworkCommand>,
+    pair_info: Arc<RwLock<Option<PairInfo>>>,
 }
 
 impl NetworkService {
@@ -115,6 +122,8 @@ impl NetworkService {
         let peers = Arc::new(RwLock::new(initial_peers));
         let worker_peers = peers.clone();
         let (command_tx, command_rx) = tokio::sync::mpsc::unbounded_channel();
+        let pair_info = Arc::new(RwLock::new(None::<PairInfo>));
+        let worker_pair_info = pair_info.clone();
 
         std::thread::Builder::new()
             .name("lownotes-network".to_owned())
@@ -131,6 +140,7 @@ impl NetworkService {
                             vault,
                             identity,
                             worker_peers,
+                            worker_pair_info,
                             command_rx,
                             app.clone(),
                         )) {
@@ -159,7 +169,12 @@ impl NetworkService {
         Self {
             peers,
             commands: command_tx,
+            pair_info,
         }
+    }
+
+    pub fn pair_info(&self) -> Option<PairInfo> {
+        self.pair_info.read().clone()
     }
 
     pub fn update_peers(&self, peers: Vec<PeerConfig>) {
@@ -197,6 +212,7 @@ async fn run_network(
     vault: PathBuf,
     identity: NetworkIdentity,
     peers: Arc<RwLock<Vec<PeerConfig>>>,
+    pair_info: Arc<RwLock<Option<PairInfo>>>,
     mut commands: tokio::sync::mpsc::UnboundedReceiver<NetworkCommand>,
     app: AppHandle,
 ) -> anyhow::Result<()> {
@@ -206,14 +222,15 @@ async fn run_network(
         .bind()
         .await?;
 
-    publish_pair_code(&endpoint, &identity, &app);
+    publish_pair_code(&endpoint, &identity, &app, &pair_info);
 
     let online_ep = endpoint.clone();
     let online_id = identity.clone();
     let online_app = app.clone();
+    let online_pair_info = pair_info.clone();
     tokio::spawn(async move {
         let _ = tokio::time::timeout(Duration::from_secs(10), online_ep.online()).await;
-        publish_pair_code(&online_ep, &online_id, &online_app);
+        publish_pair_code(&online_ep, &online_id, &online_app, &online_pair_info);
     });
 
     let pending_answers = Arc::new(tokio::sync::Mutex::new(HashMap::<
@@ -335,13 +352,19 @@ async fn run_network(
 
     Ok(())
 }
-fn publish_pair_code(endpoint: &Endpoint, identity: &NetworkIdentity, app: &AppHandle) {
+fn publish_pair_code(
+    endpoint: &Endpoint,
+    identity: &NetworkIdentity,
+    app: &AppHandle,
+    pair_info: &Arc<RwLock<Option<PairInfo>>>,
+) {
     let addr = endpoint.addr();
     let ticket = EndpointTicket::new(addr);
+    let endpoint_id = endpoint.id().to_string();
     let invite = PairInvite {
         peer: PeerConfig {
             name: identity.device_name.clone(),
-            endpoint_id: endpoint.id().to_string(),
+            endpoint_id: endpoint_id.clone(),
             ticket: ticket.to_string(),
         },
         token: identity.pairing_token.clone(),
@@ -349,11 +372,15 @@ fn publish_pair_code(endpoint: &Endpoint, identity: &NetworkIdentity, app: &AppH
         vault_name: identity.vault_name.clone(),
     };
     if let Ok(code) = encode_pair_code(&invite) {
+        *pair_info.write() = Some(PairInfo {
+            pair_code: code.clone(),
+            endpoint_id: endpoint_id.clone(),
+        });
         let _ = app.emit(
             "p2p:ready",
             NetworkEventPayload::Ready {
                 pair_code: code,
-                endpoint_id: endpoint.id().to_string(),
+                endpoint_id,
             },
         );
     }

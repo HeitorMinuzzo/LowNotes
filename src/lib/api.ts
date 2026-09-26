@@ -7,6 +7,7 @@ import type {
   ChatResponse,
   InitialStateResponse,
   NoteReadResponse,
+  PairInfo,
   RagChunk,
   VaultItem,
   ViewMode,
@@ -70,6 +71,10 @@ export async function networkAnswerPair(requestId: string, accept: boolean): Pro
 
 export async function networkRemovePeer(endpointId: string): Promise<void> {
   return await invoke('network_remove_peer', { endpointId });
+}
+
+export async function networkGetPairInfo(): Promise<PairInfo | null> {
+  return await invoke('network_get_pair_info');
 }
 
 export async function pickVaultDirectory(): Promise<string | null> {

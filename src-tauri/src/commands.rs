@@ -11,7 +11,7 @@ use tauri::{AppHandle, State};
 use crate::{
     config::{AiSettings, AppSettings, VaultConfig, decode_pair_code},
     crdt::CrdtManager,
-    network::{NetworkIdentity, NetworkService},
+    network::{NetworkIdentity, NetworkService, PairInfo},
     rag::{self, ChatMessage, ChatResponse, RagChunk},
     vault::{self, VaultItem},
 };
@@ -27,6 +27,7 @@ pub struct InitialStateResponse {
     pub settings: AppSettings,
     pub active_vault: Option<VaultConfig>,
     pub items: Vec<VaultItem>,
+    pub pair_info: Option<PairInfo>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -45,10 +46,13 @@ pub fn get_app_state(state: State<'_, AppState>) -> Result<InitialStateResponse,
         Vec::new()
     };
 
+    let pair_info = state.network.read().as_ref().and_then(|s| s.pair_info());
+
     Ok(InitialStateResponse {
         settings,
         active_vault,
         items,
+        pair_info,
     })
 }
 
@@ -85,10 +89,13 @@ pub fn select_vault(
     let items = vault::list_vault_items(&active_vault.path).map_err(|e| e.to_string())?;
     let current_settings = state.settings.read().clone();
 
+    let pair_info = state.network.read().as_ref().and_then(|s| s.pair_info());
+
     Ok(InitialStateResponse {
         settings: current_settings,
         active_vault: Some(active_vault),
         items,
+        pair_info,
     })
 }
 
@@ -117,10 +124,13 @@ pub fn create_vault(
     let items = vault::list_vault_items(&active_vault.path).map_err(|e| e.to_string())?;
     let current_settings = state.settings.read().clone();
 
+    let pair_info = state.network.read().as_ref().and_then(|s| s.pair_info());
+
     Ok(InitialStateResponse {
         settings: current_settings,
         active_vault: Some(active_vault),
         items,
+        pair_info,
     })
 }
 
@@ -274,6 +284,33 @@ pub fn network_remove_peer(
         }
     }
     Ok(())
+}
+
+#[tauri::command]
+pub async fn network_get_pair_info(state: State<'_, AppState>) -> Result<Option<PairInfo>, String> {
+    for _ in 0..40 {
+        let (has_service, maybe_info) = {
+            let net = state.network.read();
+            match net.as_ref() {
+                Some(service) => (true, service.pair_info()),
+                None => (false, None),
+            }
+        };
+
+        if let Some(info) = maybe_info {
+            return Ok(Some(info));
+        }
+        if !has_service {
+            return Ok(None);
+        }
+
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+
+    let maybe_info = {
+        state.network.read().as_ref().and_then(|s| s.pair_info())
+    };
+    Ok(maybe_info)
 }
 
 #[tauri::command]
@@ -447,16 +484,25 @@ fn restart_network_service(
     vault: &VaultConfig,
     app: AppHandle,
 ) -> Result<(), String> {
-    let secret = vault.secret_key().map_err(|e| e.to_string())?;
+    let mut vault_clone = vault.clone();
+    if vault_clone.ensure_keys() {
+        let mut s = state.settings.write();
+        if let Some(v) = s.vaults.iter_mut().find(|v| v.id == vault_clone.id) {
+            v.secret_key = vault_clone.secret_key.clone();
+            v.pairing_token = vault_clone.pairing_token.clone();
+            let _ = s.save();
+        }
+    }
+    let secret = vault_clone.secret_key().map_err(|e| e.to_string())?;
     let identity = NetworkIdentity {
         device_name: state.settings.read().device_name.clone(),
         secret_key: secret,
-        pairing_token: vault.pairing_token.clone(),
-        vault_id: vault.id.clone(),
-        vault_name: vault.name.clone(),
+        pairing_token: vault_clone.pairing_token.clone(),
+        vault_id: vault_clone.id.clone(),
+        vault_name: vault_clone.name.clone(),
     };
 
-    let service = NetworkService::start(vault.path.clone(), identity, vault.peers.clone(), app);
+    let service = NetworkService::start(vault_clone.path.clone(), identity, vault_clone.peers.clone(), app);
     *state.network.write() = Some(service);
     Ok(())
 }

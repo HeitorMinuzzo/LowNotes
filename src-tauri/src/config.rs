@@ -79,6 +79,19 @@ impl VaultConfig {
         decode_secret(&self.secret_key)
     }
 
+    pub fn ensure_keys(&mut self) -> bool {
+        let mut changed = false;
+        if self.pairing_token.trim().is_empty() {
+            self.pairing_token = new_pairing_token();
+            changed = true;
+        }
+        if decode_secret(&self.secret_key).is_err() {
+            self.secret_key = URL_SAFE_NO_PAD.encode(rand::rng().random::<[u8; 32]>());
+            changed = true;
+        }
+        changed
+    }
+
     pub fn add_peer(&mut self, peer: PeerConfig) -> bool {
         if self.peers.iter().any(|p| p.endpoint_id == peer.endpoint_id) {
             false
@@ -284,5 +297,23 @@ mod tests {
         let restored: AppSettings = serde_json::from_value(saved).unwrap();
         assert_eq!(restored.view_mode, "split");
         assert_eq!(restored.theme, "dark");
+    }
+
+    #[test]
+    fn test_vault_config_ensure_keys() {
+        let mut vault = super::VaultConfig {
+            id: "v1".to_string(),
+            name: "Test".to_string(),
+            path: std::path::PathBuf::from("/test"),
+            secret_key: "".to_string(),
+            pairing_token: "".to_string(),
+            peers: Vec::new(),
+        };
+        assert!(vault.ensure_keys());
+        assert!(!vault.secret_key.is_empty());
+        assert!(!vault.pairing_token.is_empty());
+        assert!(vault.secret_key().is_ok());
+        // Second time should not change anything
+        assert!(!vault.ensure_keys());
     }
 }

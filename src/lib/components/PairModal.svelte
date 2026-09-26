@@ -1,18 +1,18 @@
 <script lang="ts">
   import type { PeerConfig } from '../types';
-  import { networkRequestPair, networkRemovePeer } from '../api';
+  import { networkRequestPair, networkRemovePeer, networkGetPairInfo } from '../api';
 
   let {
     isOpen = $bindable(false),
-    pairCode = '',
-    endpointId = '',
+    pairCode = $bindable(''),
+    endpointId = $bindable(''),
     vaultName = '',
     peers = [],
     onPeersChange,
   } = $props<{
     isOpen: boolean;
-    pairCode: string;
-    endpointId: string;
+    pairCode?: string;
+    endpointId?: string;
     vaultName: string;
     peers: PeerConfig[];
     onPeersChange?: () => void;
@@ -24,6 +24,32 @@
   let statusMessage = $state<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   let copied = $state(false);
 
+  let isLoadingCode = $state(false);
+  let loadError = $state<string | null>(null);
+
+  async function fetchPairInfo() {
+    if (pairCode) return;
+    isLoadingCode = true;
+    loadError = null;
+    try {
+      const info = await networkGetPairInfo();
+      if (info) {
+        pairCode = info.pair_code;
+        endpointId = info.endpoint_id;
+      }
+    } catch (e: any) {
+      console.error('Falha ao obter código de pareamento:', e);
+      loadError = typeof e === 'string' ? e : e?.message || 'Falha ao obter código P2P.';
+    } finally {
+      isLoadingCode = false;
+    }
+  }
+
+  $effect(() => {
+    if (isOpen && !pairCode) {
+      fetchPairInfo();
+    }
+  });
   function copyCode() {
     if (!pairCode) return;
     navigator.clipboard.writeText(pairCode);
@@ -139,13 +165,26 @@
               </div>
             </div>
 
+            {#if loadError}
+              <div class="p-3 rounded-lg text-xs leading-relaxed bg-red-950/40 border border-red-800/60 text-red-300 flex items-center justify-between">
+                <span>{loadError}</span>
+                <button
+                  onclick={fetchPairInfo}
+                  class="px-2.5 py-1 bg-red-900/60 hover:bg-red-800/80 rounded text-xs font-medium text-white transition"
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            {/if}
+
             <div class="flex justify-between items-center pt-2">
               <span class="text-[11px] text-[var(--text-dim)] font-mono truncate max-w-[280px]">
-                ID: {endpointId.slice(0, 16)}...
+                ID: {endpointId ? (endpointId.length > 16 ? endpointId.slice(0, 16) + '...' : endpointId) : '...'}
               </span>
               <button
                 onclick={copyCode}
-                class="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-light)] text-black text-xs font-semibold rounded-lg transition shadow-md flex items-center gap-1.5"
+                disabled={!pairCode}
+                class="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-light)] disabled:opacity-40 disabled:cursor-not-allowed text-black text-xs font-semibold rounded-lg transition shadow-md flex items-center gap-1.5"
               >
                 {copied ? '✓ Código Copiado!' : 'Copiar Código'}
               </button>

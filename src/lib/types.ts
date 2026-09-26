@@ -68,10 +68,16 @@ export interface ChatResponse {
   sources: RagChunk[];
 }
 
+export interface PairInfo {
+  pair_code: string;
+  endpoint_id: string;
+}
+
 export interface InitialStateResponse {
   settings: AppSettings;
   active_vault: VaultConfig | null;
   items: VaultItem[];
+  pair_info?: PairInfo | null;
 }
 
 export interface NoteReadResponse {
