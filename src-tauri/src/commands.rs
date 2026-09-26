@@ -519,7 +519,13 @@ fn restart_network_service(
         vault_name: vault_clone.name.clone(),
     };
 
-    let service = NetworkService::start(vault_clone.path.clone(), identity, vault_clone.peers.clone(), app);
+    let service = NetworkService::start(
+        vault_clone.path.clone(),
+        identity,
+        vault_clone.peers.clone(),
+        app,
+        state.settings.clone(),
+    );
     *state.network.write() = Some(service);
     Ok(())
 }

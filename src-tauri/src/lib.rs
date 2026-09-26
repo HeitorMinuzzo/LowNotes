@@ -52,6 +52,7 @@ pub fn run() {
                         identity,
                         vault.peers.clone(),
                         app.handle().clone(),
+                        settings.clone(),
                     );
                     *network.write() = Some(service);
                 }

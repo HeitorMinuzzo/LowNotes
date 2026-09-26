@@ -37,6 +37,7 @@ const enUS = {
     enableLightTheme: 'Switch to light theme',
     enableDarkTheme: 'Switch to dark theme',
     syncNow: 'Sync now with peers',
+    syncError: 'Last synchronization failed',
   },
   editor: {
     bold: 'Bold (Ctrl+B)',
@@ -208,6 +209,11 @@ const enUS = {
     packetTooLarge: 'Packet exceeds maximum size of 12 MB',
     pairRejected: 'The pairing request was rejected by the other computer',
     invalidPairResponse: 'Invalid pairing response',
+    pairFailed: 'Failed to pair',
+    syncFailed: 'Failed to synchronize',
+    pairTimeout: 'The other computer took too long to respond',
+    packetReceivedTooLarge: 'Received packet is too large',
+    metaMissing: 'Missing note metadata',
   },
 };
 

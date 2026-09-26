@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use tauri::{AppHandle, Emitter};
 
 use crate::{
-    config::{PairInvite, PeerConfig, encode_pair_code},
+    config::{AppSettings, PairInvite, PeerConfig, encode_pair_code},
     vault::{self, Manifest, NoteMeta},
 };
 
@@ -118,12 +118,14 @@ impl NetworkService {
         identity: NetworkIdentity,
         initial_peers: Vec<PeerConfig>,
         app: AppHandle,
+        settings: Arc<RwLock<AppSettings>>,
     ) -> Self {
         let peers = Arc::new(RwLock::new(initial_peers));
         let worker_peers = peers.clone();
         let (command_tx, command_rx) = tokio::sync::mpsc::unbounded_channel();
         let pair_info = Arc::new(RwLock::new(None::<PairInfo>));
         let worker_pair_info = pair_info.clone();
+        let worker_settings = settings.clone();
 
         std::thread::Builder::new()
             .name("lownotes-network".to_owned())
@@ -143,6 +145,7 @@ impl NetworkService {
                             worker_pair_info,
                             command_rx,
                             app.clone(),
+                            worker_settings,
                         )) {
                             eprintln!("[p2p] network unavailable: {err:#}");
                             let _ = app.emit(
@@ -155,11 +158,12 @@ impl NetworkService {
                         }
                     }
                     Err(err) => {
+                        eprintln!("[p2p] failed to create network runtime: {err}");
                         let _ = app.emit(
                             "p2p:error",
                             NetworkEventPayload::Error {
                                 peer: None,
-                                message: format!("falha ao criar runtime de rede: {err}"),
+                                message: "errors.networkRuntime".to_string(),
                             },
                         );
                     }
@@ -216,6 +220,7 @@ async fn run_network(
     pair_info: Arc<RwLock<Option<PairInfo>>>,
     mut commands: tokio::sync::mpsc::UnboundedReceiver<NetworkCommand>,
     app: AppHandle,
+    settings: Arc<RwLock<AppSettings>>,
 ) -> anyhow::Result<()> {
     let endpoint = Endpoint::builder(presets::N0)
         .secret_key(identity.secret_key.clone())
@@ -234,6 +239,33 @@ async fn run_network(
         publish_pair_code(&online_ep, &online_id, &online_app, &online_pair_info);
     });
 
+    let sync_in_flight = Arc::new(parking_lot::Mutex::new(HashSet::<String>::new()));
+
+    // Periodic reconciliation: keep vaults converged even after restarts or
+    // missed CRDT broadcasts while a peer was offline.
+    let tick_ep = endpoint.clone();
+    let tick_vault = vault.clone();
+    let tick_peers = peers.clone();
+    let tick_app = app.clone();
+    let tick_in_flight = sync_in_flight.clone();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(Duration::from_secs(60));
+        interval.tick().await;
+        loop {
+            interval.tick().await;
+            let known: Vec<PeerConfig> = tick_peers.read().clone();
+            for peer in known {
+                spawn_sync(
+                    tick_ep.clone(),
+                    tick_vault.clone(),
+                    peer,
+                    tick_app.clone(),
+                    tick_in_flight.clone(),
+                );
+            }
+        }
+    });
+
     let pending_answers = Arc::new(tokio::sync::Mutex::new(HashMap::<
         String,
         tokio::sync::oneshot::Sender<bool>,
@@ -247,7 +279,8 @@ async fn run_network(
     let accept_token = identity.pairing_token.clone();
     let accept_answers = pending_answers.clone();
     let accept_ident = identity.clone();
-
+    let accept_settings = settings.clone();
+    let accept_sync = sync_in_flight.clone();
     tokio::spawn(async move {
         while let Some(incoming) = accept_ep.accept().await {
             let p_peers = accept_peers.clone();
@@ -256,6 +289,8 @@ async fn run_network(
             let p_token = accept_token.clone();
             let p_answers = accept_answers.clone();
             let p_ident = accept_ident.clone();
+            let p_settings = accept_settings.clone();
+            let p_sync = accept_sync.clone();
 
             let p_ep = accept_ep.clone();
             tokio::spawn(async move {
@@ -268,6 +303,8 @@ async fn run_network(
                     p_token,
                     p_answers,
                     p_ident,
+                    p_settings,
+                    p_sync,
                 )
                 .await;
                 if let Err(e) = res {
@@ -278,7 +315,6 @@ async fn run_network(
     });
 
     // Command loop
-    let sync_in_flight = Arc::new(parking_lot::Mutex::new(HashSet::<String>::new()));
     let pair_in_flight = Arc::new(parking_lot::Mutex::new(HashSet::<String>::new()));
 
     while let Some(cmd) = commands.recv().await {
@@ -305,17 +341,21 @@ async fn run_network(
                 let my_peers = peers.clone();
                 let my_app = app.clone();
                 let my_ident = identity.clone();
+                let my_vault = vault.clone();
+                let my_settings = settings.clone();
+                let my_sync = sync_in_flight.clone();
                 let in_flight = pair_in_flight.clone();
 
                 tokio::spawn(async move {
-                    let res = dial_pair(ep, invite, my_ident, my_peers.clone(), my_app.clone()).await;
+                    let res = dial_pair(ep, invite, my_ident, my_peers.clone(), my_app.clone(), my_vault, my_settings, my_sync).await;
                     in_flight.lock().remove(&target_id);
                     if let Err(e) = res {
+                        eprintln!("[p2p] pair failed: {e:#}");
                         let _ = my_app.emit(
                             "p2p:error",
                             NetworkEventPayload::Error {
                                 peer: Some(target_id),
-                                message: format!("falha ao parear: {e:#}"),
+                                message: "errors.pairFailed".to_string(),
                             },
                         );
                     }
@@ -396,6 +436,8 @@ async fn handle_incoming_connection(
     pairing_token: String,
     pending_answers: Arc<tokio::sync::Mutex<HashMap<String, tokio::sync::oneshot::Sender<bool>>>>,
     identity: NetworkIdentity,
+    settings: Arc<RwLock<AppSettings>>,
+    sync_in_flight: Arc<parking_lot::Mutex<HashSet<String>>>,
 ) -> anyhow::Result<()> {
     let connection = incoming.await?;
     let remote_id = connection.remote_id();
@@ -456,11 +498,19 @@ async fn handle_incoming_connection(
 
             if accepted && !already_known {
                 peers.write().push(requester.clone());
+                persist_peer(&settings, &identity.vault_id, &requester);
                 let _ = app.emit(
                     "p2p:pair-approved",
                     NetworkEventPayload::PairApproved {
-                        peer: requester,
+                        peer: requester.clone(),
                     },
+                );
+                spawn_sync(
+                    endpoint.clone(),
+                    vault.clone(),
+                    requester.clone(),
+                    app.clone(),
+                    sync_in_flight.clone(),
                 );
             } else if !accepted {
                 if let Some(r_id) = request_id {
@@ -525,6 +575,9 @@ async fn dial_pair(
     identity: NetworkIdentity,
     peers: Arc<RwLock<Vec<PeerConfig>>>,
     app: AppHandle,
+    vault: PathBuf,
+    settings: Arc<RwLock<AppSettings>>,
+    sync_in_flight: Arc<parking_lot::Mutex<HashSet<String>>>,
 ) -> anyhow::Result<()> {
     let addr = invite.peer.endpoint_addr()?;
     let connection = endpoint.connect(addr, ALPN).await?;
@@ -547,17 +600,27 @@ async fn dial_pair(
 
     let response: Packet = tokio::time::timeout(Duration::from_secs(120), recv_packet(&mut recv))
         .await
-        .context("o outro computador demorou para responder")??;
+        .context("errors.pairTimeout")??;
 
     match response {
-        Packet::PairDecision { accepted: true, .. } => {
-            let peer = invite.peer;
+        Packet::PairDecision { accepted: true, responder } => {
+            // Prefer the fresh ticket sent by the responder (includes relay
+            // addresses discovered after the invite code was generated).
+            let peer = responder.unwrap_or(invite.peer);
             peers.write().push(peer.clone());
+            persist_peer(&settings, &identity.vault_id, &peer);
             let _ = app.emit(
                 "p2p:pair-approved",
                 NetworkEventPayload::PairApproved {
                     peer: peer.clone(),
                 },
+            );
+            spawn_sync(
+                endpoint.clone(),
+                vault.clone(),
+                peer.clone(),
+                app.clone(),
+                sync_in_flight.clone(),
             );
             connection.close(0u32.into(), b"paired");
             Ok(())
@@ -566,6 +629,16 @@ async fn dial_pair(
             bail!("errors.pairRejected");
         }
         _ => bail!("errors.invalidPairResponse"),
+    }
+}
+
+fn persist_peer(settings: &Arc<RwLock<AppSettings>>, vault_id: &str, peer: &PeerConfig) {
+    let mut s = settings.write();
+    if let Some(vault) = s.vaults.iter_mut().find(|v| v.id == vault_id) {
+        if !vault.peers.iter().any(|p| p.endpoint_id == peer.endpoint_id) {
+            vault.peers.push(peer.clone());
+            let _ = s.save();
+        }
     }
 }
 
@@ -604,11 +677,12 @@ fn spawn_sync(
                 );
             }
             Err(e) => {
+                eprintln!("[p2p] sync failed: {e:#}");
                 let _ = app.emit(
                     "p2p:error",
                     NetworkEventPayload::Error {
                         peer: Some(peer.name),
-                        message: format!("erro ao sincronizar: {e:#}"),
+                        message: "errors.syncFailed".to_string(),
                     },
                 );
             }
@@ -634,7 +708,7 @@ async fn dial_sync(
         match packet {
             Packet::Request { path } => {
                 let bytes = vault::read_note(&vault, &path)?;
-                let meta = my_manifest.get(&path).context("meta ausente")?;
+                let meta = my_manifest.get(&path).context("errors.metaMissing")?;
                 send_packet(&mut send, &Packet::Put { meta: meta.clone(), content: bytes.into_bytes() }).await?;
             }
             Packet::Put { meta, content } => {
@@ -695,6 +769,10 @@ async fn serve_sync(
     }
 
     send_packet(send, &Packet::Done).await?;
+    // Flush gracefully: CONNECTION_CLOSE right after a write can drop the
+    // buffered Done packet, aborting the dialer with "connection lost".
+    send.finish()?;
+    let _ = tokio::time::timeout(Duration::from_secs(2), send.stopped()).await;
     Ok(changed)
 }
 
@@ -750,9 +828,114 @@ async fn recv_packet<T: DeserializeOwned>(stream: &mut iroh::endpoint::RecvStrea
     stream.read_exact(&mut len_buf).await?;
     let len = u32::from_be_bytes(len_buf) as usize;
     if len > MAX_PACKET_BYTES {
-        bail!("pacote recebido grande demais");
+        bail!("errors.packetReceivedTooLarge");
     }
     let mut buf = vec![0u8; len];
     stream.read_exact(&mut buf).await?;
     Ok(serde_json::from_slice(&buf)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    fn temp_vault(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "lownotes-sync-test-{}-{tag}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn peer_of(endpoint: &Endpoint, name: &str) -> PeerConfig {
+        PeerConfig {
+            name: name.to_string(),
+            endpoint_id: endpoint.id().to_string(),
+            ticket: EndpointTicket::new(endpoint.addr()).to_string(),
+        }
+    }
+
+    async fn bind_endpoint() -> Endpoint {
+        Endpoint::builder(presets::N0)
+            .secret_key(SecretKey::generate())
+            .alpns(vec![ALPN.to_vec()])
+            .bind()
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_sync_exchanges_notes_between_vaults() {
+        let vault_a = temp_vault("a");
+        let vault_b = temp_vault("b");
+        fs::write(vault_a.join("nota_a.md"), "# Nota A\n\nConteudo de A.").unwrap();
+        fs::write(vault_b.join("nota_b.md"), "# Nota B\n\nConteudo de B.").unwrap();
+
+        let ep_a = bind_endpoint().await;
+        let ep_b = bind_endpoint().await;
+        let peer_a = peer_of(&ep_a, "Vault Casa");
+        let peer_b = peer_of(&ep_b, "Notas Trabalho");
+
+        let (accept_ep, accept_vault) = (ep_a.clone(), vault_a.clone());
+        let responder = tokio::spawn(async move {
+            for _ in 0..2 {
+                let incoming = ep_accept(&accept_ep).await;
+                let connection = incoming.await.unwrap();
+                let (mut send, mut recv) = connection.accept_bi().await.unwrap();
+                let packet: Packet = recv_packet(&mut recv).await.unwrap();
+                match packet {
+                    Packet::Manifest(remote_manifest) => {
+                        serve_sync(&mut send, &mut recv, &accept_vault, remote_manifest)
+                            .await
+                            .unwrap();
+                    }
+                    other => panic!("pacote inesperado: {other:?}"),
+                }
+                connection.close(0u32.into(), b"sync complete");
+            }
+        });
+
+        let (changed_b, _direct) = dial_sync(ep_b.clone(), vault_b.clone(), peer_a.clone())
+            .await
+            .unwrap();
+        assert_eq!(changed_b, 1);
+        assert!(vault_b.join("nota_a.md").exists(), "vault B nao recebeu nota_a.md");
+        assert_eq!(
+            fs::read_to_string(vault_b.join("nota_a.md")).unwrap(),
+            "# Nota A\n\nConteudo de A."
+        );
+        assert!(vault_a.join("nota_b.md").exists(), "vault A nao recebeu nota_b.md");
+        assert_eq!(
+            fs::read_to_string(vault_a.join("nota_b.md")).unwrap(),
+            "# Nota B\n\nConteudo de B."
+        );
+
+        // Incremental: edit on B, second sync must converge A without ping-pong
+        fs::write(vault_b.join("nota_b.md"), "# Nota B\n\nConteudo de B atualizado.").unwrap();
+        let (changed_b2, _) = dial_sync(ep_b.clone(), vault_b.clone(), peer_a.clone())
+            .await
+            .unwrap();
+        responder.await.unwrap();
+
+        assert_eq!(changed_b2, 0, "B nao deveria receber nada de volta");
+        assert_eq!(
+            fs::read_to_string(vault_a.join("nota_b.md")).unwrap(),
+            "# Nota B\n\nConteudo de B atualizado."
+        );
+        assert_eq!(
+            fs::read_to_string(vault_b.join("nota_a.md")).unwrap(),
+            "# Nota A\n\nConteudo de A."
+        );
+
+        let _ = peer_b;
+        let _ = fs::remove_dir_all(&vault_a);
+        let _ = fs::remove_dir_all(&vault_b);
+    }
+
+    async fn ep_accept(endpoint: &Endpoint) -> iroh::endpoint::Incoming {
+        endpoint.accept().await.expect("endpoint fechado")
+    }
 }

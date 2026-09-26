@@ -39,6 +39,7 @@ const esES: Dictionary = {
     enableLightTheme: 'Activar tema claro',
     enableDarkTheme: 'Activar tema oscuro',
     syncNow: 'Sincronizar ahora con peers',
+    syncError: 'La última sincronización falló',
   },
   editor: {
     bold: 'Negrita (Ctrl+B)',
@@ -210,6 +211,11 @@ const esES: Dictionary = {
     packetTooLarge: 'el paquete excede el tamaño máximo de 12 MB',
     pairRejected: 'la solicitud de emparejamiento fue rechazada por la otra computadora',
     invalidPairResponse: 'respuesta de emparejamiento inválida',
+    pairFailed: 'fallo al emparejar',
+    syncFailed: 'error al sincronizar',
+    pairTimeout: 'la otra computadora tardó demasiado en responder',
+    packetReceivedTooLarge: 'paquete recibido demasiado grande',
+    metaMissing: 'metadatos de la nota ausentes',
   },
 };
 

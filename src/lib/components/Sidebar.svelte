@@ -331,9 +331,10 @@
     <button
       onclick={onOpenPairModal}
       class="flex items-center gap-2 text-xs text-left hover:opacity-90 transition group"
+      title={syncStatus === 'error' ? $t('sidebar.syncError') : $t('sidebar.manageConnections')}
     >
       <span
-        class="inline-block w-2.5 h-2.5 rounded-full {syncStatus === 'syncing' ? 'bg-[var(--accent)] animate-pulse' : peerCount > 0 ? 'bg-[var(--success)]' : 'bg-gray-500'}"
+        class="inline-block w-2.5 h-2.5 rounded-full {syncStatus === 'error' ? 'bg-red-500' : syncStatus === 'syncing' ? 'bg-[var(--accent)] animate-pulse' : peerCount > 0 ? 'bg-[var(--success)]' : 'bg-gray-500'}"
       ></span>
       <div class="flex flex-col">
         <span class="font-medium text-[var(--text-main)] leading-none text-[11px]">

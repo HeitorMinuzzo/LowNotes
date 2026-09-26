@@ -1,8 +1,9 @@
 <script lang="ts">
-  import type { PeerConfig } from '../types';
+  import type { NetworkEventPayload, PeerConfig } from '../types';
   import { networkRequestPair, networkRemovePeer, networkGetPairInfo } from '../api';
+  import { listen, type UnlistenFn } from '@tauri-apps/api/event';
+  import { onDestroy, onMount } from 'svelte';
   import { t, trError, ts } from '$lib/i18n';
-
   let {
     isOpen = $bindable(false),
     pairCode = $bindable(''),
@@ -94,6 +95,20 @@
       }
     }
   }
+
+  let unlistenError: UnlistenFn | null = null;
+
+  onMount(async () => {
+    unlistenError = await listen<NetworkEventPayload>('p2p:error', (event) => {
+      if (event.payload.type === 'Error') {
+        statusMessage = { type: 'error', text: trError(event.payload.message) };
+      }
+    });
+  });
+
+  onDestroy(() => {
+    unlistenError?.();
+  });
 </script>
 
 {#if isOpen}

@@ -20,7 +20,7 @@
     saveViewMode,
     networkGetPairInfo,
   } from '$lib/api';
-  import { locale, resolveLocale, t } from '$lib/i18n';
+  import { locale, resolveLocale, t, trError } from '$lib/i18n';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import Editor from '$lib/components/Editor.svelte';
   import PairModal from '$lib/components/PairModal.svelte';
@@ -200,7 +200,14 @@
       }
     });
 
-    unlisteners = [u1, u2, u3, u4, u5];
+    const u6 = await listen<NetworkEventPayload>('p2p:error', (event) => {
+      if (event.payload.type === 'Error') {
+        syncStatus = 'error';
+        console.error('[p2p]', trError(event.payload.message), event.payload.peer ?? '');
+      }
+    });
+
+    unlisteners = [u1, u2, u3, u4, u5, u6];
 
     await loadInitialData();
 

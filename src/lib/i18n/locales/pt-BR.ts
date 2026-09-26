@@ -39,6 +39,7 @@ const ptBR: Dictionary = {
     enableLightTheme: 'Ativar tema claro',
     enableDarkTheme: 'Ativar tema escuro',
     syncNow: 'Sincronizar agora com peers',
+    syncError: 'A última sincronização falhou',
   },
   editor: {
     bold: 'Negrito (Ctrl+B)',
@@ -210,6 +211,11 @@ const ptBR: Dictionary = {
     packetTooLarge: 'pacote excede tamanho máximo de 12 MB',
     pairRejected: 'a solicitação de pareamento foi recusada pelo outro computador',
     invalidPairResponse: 'resposta de pareamento inválida',
+    pairFailed: 'falha ao parear',
+    syncFailed: 'erro ao sincronizar',
+    pairTimeout: 'o outro computador demorou para responder',
+    packetReceivedTooLarge: 'pacote recebido grande demais',
+    metaMissing: 'metadados da nota ausentes',
   },
 };
 
