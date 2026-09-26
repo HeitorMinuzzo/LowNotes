@@ -40,6 +40,7 @@ export interface AppSettings {
   device_name: string;
   theme: AppTheme;
   view_mode: ViewMode;
+  language: string;
   active_vault_id: string | null;
   vaults: VaultConfig[];
   ai: AiSettings;

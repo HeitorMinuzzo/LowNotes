@@ -64,7 +64,7 @@ pub fn select_vault(
 ) -> Result<InitialStateResponse, String> {
     let path = PathBuf::from(path_str);
     if !path.is_dir() {
-        return Err("o caminho informado não é uma pasta válida".to_string());
+        return Err("errors.invalidFolderPath".to_string());
     }
 
     let mut settings = state.settings.write();
@@ -80,7 +80,7 @@ pub fn select_vault(
     settings.active_vault_id = Some(vault_id);
     settings.save().map_err(|e| e.to_string())?;
 
-    let active_vault = settings.active_vault().cloned().ok_or("vault não encontrado")?;
+    let active_vault = settings.active_vault().cloned().ok_or("errors.vaultNotFound")?;
     drop(settings);
 
     // Restart network service for the selected vault
@@ -116,7 +116,7 @@ pub fn create_vault(
     settings.active_vault_id = Some(id);
     settings.save().map_err(|e| e.to_string())?;
 
-    let active_vault = settings.active_vault().cloned().ok_or("vault não encontrado")?;
+    let active_vault = settings.active_vault().cloned().ok_or("errors.vaultNotFound")?;
     drop(settings);
 
     restart_network_service(&state, &active_vault, app)?;
@@ -137,14 +137,14 @@ pub fn create_vault(
 #[tauri::command]
 pub fn list_notes(state: State<'_, AppState>) -> Result<Vec<VaultItem>, String> {
     let settings = state.settings.read();
-    let vault = settings.active_vault().ok_or("nenhum vault ativo")?;
+    let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
     vault::list_vault_items(&vault.path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn read_note(path: String, state: State<'_, AppState>) -> Result<NoteReadResponse, String> {
     let settings = state.settings.read();
-    let vault = settings.active_vault().ok_or("nenhum vault ativo")?;
+    let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
     let content = vault::read_note(&vault.path, &path).map_err(|e| e.to_string())?;
 
     let crdt_bytes = state.crdt.get_or_create_doc(&path, &content);
@@ -159,7 +159,7 @@ pub fn read_note(path: String, state: State<'_, AppState>) -> Result<NoteReadRes
 #[tauri::command]
 pub fn save_note(path: String, content: String, state: State<'_, AppState>) -> Result<(), String> {
     let settings = state.settings.read();
-    let vault = settings.active_vault().ok_or("nenhum vault ativo")?;
+    let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
     vault::save_note(&vault.path, &path, &content).map_err(|e| e.to_string())
 }
 
@@ -170,15 +170,17 @@ pub fn create_note(
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     let settings = state.settings.read();
-    let vault = settings.active_vault().ok_or("nenhum vault ativo")?;
+    let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
+    let lang = settings.language.clone();
     let init_content = title.map(|t| format!("# {t}\n\n"));
-    vault::create_note(&vault.path, &path, init_content.as_deref()).map_err(|e| e.to_string())
+    vault::create_note(&vault.path, &path, init_content.as_deref(), &lang)
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn create_folder(path: String, state: State<'_, AppState>) -> Result<(), String> {
     let settings = state.settings.read();
-    let vault = settings.active_vault().ok_or("nenhum vault ativo")?;
+    let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
     vault::create_folder(&vault.path, &path).map_err(|e| e.to_string())
 }
 
@@ -189,14 +191,14 @@ pub fn rename_item(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let settings = state.settings.read();
-    let vault = settings.active_vault().ok_or("nenhum vault ativo")?;
+    let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
     vault::rename_item(&vault.path, &old_path, &new_path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub fn delete_item(path: String, state: State<'_, AppState>) -> Result<(), String> {
     let settings = state.settings.read();
-    let vault = settings.active_vault().ok_or("nenhum vault ativo")?;
+    let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
     vault::delete_item(&vault.path, &path).map_err(|e| e.to_string())?;
 
     if let Some(net) = state.network.read().as_ref() {
@@ -214,7 +216,7 @@ pub fn crdt_apply_client_update(
 ) -> Result<(), String> {
     let update_bytes = URL_SAFE_NO_PAD
         .decode(&update_base64)
-        .map_err(|e| format!("base64 inválido: {e}"))?;
+        .map_err(|_e| "errors.invalidBase64".to_string())?;
 
     // Apply to Yrs in-memory doc and get text
     let new_text = state
@@ -239,7 +241,7 @@ pub fn crdt_apply_client_update(
 #[tauri::command]
 pub fn network_sync_now(state: State<'_, AppState>) -> Result<(), String> {
     let net = state.network.read();
-    let service = net.as_ref().ok_or("serviço P2P não iniciado")?;
+    let service = net.as_ref().ok_or("errors.p2pNotStarted")?;
     service.sync_now();
     Ok(())
 }
@@ -248,7 +250,7 @@ pub fn network_sync_now(state: State<'_, AppState>) -> Result<(), String> {
 pub fn network_request_pair(pair_code: String, state: State<'_, AppState>) -> Result<(), String> {
     let invite = decode_pair_code(&pair_code).map_err(|e| e.to_string())?;
     let net = state.network.read();
-    let service = net.as_ref().ok_or("serviço P2P não iniciado")?;
+    let service = net.as_ref().ok_or("errors.p2pNotStarted")?;
     service.request_pair(invite);
     Ok(())
 }
@@ -260,7 +262,7 @@ pub fn network_answer_pair(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let net = state.network.read();
-    let service = net.as_ref().ok_or("serviço P2P não iniciado")?;
+    let service = net.as_ref().ok_or("errors.p2pNotStarted")?;
     service.answer_pair(request_id, accept);
     Ok(())
 }
@@ -323,7 +325,7 @@ pub fn save_ai_settings(settings: AiSettings, state: State<'_, AppState>) -> Res
 #[tauri::command]
 pub fn save_theme(theme: String, state: State<'_, AppState>) -> Result<(), String> {
     if !matches!(theme.as_str(), "dark" | "light") {
-        return Err("tema inválido".to_string());
+        return Err("errors.invalidTheme".to_string());
     }
     let mut settings = state.settings.write();
     let previous = std::mem::replace(&mut settings.theme, theme);
@@ -337,12 +339,26 @@ pub fn save_theme(theme: String, state: State<'_, AppState>) -> Result<(), Strin
 #[tauri::command]
 pub fn save_view_mode(view_mode: String, state: State<'_, AppState>) -> Result<(), String> {
     if !matches!(view_mode.as_str(), "edit" | "split" | "preview") {
-        return Err("modo de visualização inválido".to_string());
+        return Err("errors.invalidViewMode".to_string());
     }
     let mut settings = state.settings.write();
     let previous = std::mem::replace(&mut settings.view_mode, view_mode);
     if let Err(error) = settings.save() {
         settings.view_mode = previous;
+        return Err(error.to_string());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn save_language(language: String, state: State<'_, AppState>) -> Result<(), String> {
+    if !matches!(language.as_str(), "en-US" | "pt-BR" | "es-ES") {
+        return Err("errors.invalidLanguage".to_string());
+    }
+    let mut settings = state.settings.write();
+    let previous = std::mem::replace(&mut settings.language, language);
+    if let Err(error) = settings.save() {
+        settings.language = previous;
         return Err(error.to_string());
     }
     Ok(())
@@ -365,7 +381,7 @@ pub async fn fetch_ai_models(
             .providers
             .iter()
             .find(|p| p.id == p_id)
-            .ok_or_else(|| "provedor não encontrado".to_string())?;
+            .ok_or_else(|| "errors.providerNotFound".to_string())?;
         (provider.base_url.clone(), provider.api_key.clone())
     };
 
@@ -381,7 +397,7 @@ pub fn search_vault_rag(
     state: State<'_, AppState>,
 ) -> Result<Vec<RagChunk>, String> {
     let settings = state.settings.read();
-    let vault = settings.active_vault().ok_or("nenhum vault ativo")?;
+    let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
     rag::index_and_search_vault(&vault.path, &query, limit.unwrap_or(5))
         .map_err(|e| e.to_string())
 }
@@ -395,7 +411,7 @@ pub async fn ai_chat_query(
 ) -> Result<ChatResponse, String> {
     let (provider, vault_path) = {
         let settings = state.settings.read();
-        let vault = settings.active_vault().ok_or("nenhum vault ativo")?;
+        let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
         let p = settings
             .ai
             .providers
@@ -411,12 +427,12 @@ pub async fn ai_chat_query(
         let chunk = RagChunk {
             note_path: path.clone(),
             note_title: path.clone(),
-            section_title: "Nota Aberta".to_string(),
+            section_title: "Open Note".to_string(),
             line_number: 1,
             content: content.clone(),
             score: 1.0,
         };
-        let context = format!("---\n[Nota Aberta: {path} (Linha: 1)]\n{content}\n---");
+        let context = format!("---\n[Open Note: {path} (Line: 1)]\n{content}\n---");
         (vec![chunk], context)
     } else {
         let chunks = rag::index_and_search_vault(&vault_path, &prompt, 5)
@@ -425,7 +441,7 @@ pub async fn ai_chat_query(
         let mut parts = Vec::new();
         for chunk in &chunks {
             parts.push(format!(
-                "---\n[Nota: {} ({}), Seção: {}, Linha: {}]\n{}\n---",
+                "---\n[Note: {} ({}), Section: {}, Line: {}]\n{}\n---",
                 chunk.note_title, chunk.note_path, chunk.section_title, chunk.line_number, chunk.content
             ));
         }
@@ -434,14 +450,15 @@ pub async fn ai_chat_query(
     };
 
     let system_prompt = format!(
-        "Você é o assistente inteligente de notas do LowNotes.\n\
-        Responda à dúvida do usuário de forma clara, prestativa e concisa, baseando-se estritamente nas notas do usuário fornecidas no contexto abaixo.\n\n\
-        DIRETRIZ DE LINKAGEM OBRIGATÓRIA:\n\
-        Sempre que você citar ou referenciar um trecho ou informação de uma nota, use links no formato Markdown:\n\
-        [Nome da Nota](lownotes://open?path=<caminho_relativo>&line=<numero_da_linha>)\n\
-        Exemplo: 'Conforme registrado em [Ideias](lownotes://open?path=Ideias.md&line=12), a arquitetura...'\n\
-        Se a resposta não constar no contexto das notas, responda com honestidade informando que não encontrou registro nas notas.\n\n\
-        CONTEXTO DAS NOTAS DO USUÁRIO:\n\
+        "You are LowNotes' intelligent notes assistant.\n\
+        Answer the user's question clearly, helpfully and concisely, based strictly on the user's notes provided in the context below.\n\
+        Always respond in the same language as the user's latest message.\n\n\
+        MANDATORY LINKING GUIDELINE:\n\
+        Whenever you cite or reference an excerpt or information from a note, use Markdown links in the format:\n\
+        [Note Name](lownotes://open?path=<relative_path>&line=<line_number>)\n\
+        Example: 'As recorded in [Ideias](lownotes://open?path=Ideias.md&line=12), the architecture...'\n\
+        If the answer is not present in the notes context, honestly say that no record was found in the notes.\n\n\
+        USER NOTES CONTEXT:\n\
         {context_text}"
     );
 

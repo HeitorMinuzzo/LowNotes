@@ -12,6 +12,7 @@
     fetchAiModels,
     saveAiSettings,
   } from '../api';
+  import { locale, t, trError, ts } from '$lib/i18n';
 
   let {
     isOpen = $bindable(false),
@@ -126,7 +127,7 @@
         selectedModelInput = models[0];
       }
     } catch (err: any) {
-      errorMessage = typeof err === 'string' ? err : err.message || 'Falha ao buscar modelos';
+      errorMessage = trError(typeof err === 'string' ? err : err.message || 'ai.errorFetchModels');
     } finally {
       isFetchingModels = false;
     }
@@ -147,7 +148,7 @@
       isSettingsOpen = false;
       errorMessage = null;
     } catch (e: any) {
-      errorMessage = typeof e === 'string' ? e : e.message || 'Erro ao salvar';
+      errorMessage = trError(typeof e === 'string' ? e : e.message || 'ai.errorSave');
     }
   }
 
@@ -177,7 +178,7 @@
     inputPrompt = '';
     errorMessage = null;
 
-    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const time = new Date().toLocaleTimeString($locale, { hour: '2-digit', minute: '2-digit' });
     messages.push({
       role: 'user',
       content: text,
@@ -199,14 +200,14 @@
         role: 'assistant',
         content: resp.answer,
         sources: resp.sources,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        timestamp: new Date().toLocaleTimeString($locale, { hour: '2-digit', minute: '2-digit' }),
       });
     } catch (err: any) {
-      const msg = typeof err === 'string' ? err : err.message || 'Falha ao obter resposta da IA';
+      const msg = trError(typeof err === 'string' ? err : err.message || 'ai.errorQuery');
       messages.push({
         role: 'assistant',
-        content: `⚠️ **Erro:** ${msg}\n\n*Dica: Verifique se o provedor está ativo (ex: Ollama rodando) ou confira a API Key nas configurações (⚙️).*`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        content: ts('ai.errorMessage', { message: msg }),
+        timestamp: new Date().toLocaleTimeString($locale, { hour: '2-digit', minute: '2-digit' }),
       });
     } finally {
       isLoading = false;
@@ -263,7 +264,7 @@
     <header class="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-card)]">
       <div class="flex items-center gap-2">
         <span class="text-[var(--accent-light)] font-bold text-sm">✦</span>
-        <h3 class="text-xs font-bold text-[var(--text-main)]">Assistente</h3>
+        <h3 class="text-xs font-bold text-[var(--text-main)]">{$t('ai.title')}</h3>
 
         <!-- Quick Provider Switcher in Header -->
         <select
@@ -276,7 +277,7 @@
             await saveAiSettings(aiSettings);
           }}
           class="bg-[var(--bg-main)] border border-[var(--border)] rounded px-2 py-0.5 text-[11px] font-medium text-[var(--accent-light)] focus:outline-none focus:border-[var(--accent)] cursor-pointer hover:border-[var(--accent)] transition"
-          title="Mudar provedor de IA rapidamente"
+          title={$t('ai.quickProviderSwitch')}
         >
           {#each aiSettings.providers as prov}
             <option value={prov.id} selected={aiSettings.active_provider_id === prov.id}>
@@ -289,14 +290,14 @@
         <button
           onclick={() => (isSettingsOpen = !isSettingsOpen)}
           class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--accent-light)] transition"
-          title="Configurações da IA"
+          title={$t('ai.settings')}
         >
           ⚙️
         </button>
         <button
           onclick={() => (isOpen = false)}
           class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-main)] transition"
-          title="Fechar"
+          title={$t('ai.close')}
         >
           ✕
         </button>
@@ -305,21 +306,21 @@
 
     <!-- Scope Selector Bar -->
     <div class="flex items-center justify-between px-4 py-2 bg-[var(--bg-main)] border-b border-[var(--border)] text-xs">
-      <span class="text-[11px] text-[var(--text-dim)]">Escopo:</span>
+      <span class="text-[11px] text-[var(--text-dim)]">{$t('ai.scope')}</span>
       <div class="flex bg-[var(--bg-card)] p-0.5 rounded-lg border border-[var(--border)]">
         <button
           onclick={() => (scope = 'vault')}
           class="px-2.5 py-0.5 rounded-md text-[11px] transition {scope === 'vault' ? 'bg-[var(--accent)] text-black font-semibold shadow' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
         >
-          Vault Inteiro
+          {$t('ai.scopeVault')}
         </button>
         <button
           onclick={() => (scope = 'note')}
           disabled={!currentNotePath}
           class="px-2.5 py-0.5 rounded-md text-[11px] transition disabled:opacity-40 {scope === 'note' ? 'bg-[var(--accent)] text-black font-semibold shadow' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
-          title={currentNotePath ? currentNotePath : 'Abra uma nota para usar este modo'}
+          title={currentNotePath ? currentNotePath : $t('ai.scopeNoteHint')}
         >
-          Esta Nota
+          {$t('ai.scopeNote')}
         </button>
       </div>
     </div>
@@ -328,7 +329,7 @@
     {#if isSettingsOpen}
       <div class="absolute top-[88px] left-0 right-0 bottom-0 bg-[var(--bg-card)] z-40 p-4 overflow-y-auto flex flex-col gap-4 border-b border-[var(--border)] animate-fadeIn">
         <div class="flex items-center justify-between pb-2 border-b border-[var(--border)]">
-          <span class="text-xs font-bold text-[var(--text-main)]">Configurações de Provedores de IA</span>
+          <span class="text-xs font-bold text-[var(--text-main)]">{$t('ai.settingsTitle')}</span>
           <button
             onclick={() => (isSettingsOpen = false)}
             class="text-xs text-[var(--text-dim)] hover:text-[var(--text-main)]"
@@ -340,7 +341,7 @@
         <!-- Provider Selection -->
         <!-- Provider Selection in Settings Drawer -->
         <div class="flex flex-col gap-1.5">
-          <label for="ai-provider-select" class="text-xs text-[var(--text-dim)] font-medium">Provedor:</label>
+          <label for="ai-provider-select" class="text-xs text-[var(--text-dim)] font-medium">{$t('ai.provider')}</label>
           <select
             id="ai-provider-select"
             value={selectedProviderId}
@@ -357,7 +358,7 @@
 
         <!-- Base URL -->
         <div class="flex flex-col gap-1.5">
-          <label for="ai-base-url" class="text-xs text-[var(--text-dim)] font-medium">Endpoint Base URL (OpenAI-compatible):</label>
+          <label for="ai-base-url" class="text-xs text-[var(--text-dim)] font-medium">{$t('ai.baseUrl')}</label>
           <input
             id="ai-base-url"
             type="text"
@@ -370,19 +371,19 @@
         <!-- API Key -->
         <div class="flex flex-col gap-1.5">
           <div class="flex items-center justify-between">
-            <label for="ai-api-key" class="text-xs text-[var(--text-dim)] font-medium">API Key:</label>
+            <label for="ai-api-key" class="text-xs text-[var(--text-dim)] font-medium">{$t('ai.apiKey')}</label>
             <button
               onclick={() => (showApiKey = !showApiKey)}
               class="text-[10px] text-[var(--text-dim)] hover:text-[var(--accent-light)]"
             >
-              {showApiKey ? 'Ocultar' : 'Mostrar'}
+              {showApiKey ? $t('ai.hide') : $t('ai.show')}
             </button>
           </div>
           <input
             id="ai-api-key"
             type={showApiKey ? 'text' : 'password'}
             bind:value={apiKeyInput}
-            placeholder={selectedProviderId === 'ollama' || selectedProviderId === 'lmstudio' ? 'Não necessária para provedor local' : 'sk-...'}
+            placeholder={selectedProviderId === 'ollama' || selectedProviderId === 'lmstudio' ? $t('ai.apiKeyLocalPlaceholder') : 'sk-...'}
             class="bg-[var(--bg-main)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-xs font-mono text-[var(--text-main)] focus:outline-none focus:border-[var(--accent)]"
           />
         </div>
@@ -391,7 +392,7 @@
         <!-- Model Selection Combobox -->
         <div class="flex flex-col gap-1.5 relative">
           <div class="flex items-center justify-between">
-            <label for="ai-model-input" class="text-xs text-[var(--text-dim)] font-medium">Modelo Selecionado:</label>
+            <label for="ai-model-input" class="text-xs text-[var(--text-dim)] font-medium">{$t('ai.selectedModel')}</label>
             <button
               type="button"
               onclick={handleFetchModels}
@@ -399,7 +400,7 @@
               class="text-[11px] text-[var(--accent-light)] hover:underline flex items-center gap-1 disabled:opacity-50"
             >
               <span>↻</span>
-              <span>{isFetchingModels ? 'Buscando...' : 'Listar Modelos'}</span>
+              <span>{isFetchingModels ? $t('ai.fetching') : $t('ai.listModels')}</span>
             </button>
           </div>
 
@@ -410,7 +411,7 @@
               type="text"
               bind:value={selectedModelInput}
               onfocus={() => { if (availableModels.length > 0) isModelDropdownOpen = true; }}
-              placeholder="ex: qwen2.5:1.5b ou gpt-4o-mini"
+              placeholder={$t('ai.modelPlaceholder')}
               class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-md pl-2.5 pr-14 py-1.5 text-xs font-mono text-[var(--text-main)] focus:outline-none focus:border-[var(--accent)]"
             />
 
@@ -420,7 +421,7 @@
                   type="button"
                   onclick={() => { selectedModelInput = ''; modelSearchQuery = ''; }}
                   class="w-4 h-4 flex items-center justify-center text-[10px] text-[var(--text-dim)] hover:text-[var(--text-main)]"
-                  title="Limpar"
+                  title={$t('ai.clear')}
                 >
                   ✕
                 </button>
@@ -431,7 +432,7 @@
                   type="button"
                   onclick={() => (isModelDropdownOpen = !isModelDropdownOpen)}
                   class="w-5 h-5 flex items-center justify-center rounded text-[10px] text-[var(--text-dim)] hover:text-[var(--accent-light)] hover:bg-[var(--bg-hover)] transition"
-                  title="Abrir lista de modelos"
+                  title={$t('ai.openModelList')}
                 >
                   {isModelDropdownOpen ? '▲' : '▼'}
                 </button>
@@ -448,7 +449,7 @@
                 <input
                   type="text"
                   bind:value={modelSearchQuery}
-                  placeholder="Pesquisar nos {availableModels.length} modelos..."
+                  placeholder={$t('ai.searchModels', { count: availableModels.length })}
                   class="flex-1 bg-transparent text-xs text-[var(--text-main)] placeholder-[var(--text-dim)] focus:outline-none"
                 />
                 {#if modelSearchQuery}
@@ -464,9 +465,9 @@
                   type="button"
                   onclick={() => (isModelDropdownOpen = false)}
                   class="text-[11px] text-[var(--text-dim)] hover:text-[var(--text-main)] ml-1"
-                  title="Fechar lista"
+                  title={$t('ai.closeList')}
                 >
-                  Pronto
+                  {$t('ai.done')}
                 </button>
               </div>
 
@@ -482,13 +483,13 @@
                     class="w-full text-left px-2.5 py-1.5 rounded-md text-xs font-mono text-[var(--accent-light)] hover:bg-[var(--bg-hover)] flex items-center gap-1.5 transition border-b border-[var(--border)]"
                   >
                     <span>➕</span>
-                    <span class="truncate">Usar "{modelSearchQuery.trim()}" (Personalizado)</span>
+                    <span class="truncate">{$t('ai.useCustomModel', { model: modelSearchQuery.trim() })}</span>
                   </button>
                 {/if}
 
                 {#if filteredModels.length === 0}
                   <div class="p-4 text-center text-xs text-[var(--text-dim)]">
-                    Nenhum modelo encontrado para "{modelSearchQuery}"
+                    {$t('ai.noModelsFound', { query: modelSearchQuery })}
                   </div>
                 {:else}
                   {#each filteredModels as mod}
@@ -511,8 +512,8 @@
 
               <!-- Footer with count -->
               <div class="px-3 py-1.5 border-t border-[var(--border)] bg-[var(--bg-main)] text-[10px] text-[var(--text-dim)] flex items-center justify-between">
-                <span>{filteredModels.length} de {availableModels.length} modelos</span>
-                <span class="text-emerald-400">Disponíveis</span>
+                <span>{$t('ai.modelsCount', { shown: filteredModels.length, total: availableModels.length })}</span>
+                <span class="text-emerald-400">{$t('ai.available')}</span>
               </div>
             </div>
           {/if}
@@ -530,21 +531,21 @@
             onclick={() => (isAddingCustom = true)}
             class="text-xs text-[var(--text-dim)] hover:text-[var(--accent-light)] text-left"
           >
-            + Adicionar outro Provedor Personalizado
+            + {$t('ai.addCustomProvider')}
           </button>
         {:else}
           <div class="p-3 bg-[var(--bg-main)] border border-[var(--border)] rounded-md flex flex-col gap-2">
-            <span class="text-xs font-semibold text-[var(--text-main)]">Novo Provedor</span>
+            <span class="text-xs font-semibold text-[var(--text-main)]">{$t('ai.newProvider')}</span>
             <input
               type="text"
               bind:value={customName}
-              placeholder="Nome (ex: LocalAI)"
+              placeholder={$t('ai.providerNamePlaceholder')}
               class="bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text-main)]"
             />
             <input
               type="text"
               bind:value={customUrl}
-              placeholder="URL (ex: http://192.168.1.50:8080/v1)"
+              placeholder={$t('ai.providerUrlPlaceholder')}
               class="bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1 text-xs font-mono text-[var(--text-main)]"
             />
             <div class="flex justify-end gap-1.5">
@@ -552,13 +553,13 @@
                 onclick={() => (isAddingCustom = false)}
                 class="px-2 py-1 text-xs text-[var(--text-dim)] hover:text-[var(--text-main)]"
               >
-                Cancelar
+                {$t('ai.cancel')}
               </button>
               <button
                 onclick={handleAddCustomProvider}
                 class="px-3 py-1 bg-[var(--accent)] text-black text-xs font-semibold rounded"
               >
-                Adicionar
+                {$t('ai.add')}
               </button>
             </div>
           </div>
@@ -569,7 +570,7 @@
             onclick={handleSaveSettings}
             class="w-full py-2 bg-[var(--accent)] hover:bg-[var(--accent-light)] text-black text-xs font-semibold rounded-lg shadow-md transition"
           >
-            Salvar Configurações
+            {$t('ai.saveSettings')}
           </button>
         </div>
       </div>
@@ -586,29 +587,29 @@
           <div class="w-12 h-12 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center text-xl mb-3">
             ✦
           </div>
-          <h4 class="text-xs font-bold text-[var(--text-main)] mb-1">Como posso te ajudar hoje?</h4>
+          <h4 class="text-xs font-bold text-[var(--text-main)] mb-1">{$t('ai.emptyTitle')}</h4>
           <p class="text-[11px] text-[var(--text-muted)] max-w-[240px] leading-relaxed mb-4">
-            Consulte qualquer nota do seu vault com busca semântica e citações diretas.
+            {$t('ai.emptySubtitle')}
           </p>
 
           <div class="flex flex-col gap-1.5 w-full max-w-[260px]">
             <button
-              onclick={() => sendMessage('O que minhas notas dizem sobre este projeto?')}
+              onclick={() => sendMessage(ts('ai.suggestionProject'))}
               class="px-3 py-2 text-[11px] text-left rounded-lg bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
             >
-              "O que minhas notas dizem sobre este projeto?"
+              {$t('ai.suggestionProject')}
             </button>
             <button
-              onclick={() => sendMessage('Resuma as principais ideias e tópicos anotados.')}
+              onclick={() => sendMessage(ts('ai.suggestionSummary'))}
               class="px-3 py-2 text-[11px] text-left rounded-lg bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
             >
-              "Resuma as principais ideias e tópicos anotados."
+              {$t('ai.suggestionSummary')}
             </button>
             <button
-              onclick={() => sendMessage('Liste tarefas ou pontos pendentes encontrados.')}
+              onclick={() => sendMessage(ts('ai.suggestionTasks'))}
               class="px-3 py-2 text-[11px] text-left rounded-lg bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
             >
-              "Liste tarefas ou pontos pendentes encontrados."
+              {$t('ai.suggestionTasks')}
             </button>
           </div>
         </div>
@@ -616,7 +617,7 @@
         {#each messages as msg}
           <div class="flex flex-col gap-1 {msg.role === 'user' ? 'items-end' : 'items-start'}">
             <div class="flex items-center gap-1.5 text-[10px] text-[var(--text-dim)] px-1 select-none">
-              <span>{msg.role === 'user' ? 'Você' : 'Assistente'}</span>
+              <span>{msg.role === 'user' ? $t('ai.you') : $t('ai.assistantRole')}</span>
               <span>•</span>
               <span>{msg.timestamp}</span>
             </div>
@@ -626,13 +627,13 @@
             >
               {#if msg.role === 'assistant'}
                 <div class="prose max-w-none text-xs leading-relaxed">
-                  {@html marked.parse(msg.content)}
+                  {@html marked.parse(trError(msg.content))}
                 </div>
 
                 <!-- Sources Chips -->
                 {#if msg.sources && msg.sources.length > 0}
                   <div class="mt-3 pt-2 border-t border-[var(--border)] flex flex-col gap-1.5 select-none">
-                    <span class="text-[10px] text-[var(--text-dim)] font-medium">Fontes consultadas:</span>
+                    <span class="text-[10px] text-[var(--text-dim)] font-medium">{$t('ai.sources')}</span>
                     <div class="flex flex-wrap gap-1">
                       {#each msg.sources as src}
                         <button
@@ -658,7 +659,7 @@
         {#if isLoading}
           <div class="flex items-center gap-2 text-xs text-[var(--text-dim)] px-2 animate-pulse">
             <span class="inline-block w-2 h-2 rounded-full bg-[var(--accent)]"></span>
-            <span>Buscando no vault e gerando resposta...</span>
+            <span>{$t('ai.thinking')}</span>
           </div>
         {/if}
       {/if}
@@ -679,20 +680,20 @@
                 sendMessage();
               }
             }}
-            placeholder="Pergunte às suas notas... (Enter envia)"
+            placeholder={$t('ai.inputPlaceholder')}
             rows="2"
             class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-lg p-2.5 text-xs text-[var(--text-main)] placeholder-[var(--text-dim)] resize-none focus:outline-none focus:border-[var(--accent)] select-text"
           ></textarea>
         </div>
 
         <div class="flex items-center justify-between text-[11px] text-[var(--text-dim)]">
-          <span class="text-[10px]">Shift+Enter para nova linha</span>
+          <span class="text-[10px]">{$t('ai.shiftEnterHint')}</span>
           <button
             type="submit"
             disabled={isLoading || !inputPrompt.trim()}
             class="px-3 py-1 bg-[var(--accent)] hover:bg-[var(--accent-light)] disabled:opacity-40 text-black text-xs font-semibold rounded-md transition shadow flex items-center gap-1"
           >
-            <span>Enviar</span>
+            <span>{$t('ai.send')}</span>
             <span>➤</span>
           </button>
         </div>

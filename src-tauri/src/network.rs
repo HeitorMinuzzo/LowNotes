@@ -144,11 +144,12 @@ impl NetworkService {
                             command_rx,
                             app.clone(),
                         )) {
+                            eprintln!("[p2p] network unavailable: {err:#}");
                             let _ = app.emit(
                                 "p2p:error",
                                 NetworkEventPayload::Error {
                                     peer: None,
-                                    message: format!("rede indisponível: {err:#}"),
+                                    message: "errors.networkUnavailable".to_string(),
                                 },
                             );
                         }
@@ -164,7 +165,7 @@ impl NetworkService {
                     }
                 }
             })
-            .expect("não foi possível criar thread de rede");
+            .expect("failed to spawn network thread");
 
         Self {
             peers,
@@ -479,7 +480,7 @@ async fn handle_incoming_connection(
                 .iter()
                 .find(|p| p.endpoint_id == remote_id.to_string())
                 .cloned()
-                .context("dispositivo não autorizado")?;
+                .context("errors.unauthorizedDevice")?;
 
             let changed = serve_sync(&mut send, &mut recv, &vault, remote_manifest).await?;
             connection.close(0u32.into(), b"sync complete");
@@ -512,7 +513,7 @@ async fn handle_incoming_connection(
                 let _ = vault::delete_item(&vault, &path);
             }
         }
-        _ => bail!("pacote inesperado no início da conexão"),
+        _ => bail!("errors.unexpectedPacketStart"),
     }
 
     Ok(())
@@ -562,9 +563,9 @@ async fn dial_pair(
             Ok(())
         }
         Packet::PairDecision { accepted: false, .. } => {
-            bail!("a solicitação de pareamento foi recusada pelo outro computador");
+            bail!("errors.pairRejected");
         }
-        _ => bail!("resposta de pareamento inválida"),
+        _ => bail!("errors.invalidPairResponse"),
     }
 }
 
@@ -642,7 +643,7 @@ async fn dial_sync(
                 changed += 1;
             }
             Packet::Done => break,
-            _ => bail!("pacote inesperado durante sincronização"),
+            _ => bail!("errors.unexpectedPacketSync"),
         }
     }
 
@@ -737,7 +738,7 @@ fn connection_is_direct(connection: &iroh::endpoint::Connection) -> Option<bool>
 async fn send_packet(stream: &mut iroh::endpoint::SendStream, packet: &Packet) -> anyhow::Result<()> {
     let bytes = serde_json::to_vec(packet)?;
     if bytes.len() > MAX_PACKET_BYTES {
-        bail!("pacote excede tamanho máximo de 12 MB");
+        bail!("errors.packetTooLarge");
     }
     stream.write_all(&(bytes.len() as u32).to_be_bytes()).await?;
     stream.write_all(&bytes).await?;

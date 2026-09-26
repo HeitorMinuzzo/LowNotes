@@ -117,7 +117,7 @@ pub fn index_and_search_vault(
 
 fn chunk_markdown(note_path: &str, note_title: &str, content: &str) -> Vec<RagChunk> {
     let mut chunks = Vec::new();
-    let mut current_section = "Introdução".to_string();
+    let mut current_section = "Introduction".to_string();
     let mut current_lines = Vec::new();
     let mut chunk_start_line = 1;
 
@@ -248,7 +248,7 @@ pub async fn fetch_models(
     let body: OpenAiModelsResponse = resp
         .json()
         .await
-        .context("resposta de modelos em formato inválido")?;
+        .context("errors.invalidModelsResponse")?;
 
     let mut models: Vec<String> = body.data.into_iter().map(|m| m.id).collect();
     models.sort();
@@ -297,7 +297,7 @@ pub async fn generate_chat_completion(
     let result: OpenAiChatResponse = resp
         .json()
         .await
-        .context("resposta da IA em formato inválido")?;
+        .context("errors.invalidAiResponse")?;
 
     let choice = result
         .choices
@@ -308,7 +308,7 @@ pub async fn generate_chat_completion(
     let answer = choice
         .message
         .content
-        .unwrap_or_else(|| "Nenhum conteúdo retornado pela IA.".to_string());
+        .unwrap_or_else(|| "errors.aiEmptyContent".to_string());
 
     Ok(answer)
 }

@@ -9,7 +9,9 @@
     pickVaultDirectory,
     selectVault,
     networkSyncNow,
+    saveLanguage,
   } from '../api';
+  import { LOCALE_SHORT_LABELS, SUPPORTED_LOCALES, locale, t, trError, ts, type LocaleCode } from '$lib/i18n';
 
   let {
     activeVault = null,
@@ -86,7 +88,7 @@
       onRefreshItems();
       onSelectNote(path);
     } catch (e: any) {
-      alert(typeof e === 'string' ? e : e.message || 'Erro ao criar nota');
+      alert(trError(typeof e === 'string' ? e : e.message || 'sidebar.errorCreateNote'));
     }
   }
 
@@ -98,25 +100,25 @@
       newFolderName = '';
       onRefreshItems();
     } catch (e: any) {
-      alert(typeof e === 'string' ? e : e.message || 'Erro ao criar pasta');
+      alert(trError(typeof e === 'string' ? e : e.message || 'sidebar.errorCreateFolder'));
     }
   }
 
   async function handleDelete(path: string, event: MouseEvent) {
     event.stopPropagation();
-    if (confirm(`Deseja realmente excluir "${path}"?`)) {
+    if (confirm(ts('sidebar.confirmDelete', { path }))) {
       try {
         await deleteItem(path);
         onRefreshItems();
       } catch (e) {
-        console.error('Erro ao deletar:', e);
+        console.error('Failed to delete:', e);
       }
     }
   }
 
   async function handleRename(oldPath: string, event: MouseEvent) {
     event.stopPropagation();
-    const newName = prompt('Novo nome:', oldPath);
+    const newName = prompt(ts('sidebar.renamePrompt'), oldPath);
     if (newName && newName !== oldPath) {
       try {
         await renameItem(oldPath, newName);
@@ -125,8 +127,17 @@
           onSelectNote(newName);
         }
       } catch (e: any) {
-        alert(typeof e === 'string' ? e : e.message || 'Erro ao renomear');
+        alert(trError(typeof e === 'string' ? e : e.message || 'sidebar.errorRename'));
       }
+    }
+  }
+
+  async function handleLanguageChange(next: LocaleCode) {
+    locale.set(next);
+    try {
+      await saveLanguage(next);
+    } catch (e) {
+      console.error('Failed to save language:', e);
     }
   }
 </script>
@@ -141,7 +152,7 @@
       <div class="flex items-center gap-2 overflow-hidden">
         <span class="text-[var(--accent-light)] font-bold text-sm">✦</span>
         <span class="text-xs font-semibold text-[var(--text-main)] truncate">
-          {activeVault ? activeVault.name : 'Selecionar Vault'}
+          {activeVault ? activeVault.name : $t('sidebar.selectVault')}
         </span>
       </div>
       <span class="text-[10px] text-[var(--text-dim)] group-hover:text-[var(--text-muted)]">▼</span>
@@ -151,7 +162,7 @@
     {#if isVaultDropdownOpen}
       <div class="absolute top-full left-2 right-2 mt-1 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg shadow-xl py-1.5 z-40 animate-fadeIn">
         <div class="px-3 py-1 text-[10px] font-semibold text-[var(--text-dim)] uppercase tracking-wider">
-          Seus Vaults
+          {$t('sidebar.yourVaults')}
         </div>
         {#each vaults as v}
           <button
@@ -160,7 +171,7 @@
           >
             <span class="truncate">{v.name}</span>
             {#if activeVault?.id === v.id}
-              <span class="text-[10px] text-[var(--accent-light)]">ativo</span>
+              <span class="text-[10px] text-[var(--accent-light)]">{$t('sidebar.active')}</span>
             {/if}
           </button>
         {/each}
@@ -170,7 +181,7 @@
           class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--accent-light)] hover:bg-[var(--bg-hover)] transition font-medium"
         >
           <span>+</span>
-          <span>Abrir Pasta do Computador</span>
+          <span>{$t('sidebar.openComputerFolder')}</span>
         </button>
       </div>
     {/if}
@@ -182,7 +193,7 @@
       <input
         type="text"
         bind:value={searchQuery}
-        placeholder="Buscar notas..."
+        placeholder={$t('sidebar.searchPlaceholder')}
         class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-md px-2.5 py-1 text-xs text-[var(--text-main)] placeholder-[var(--text-dim)] focus:outline-none focus:border-[var(--accent)]"
       />
       {#if searchQuery}
@@ -201,12 +212,12 @@
         onclick={() => (isCreatingNote = true)}
         class="flex-1 py-1 px-2 text-xs font-medium rounded bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition text-center"
       >
-        + Nova Nota
+        + {$t('sidebar.newNote')}
       </button>
       <button
         onclick={() => (isCreatingFolder = true)}
         class="py-1 px-2 text-xs font-medium rounded bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
-        title="Nova Pasta"
+        title={$t('sidebar.newFolder')}
       >
         📁+
       </button>
@@ -221,7 +232,7 @@
         <input
           type="text"
           bind:value={newNoteName}
-          placeholder="Nome da nota (ex: Ideias)"
+          placeholder={$t('sidebar.noteNamePlaceholder')}
           class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text-main)] focus:outline-none"
         />
         <div class="flex justify-end gap-1">
@@ -230,13 +241,13 @@
             onclick={() => (isCreatingNote = false)}
             class="px-2 py-0.5 text-[11px] text-[var(--text-dim)] hover:text-[var(--text-main)]"
           >
-            Cancelar
+            {$t('sidebar.cancel')}
           </button>
           <button
             type="submit"
             class="px-2 py-0.5 text-[11px] bg-[var(--accent)] text-black font-semibold rounded"
           >
-            Criar
+            {$t('sidebar.create')}
           </button>
         </div>
       </form>
@@ -251,7 +262,7 @@
         <input
           type="text"
           bind:value={newFolderName}
-          placeholder="Nome da pasta"
+          placeholder={$t('sidebar.folderNamePlaceholder')}
           class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text-main)] focus:outline-none"
         />
         <div class="flex justify-end gap-1">
@@ -260,13 +271,13 @@
             onclick={() => (isCreatingFolder = false)}
             class="px-2 py-0.5 text-[11px] text-[var(--text-dim)] hover:text-[var(--text-main)]"
           >
-            Cancelar
+            {$t('sidebar.cancel')}
           </button>
           <button
             type="submit"
             class="px-2 py-0.5 text-[11px] bg-[var(--accent)] text-black font-semibold rounded"
           >
-            Criar Pasta
+            {$t('sidebar.createFolder')}
           </button>
         </div>
       </form>
@@ -277,7 +288,7 @@
   <div class="flex-1 overflow-y-auto px-2 py-2 flex flex-col gap-0.5">
     {#if filteredItems.length === 0}
       <div class="text-center py-8 text-xs text-[var(--text-dim)]">
-        {searchQuery ? 'Nenhuma nota encontrada' : 'Nenhuma nota neste vault'}
+        {searchQuery ? $t('sidebar.noNotesFound') : $t('sidebar.noNotesInVault')}
       </div>
     {:else}
       {#each filteredItems as item}
@@ -298,14 +309,14 @@
             <button
               onclick={(e) => handleRename(item.path, e)}
               class="w-4 h-4 flex items-center justify-center text-[10px] text-[var(--text-dim)] hover:text-[var(--text-main)]"
-              title="Renomear"
+              title={$t('sidebar.rename')}
             >
               ✎
             </button>
             <button
               onclick={(e) => handleDelete(item.path, e)}
               class="w-4 h-4 flex items-center justify-center text-[10px] text-[var(--text-dim)] hover:text-red-400"
-              title="Excluir"
+              title={$t('sidebar.delete')}
             >
               ✕
             </button>
@@ -326,28 +337,43 @@
       ></span>
       <div class="flex flex-col">
         <span class="font-medium text-[var(--text-main)] leading-none text-[11px]">
-          {peerCount > 0 ? `${peerCount} pareado${peerCount > 1 ? 's' : ''}` : 'P2P Offline'}
+          {peerCount > 0
+            ? peerCount === 1
+              ? $t('sidebar.pairedOne')
+              : $t('sidebar.pairedMany', { count: peerCount })
+            : $t('sidebar.p2pOffline')}
         </span>
         <span class="text-[10px] text-[var(--text-dim)] group-hover:text-[var(--accent-light)]">
-          Gerenciar Conexões
+          {$t('sidebar.manageConnections')}
         </span>
       </div>
     </button>
 
     <div class="flex items-center gap-1">
+      <select
+        value={$locale}
+        onchange={(e) => handleLanguageChange(e.currentTarget.value as LocaleCode)}
+        class="bg-transparent border border-[var(--border)] rounded px-1 py-0.5 text-[10px] font-medium text-[var(--text-dim)] hover:text-[var(--accent-light)] focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+        title={$t('settings.language')}
+        aria-label={$t('settings.language')}
+      >
+        {#each SUPPORTED_LOCALES as code}
+          <option value={code} selected={$locale === code}>{LOCALE_SHORT_LABELS[code]}</option>
+        {/each}
+      </select>
       <button
         onclick={onToggleTheme}
         class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--accent-light)] transition"
-        title={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
-        aria-label={theme === 'dark' ? 'Ativar tema claro' : 'Ativar tema escuro'}
+        title={$t(theme === 'dark' ? 'sidebar.enableLightTheme' : 'sidebar.enableDarkTheme')}
+        aria-label={$t(theme === 'dark' ? 'sidebar.enableLightTheme' : 'sidebar.enableDarkTheme')}
       >
         {#if theme === 'dark'}<Moon size={15} />{:else}<Sun size={15} />{/if}
       </button>
       <button
         onclick={() => networkSyncNow().catch(console.error)}
         class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--accent-light)] transition"
-        title="Sincronizar agora com peers"
-        aria-label="Sincronizar agora com peers"
+        title={$t('sidebar.syncNow')}
+        aria-label={$t('sidebar.syncNow')}
       >
         ↻
       </button>

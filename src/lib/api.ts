@@ -77,6 +77,10 @@ export async function networkGetPairInfo(): Promise<PairInfo | null> {
   return await invoke('network_get_pair_info');
 }
 
+export async function saveLanguage(language: string): Promise<void> {
+  return await invoke('save_language', { language });
+}
+
 export async function pickVaultDirectory(): Promise<string | null> {
   const selected = await open({
     directory: true,

@@ -20,6 +20,7 @@
     saveViewMode,
     networkGetPairInfo,
   } from '$lib/api';
+  import { locale, resolveLocale, t } from '$lib/i18n';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import Editor from '$lib/components/Editor.svelte';
   import PairModal from '$lib/components/PairModal.svelte';
@@ -51,6 +52,7 @@
     try {
       const data = await getAppState();
       settings = data.settings;
+      locale.set(resolveLocale(data.settings.language));
       theme = data.settings.theme === 'light' ? 'light' : 'dark';
       viewMode = ['edit', 'split', 'preview'].includes(data.settings.view_mode)
         ? data.settings.view_mode
@@ -73,7 +75,7 @@
         }
       }
     } catch (e) {
-      console.error('Falha ao carregar estado inicial:', e);
+      console.error('Failed to load initial state:', e);
     }
   }
 
@@ -81,7 +83,7 @@
     try {
       items = await listNotes();
     } catch (e) {
-      console.error('Falha ao atualizar notas:', e);
+      console.error('Failed to refresh notes:', e);
     }
   }
 
@@ -92,7 +94,7 @@
       currentNoteContent = res.content;
       currentCrdtBase64 = res.crdt_update_base64;
     } catch (e) {
-      console.error('Falha ao abrir nota:', e);
+      console.error('Failed to open note:', e);
     }
   }
 
@@ -137,7 +139,7 @@
       await saveTheme(theme);
     } catch (error) {
       theme = previous;
-      console.error('Falha ao salvar tema:', error);
+      console.error('Failed to save theme:', error);
     }
   }
 
@@ -148,12 +150,16 @@
       await saveViewMode(next);
     } catch (error) {
       viewMode = previous;
-      console.error('Falha ao salvar modo de visualização:', error);
+      console.error('Failed to save view mode:', error);
     }
   }
 
   $effect(() => {
     document.documentElement.dataset.theme = theme;
+  });
+
+  $effect(() => {
+    document.documentElement.lang = $locale;
   });
 
   onMount(async () => {
@@ -207,7 +213,7 @@
           endpointId = info.endpoint_id;
         }
       } catch (err) {
-        console.error('Falha ao obter código P2P:', err);
+        console.error('Failed to fetch P2P code:', err);
       }
     }
   });
@@ -224,9 +230,9 @@
       <div class="w-16 h-16 rounded-2xl bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center text-3xl mb-6 shadow-xl">
         ✦
       </div>
-      <h1 class="text-2xl font-bold mb-2">Bem-vindo ao LowNotes</h1>
+      <h1 class="text-2xl font-bold mb-2">{$t('app.welcomeTitle')}</h1>
       <p class="text-sm text-[var(--text-muted)] max-w-md mb-8 leading-relaxed">
-        Editor de notas Markdown local-first, super leve e com sincronização P2P criptografada sem servidor central.
+        {$t('app.welcomeSubtitle')}
       </p>
 
       <button
@@ -234,11 +240,11 @@
         class="px-6 py-3 bg-[var(--accent)] hover:bg-[var(--accent-light)] text-black font-semibold text-sm rounded-xl transition shadow-lg flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
       >
         <span>📁</span>
-        <span>Escolher pasta para o Vault</span>
+        <span>{$t('app.chooseVaultFolder')}</span>
       </button>
 
       <p class="text-xs text-[var(--text-dim)] mt-6">
-        Seus arquivos permanecem 100% legíveis como arquivos .md no seu computador.
+        {$t('app.filesReadable')}
       </p>
     </main>
   {:else}
@@ -290,10 +296,10 @@
             class="absolute top-3 right-4 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-xs text-[var(--text-muted)] hover:text-[var(--accent-light)] flex items-center gap-1.5 transition shadow"
           >
             <span>💬</span>
-            <span>Abrir Assistente IA</span>
+            <span>{$t('app.openAiChat')}</span>
           </button>
           <span class="text-4xl mb-3 opacity-60">📄</span>
-          <p class="text-sm">Selecione uma nota na barra lateral ou crie uma nova para começar.</p>
+          <p class="text-sm">{$t('app.emptyState')}</p>
         </div>
       {/if}
     </div>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { markWelcomeSeen } from '../api';
+  import { t } from '$lib/i18n';
 
   let {
     isOpen = $bindable(false),
@@ -14,7 +15,7 @@
     try {
       await markWelcomeSeen();
     } catch (e) {
-      console.error('Erro ao marcar apresentação como vista:', e);
+      console.error('Failed to mark welcome as seen:', e);
     }
     if (openAi && onOpenAiChat) {
       onOpenAiChat();
@@ -38,9 +39,9 @@
         <div class="w-14 h-14 rounded-2xl bg-[var(--bg-main)] border border-[var(--accent)]/40 flex items-center justify-center text-2xl mx-auto mb-4 shadow-lg text-[var(--accent-light)]">
           ✦
         </div>
-        <h2 class="text-xl font-bold text-[var(--text-main)] mb-1.5">Conheça o LowNotes</h2>
+        <h2 class="text-xl font-bold text-[var(--text-main)] mb-1.5">{$t('welcome.title')}</h2>
         <p class="text-xs text-[var(--text-muted)] max-w-md mx-auto leading-relaxed">
-          Seu novo editor de notas Markdown local-first: rápido, sem servidores centrais e com IA conectada ao seu vault.
+          {$t('welcome.subtitle')}
         </p>
       </div>
 
@@ -50,9 +51,9 @@
         <div class="flex items-start gap-3.5 p-3 rounded-xl bg-[var(--bg-main)] border border-[var(--border)]">
           <span class="text-xl mt-0.5">📄</span>
           <div>
-            <h4 class="text-xs font-bold text-[var(--text-main)] mb-0.5">100% Markdown com Mermaid</h4>
+            <h4 class="text-xs font-bold text-[var(--text-main)] mb-0.5">{$t('welcome.feature1Title')}</h4>
             <p class="text-[11px] text-[var(--text-muted)] leading-relaxed">
-              Suas notas continuam como arquivos <code class="text-[var(--accent-light)]">.md</code> no seu disco. Suporta edição rica com CodeMirror 6 e renderização instantânea de diagramas e gráficos Mermaid.
+              {$t('welcome.feature1Body')}
             </p>
           </div>
         </div>
@@ -61,9 +62,9 @@
         <div class="flex items-start gap-3.5 p-3 rounded-xl bg-[var(--bg-main)] border border-[var(--border)]">
           <span class="text-xl mt-0.5">🔗</span>
           <div>
-            <h4 class="text-xs font-bold text-[var(--text-main)] mb-0.5">Sincronização P2P sem Servidor</h4>
+            <h4 class="text-xs font-bold text-[var(--text-main)] mb-0.5">{$t('welcome.feature2Title')}</h4>
             <p class="text-[11px] text-[var(--text-muted)] leading-relaxed">
-              Conecte seus computadores diretamente via Iroh QUIC criptografado com chaves ed25519. Permite até edição colaborativa na mesma nota em tempo real usando CRDT (Yrs/Yjs).
+              {$t('welcome.feature2Body')}
             </p>
           </div>
         </div>
@@ -73,11 +74,11 @@
           <span class="text-xl mt-0.5">🤖</span>
           <div>
             <h4 class="text-xs font-bold text-[var(--text-main)] mb-0.5 flex items-center gap-1.5">
-              <span>Assistente de IA & RAG Local</span>
-              <span class="px-1.5 py-0.2 text-[9px] font-mono rounded bg-[var(--accent)] text-black font-bold">NOVO</span>
+              <span>{$t('welcome.feature3Title')}</span>
+              <span class="px-1.5 py-0.2 text-[9px] font-mono rounded bg-[var(--accent)] text-black font-bold">{$t('welcome.new')}</span>
             </h4>
             <p class="text-[11px] text-[var(--text-muted)] leading-relaxed">
-              Clique no botão de chat <span class="text-[var(--accent-light)] font-bold">💬</span> na barra superior direita para fazer perguntas ao seu vault. A IA busca trechos e cita links clicáveis que levam você direto à linha da nota!
+              {$t('welcome.feature3Body')}
             </p>
           </div>
         </div>
@@ -89,7 +90,7 @@
           onclick={() => handleDismiss(false)}
           class="text-xs text-[var(--text-dim)] hover:text-[var(--text-main)] transition"
         >
-          Pular Apresentação
+          {$t('welcome.skip')}
         </button>
 
         <div class="flex gap-2">
@@ -97,13 +98,13 @@
             onclick={() => handleDismiss(false)}
             class="px-5 py-2.5 bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-xs font-semibold rounded-xl text-[var(--text-main)] transition"
           >
-            Começar a Escrever
+            {$t('welcome.start')}
           </button>
           <button
             onclick={() => handleDismiss(true)}
             class="px-5 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-light)] text-black text-xs font-semibold rounded-xl shadow-lg transition flex items-center gap-1.5"
           >
-            <span>Testar Assistente IA</span>
+            <span>{$t('welcome.tryAi')}</span>
             <span>💬</span>
           </button>
         </div>

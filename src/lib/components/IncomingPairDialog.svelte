@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { PeerConfig } from '../types';
   import { networkAnswerPair } from '../api';
+  import { t } from '$lib/i18n';
 
   let {
     request = null,
@@ -15,7 +16,7 @@
     try {
       await networkAnswerPair(request.request_id, accept);
     } catch (e) {
-      console.error('Erro ao responder pareamento:', e);
+      console.error('Failed to answer pairing request:', e);
     } finally {
       onAnswer();
     }
@@ -36,8 +37,8 @@
       <div class="flex items-center gap-3">
         <span class="text-2xl text-[var(--accent-light)]">🔗</span>
         <div>
-          <h3 class="text-sm font-bold text-[var(--text-main)]">Solicitação de Conexão P2P</h3>
-          <p class="text-xs text-[var(--text-dim)]">Um novo computador deseja sincronizar este vault</p>
+          <h3 class="text-sm font-bold text-[var(--text-main)]">{$t('incoming.title')}</h3>
+          <p class="text-xs text-[var(--text-dim)]">{$t('incoming.subtitle')}</p>
         </div>
       </div>
 
@@ -47,7 +48,7 @@
       </div>
 
       <p class="text-xs text-[var(--text-muted)] leading-relaxed">
-        Ao aceitar, as notas deste vault serão sincronizadas diretamente entre os dois computadores via QUIC com criptografia ponta a ponta.
+        {$t('incoming.description')}
       </p>
 
       <div class="flex justify-end gap-2.5 pt-2">
@@ -55,13 +56,13 @@
           onclick={() => handleDecision(false)}
           class="px-4 py-2 text-xs font-medium text-red-400 hover:text-red-300 hover:bg-red-950/40 rounded-lg border border-red-900/40 transition"
         >
-          Recusar
+          {$t('incoming.reject')}
         </button>
         <button
           onclick={() => handleDecision(true)}
           class="px-4 py-2 text-xs font-semibold bg-[var(--accent)] hover:bg-[var(--accent-light)] text-black rounded-lg transition shadow-md"
         >
-          Aceitar Conexão
+          {$t('incoming.accept')}
         </button>
       </div>
     </div>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { PeerConfig } from '../types';
   import { networkRequestPair, networkRemovePeer, networkGetPairInfo } from '../api';
+  import { t, trError, ts } from '$lib/i18n';
 
   let {
     isOpen = $bindable(false),
@@ -38,8 +39,8 @@
         endpointId = info.endpoint_id;
       }
     } catch (e: any) {
-      console.error('Falha ao obter código de pareamento:', e);
-      loadError = typeof e === 'string' ? e : e?.message || 'Falha ao obter código P2P.';
+      console.error('Failed to fetch pairing code:', e);
+      loadError = trError(typeof e === 'string' ? e : e?.message || 'pair.fetchFailed');
     } finally {
       isLoadingCode = false;
     }
@@ -63,20 +64,20 @@
     if (!inputCode.trim()) return;
 
     isConnecting = true;
-    statusMessage = { type: 'info', text: 'Conectando ao dispositivo remoto via P2P...' };
+    statusMessage = { type: 'info', text: ts('pair.connecting') };
 
     try {
       await networkRequestPair(inputCode.trim());
       statusMessage = {
         type: 'info',
-        text: 'Solicitação enviada! Aprove a conexão na tela do outro computador para concluir.',
+        text: ts('pair.requestSent'),
       };
       inputCode = '';
       onPeersChange?.();
     } catch (err: any) {
       statusMessage = {
         type: 'error',
-        text: typeof err === 'string' ? err : err.message || 'Falha ao solicitar pareamento.',
+        text: trError(typeof err === 'string' ? err : err.message || 'pair.requestFailed'),
       };
     } finally {
       isConnecting = false;
@@ -84,12 +85,12 @@
   }
 
   async function handleRemove(peerId: string) {
-    if (confirm('Deseja realmente remover este dispositivo pareado?')) {
+    if (confirm(ts('pair.confirmRemove'))) {
       try {
         await networkRemovePeer(peerId);
         onPeersChange?.();
       } catch (e) {
-        console.error('Erro ao remover peer:', e);
+        console.error('Failed to remove peer:', e);
       }
     }
   }
@@ -111,8 +112,8 @@
       <!-- Header -->
       <div class="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-[var(--bg-sidebar)]">
         <div>
-          <h2 class="text-base font-semibold text-[var(--text-main)]">Sincronização P2P & Dispositivos</h2>
-          <p class="text-xs text-[var(--text-dim)]">Vault atual: <span class="text-[var(--text-muted)] font-medium">{vaultName}</span></p>
+          <h2 class="text-base font-semibold text-[var(--text-main)]">{$t('pair.title')}</h2>
+          <p class="text-xs text-[var(--text-dim)]">{$t('pair.currentVault')} <span class="text-[var(--text-muted)] font-medium">{vaultName}</span></p>
         </div>
         <button
           onclick={() => (isOpen = false)}
@@ -128,19 +129,19 @@
           onclick={() => { activeTab = 'share'; statusMessage = null; }}
           class="py-2.5 px-3 text-xs font-medium border-b-2 transition {activeTab === 'share' ? 'border-[var(--accent)] text-[var(--accent-light)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
         >
-          Compartilhar Código
+          {$t('pair.tabShare')}
         </button>
         <button
           onclick={() => { activeTab = 'join'; statusMessage = null; }}
           class="py-2.5 px-3 text-xs font-medium border-b-2 transition {activeTab === 'join' ? 'border-[var(--accent)] text-[var(--accent-light)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
         >
-          Conectar Dispositivo
+          {$t('pair.tabJoin')}
         </button>
         <button
           onclick={() => { activeTab = 'devices'; statusMessage = null; }}
           class="py-2.5 px-3 text-xs font-medium border-b-2 transition {activeTab === 'devices' ? 'border-[var(--accent)] text-[var(--accent-light)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
         >
-          Dispositivos ({peers.length})
+          {$t('pair.tabDevices', { count: peers.length })}
         </button>
       </div>
 
@@ -149,16 +150,16 @@
         {#if activeTab === 'share'}
           <div class="flex flex-col gap-4">
             <p class="text-xs text-[var(--text-muted)] leading-relaxed">
-              Cole este código seguro no outro computador para conectá-los diretamente ponto-a-ponto (P2P criptografado com QUIC). Sem servidor intermediário e sem intermediários lendo seus dados.
+              {$t('pair.shareDescription')}
             </p>
 
             <div class="flex flex-col gap-1.5">
-              <label for="p2p-code-display" class="text-xs font-medium text-[var(--text-dim)]">Seu código de convite:</label>
+              <label for="p2p-code-display" class="text-xs font-medium text-[var(--text-dim)]">{$t('pair.inviteLabel')}</label>
               <div class="relative">
                 <textarea
                   id="p2p-code-display"
                   readonly
-                  value={pairCode || 'Gerando código P2P seguro...'}
+                  value={pairCode || $t('pair.generating')}
                   rows="3"
                   class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-lg p-3 text-xs font-mono text-[var(--text-main)] resize-none select-all focus:outline-none focus:border-[var(--accent)]"
                 ></textarea>
@@ -172,36 +173,36 @@
                   onclick={fetchPairInfo}
                   class="px-2.5 py-1 bg-red-900/60 hover:bg-red-800/80 rounded text-xs font-medium text-white transition"
                 >
-                  Tentar novamente
+                  {$t('pair.retry')}
                 </button>
               </div>
             {/if}
 
             <div class="flex justify-between items-center pt-2">
               <span class="text-[11px] text-[var(--text-dim)] font-mono truncate max-w-[280px]">
-                ID: {endpointId ? (endpointId.length > 16 ? endpointId.slice(0, 16) + '...' : endpointId) : '...'}
+                {$t('pair.idLabel')} {endpointId ? (endpointId.length > 16 ? endpointId.slice(0, 16) + '...' : endpointId) : '...'}
               </span>
               <button
                 onclick={copyCode}
                 disabled={!pairCode}
                 class="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-light)] disabled:opacity-40 disabled:cursor-not-allowed text-black text-xs font-semibold rounded-lg transition shadow-md flex items-center gap-1.5"
               >
-                {copied ? '✓ Código Copiado!' : 'Copiar Código'}
+                {copied ? '✓ ' + $t('pair.copied') : $t('pair.copy')}
               </button>
             </div>
           </div>
         {:else if activeTab === 'join'}
           <div class="flex flex-col gap-4">
             <p class="text-xs text-[var(--text-muted)] leading-relaxed">
-              Insira o código de convite gerado pelo outro computador para iniciar o pareamento.
+              {$t('pair.joinDescription')}
             </p>
 
             <div class="flex flex-col gap-1.5">
-              <label for="p2p-code-input" class="text-xs font-medium text-[var(--text-dim)]">Código do outro dispositivo:</label>
+              <label for="p2p-code-input" class="text-xs font-medium text-[var(--text-dim)]">{$t('pair.joinLabel')}</label>
               <textarea
                 id="p2p-code-input"
                 bind:value={inputCode}
-                placeholder="Cole o código LOWNOTES1_... aqui"
+                placeholder={$t('pair.joinPlaceholder')}
                 rows="3"
                 class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-lg p-3 text-xs font-mono text-[var(--text-main)] resize-none focus:outline-none focus:border-[var(--accent)]"
               ></textarea>
@@ -221,7 +222,7 @@
                 disabled={isConnecting || !inputCode.trim()}
                 class="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-light)] disabled:opacity-50 text-black text-xs font-semibold rounded-lg transition shadow-md"
               >
-                {isConnecting ? 'Conectando...' : 'Solicitar Pareamento'}
+                {isConnecting ? $t('pair.connectingButton') : $t('pair.requestPair')}
               </button>
             </div>
           </div>
@@ -229,12 +230,12 @@
           <div class="flex flex-col gap-3">
             {#if peers.length === 0}
               <div class="text-center py-8">
-                <p class="text-xs text-[var(--text-dim)]">Nenhum dispositivo pareado neste vault ainda.</p>
+                <p class="text-xs text-[var(--text-dim)]">{$t('pair.noDevices')}</p>
                 <button
                   onclick={() => (activeTab = 'share')}
                   class="mt-2 text-xs text-[var(--accent-light)] hover:underline"
                 >
-                  Compartilhe um código para começar
+                  {$t('pair.shareToStart')}
                 </button>
               </div>
             {:else}
@@ -249,7 +250,7 @@
                       onclick={() => handleRemove(peer.endpoint_id)}
                       class="px-2.5 py-1 text-xs text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded border border-transparent hover:border-red-900/50 transition"
                     >
-                      Remover
+                      {$t('pair.remove')}
                     </button>
                   </div>
                 {/each}

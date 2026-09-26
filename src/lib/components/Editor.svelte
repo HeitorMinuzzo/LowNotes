@@ -10,6 +10,7 @@
   import { crdtApplyClientUpdate, saveNote } from '../api';
   import { renderMarkdown } from '../markdown';
   import type { AppTheme, ViewMode } from '../types';
+  import { t, ts } from '$lib/i18n';
 
   let {
     notePath,
@@ -140,7 +141,7 @@
         const update = base64ToUint8Array(crdtUpdateBase64);
         Y.applyUpdate(yDoc, update, 'init');
       } catch (e) {
-        console.error('Falha ao aplicar update CRDT inicial:', e);
+        console.error('Failed to apply initial CRDT update:', e);
       }
     }
 
@@ -168,7 +169,7 @@
           saveNote(notePath, text).then(() => {
             saveStatus = 'saved';
           }).catch((err) => {
-            console.error('Erro ao salvar nota:', err);
+            console.error('Failed to save note:', err);
             saveStatus = 'saved';
           });
         }, 500);
@@ -203,7 +204,7 @@
       });
       editorView.focus();
     } catch (e) {
-      console.error('Falha ao navegar para linha:', e);
+      console.error('Failed to navigate to line:', e);
     }
   }
 
@@ -217,7 +218,7 @@
     if (!editorView) return;
     const { from, to } = editorView.state.selection.main;
     const selectedText = editorView.state.sliceDoc(from, to);
-    const replacement = `${prefix}${selectedText || 'texto'}${suffix}`;
+    const replacement = `${prefix}${selectedText || ts('editor.placeholderText')}${suffix}`;
 
     editorView.dispatch({
       changes: { from, to, insert: replacement },
@@ -278,21 +279,21 @@
       <button
         onclick={() => applyFormatting('**', '**')}
         class="px-2 py-1 text-xs font-bold rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
-        title="Negrito (Ctrl+B)"
+        title={$t('editor.bold')}
       >
         B
       </button>
       <button
         onclick={() => applyFormatting('*', '*')}
         class="px-2 py-1 text-xs italic rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
-        title="Itálico (Ctrl+I)"
+        title={$t('editor.italic')}
       >
         I
       </button>
       <button
         onclick={() => applyFormatting('~~', '~~')}
         class="px-2 py-1 text-xs line-through rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
-        title="Riscado"
+        title={$t('editor.strikethrough')}
       >
         S
       </button>
@@ -300,44 +301,44 @@
       <button
         onclick={() => applyFormatting('# ')}
         class="px-2 py-1 text-xs font-semibold rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
-        title="Título H1"
+        title={$t('editor.heading1')}
       >
         H1
       </button>
       <button
         onclick={() => applyFormatting('## ')}
         class="px-2 py-1 text-xs font-semibold rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
-        title="Título H2"
+        title={$t('editor.heading2')}
       >
         H2
       </button>
       <button
         onclick={() => applyFormatting('- ')}
         class="px-2 py-1 text-xs rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
-        title="Lista"
+        title={$t('editor.list')}
       >
-        • Lista
+        • {$t('editor.list')}
       </button>
       <button
         onclick={() => applyFormatting('- [ ] ')}
         class="px-2 py-1 text-xs rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
-        title="Checklist"
+        title={$t('editor.checklist')}
       >
-        ☑ Tarefa
+        ☑ {$t('editor.task')}
       </button>
       <button
         onclick={() => applyFormatting('`', '`')}
         class="px-2 py-1 text-xs font-mono rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
-        title="Código"
+        title={$t('editor.code')}
       >
         &lt;/&gt;
       </button>
       <button
         onclick={() => applyFormatting('> ')}
         class="px-2 py-1 text-xs rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
-        title="Citação"
+        title={$t('editor.quote')}
       >
-        ” Citação
+        ” {$t('editor.quote')}
       </button>
     </div>
 
@@ -346,10 +347,10 @@
       <div class="flex items-center gap-1.5 text-xs text-[var(--text-dim)]">
         {#if saveStatus === 'saving'}
           <span class="inline-block w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse"></span>
-          <span>Salvando...</span>
+          <span>{$t('editor.saving')}</span>
         {:else}
           <span class="inline-block w-2 h-2 rounded-full bg-[var(--success)]"></span>
-          <span>Salvo</span>
+          <span>{$t('editor.saved')}</span>
         {/if}
       </div>
 
@@ -358,19 +359,19 @@
           onclick={() => onViewModeChange('edit')}
           class="px-2.5 py-1 text-xs rounded transition {viewMode === 'edit' ? 'bg-[var(--bg-active)] text-[var(--accent-light)] font-medium shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
         >
-          Editor
+          {$t('editor.modeEdit')}
         </button>
         <button
           onclick={() => onViewModeChange('split')}
           class="px-2.5 py-1 text-xs rounded transition {viewMode === 'split' ? 'bg-[var(--bg-active)] text-[var(--accent-light)] font-medium shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
         >
-          Dividido
+          {$t('editor.modeSplit')}
         </button>
         <button
           onclick={() => onViewModeChange('preview')}
           class="px-2.5 py-1 text-xs rounded transition {viewMode === 'preview' ? 'bg-[var(--bg-active)] text-[var(--accent-light)] font-medium shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
         >
-          Visualizar
+          {$t('editor.modePreview')}
         </button>
       </div>
 
@@ -378,10 +379,10 @@
         <button
           onclick={onToggleAiChat}
           class="px-2.5 py-1 text-xs rounded transition flex items-center gap-1.5 border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-light)] {isAiChatOpen ? 'border-[var(--accent)] text-[var(--accent-light)] font-medium shadow-sm bg-[var(--bg-active)]' : ''}"
-          title="Abrir Assistente de IA (Chat & RAG)"
+          title={$t('editor.openAiAssistant')}
         >
           <span>💬</span>
-          <span class="font-medium">Assistente</span>
+          <span class="font-medium">{$t('editor.assistant')}</span>
         </button>
       {/if}
     </div>
@@ -414,9 +415,9 @@
       <span>{notePath}</span>
     </div>
     <div class="flex items-center gap-4">
-      <span>{wordCount} palavras</span>
-      <span>{charCount} caracteres</span>
-      <span class="text-[var(--accent-light)] font-mono">P2P Realtime Ativo</span>
+      <span>{$t('editor.words', { count: wordCount })}</span>
+      <span>{$t('editor.chars', { count: charCount })}</span>
+      <span class="text-[var(--accent-light)] font-mono">{$t('editor.p2pRealtime')}</span>
     </div>
   </footer>
 </div>

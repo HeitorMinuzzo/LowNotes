@@ -25,14 +25,14 @@ impl PeerConfig {
         let ticket: EndpointTicket = self
             .ticket
             .parse()
-            .context("o endereço do dispositivo salvo é inválido")?;
+            .context("errors.invalidDeviceAddress")?;
         Ok(ticket.endpoint_addr().clone())
     }
 
     pub fn id(&self) -> anyhow::Result<EndpointId> {
         self.endpoint_id
             .parse()
-            .context("a identidade do dispositivo salvo é inválida")
+            .context("errors.invalidDeviceId")
     }
 }
 
@@ -184,6 +184,8 @@ pub struct AppSettings {
     pub theme: String,
     #[serde(default = "default_view_mode")]
     pub view_mode: String,
+    #[serde(default)]
+    pub language: String,
     pub active_vault_id: Option<String>,
     pub vaults: Vec<VaultConfig>,
     #[serde(default)]
@@ -203,6 +205,7 @@ impl Default for AppSettings {
             device_name: host,
             theme: default_theme(),
             view_mode: default_view_mode(),
+            language: String::new(),
             active_vault_id: None,
             vaults: Vec::new(),
             ai: AiSettings::default(),
@@ -222,7 +225,7 @@ fn default_view_mode() -> String {
 impl AppSettings {
     pub fn config_file() -> anyhow::Result<PathBuf> {
         let dirs = ProjectDirs::from("dev", "lowbloat", "lownotes")
-            .context("não foi possível determinar o diretório de dados")?;
+            .context("errors.configDir")?;
         let dir = dirs.config_dir();
         fs::create_dir_all(dir)?;
         Ok(dir.join("settings.json"))
@@ -261,10 +264,10 @@ pub fn new_pairing_token() -> String {
 pub fn decode_secret(encoded: &str) -> anyhow::Result<SecretKey> {
     let bytes = URL_SAFE_NO_PAD
         .decode(encoded.trim())
-        .context("chave secreta inválida")?;
+        .context("errors.invalidSecretKey")?;
     let key: [u8; 32] = bytes
         .try_into()
-        .map_err(|_| anyhow::anyhow!("tamanho de chave inválido"))?;
+        .map_err(|_| anyhow::anyhow!("errors.invalidKeySize"))?;
     Ok(SecretKey::from(key))
 }
 
@@ -279,7 +282,7 @@ pub fn decode_pair_code(code: &str) -> anyhow::Result<PairInvite> {
     let body = trimmed
         .strip_prefix(&format!("{PAIR_CODE_PREFIX}_"))
         .or_else(|| trimmed.strip_prefix(PAIR_CODE_PREFIX))
-        .context("código de pareamento inválido ou de versão diferente")?;
+        .context("errors.invalidPairCode")?;
     let json = URL_SAFE_NO_PAD.decode(body)?;
     let invite = serde_json::from_slice(&json)?;
     Ok(invite)

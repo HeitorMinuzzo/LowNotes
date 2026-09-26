@@ -78,6 +78,7 @@ pub fn run() {
             commands::network_get_pair_info,
             commands::save_theme,
             commands::save_view_mode,
+            commands::save_language,
             commands::fetch_ai_models,
             commands::search_vault_rag,
             commands::ai_chat_query,

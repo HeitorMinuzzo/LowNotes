@@ -46,14 +46,14 @@ pub fn safe_join(root: &Path, relative_wire: &str) -> anyhow::Result<PathBuf> {
     for component in candidate.components() {
         match component {
             Component::Normal(segment) => {
-                let name = segment.to_str().context("caminho com caracteres inválidos")?;
+                let name = segment.to_str().context("errors.invalidPathChars")?;
                 if name.starts_with('.') && name != ".lownotes" {
-                    bail!("acesso a caminhos ocultos não é permitido");
+                    bail!("errors.hiddenPath");
                 }
                 resolved.push(segment);
             }
             Component::CurDir => {}
-            _ => bail!("caminho inválido ou tentativa de saída do vault"),
+            _ => bail!("errors.pathEscape"),
         }
     }
 
@@ -152,11 +152,11 @@ fn extract_title_or_name(path: &Path, file_name: &str) -> String {
 
 pub fn read_note(root: &Path, relative: &str) -> anyhow::Result<String> {
     let target = safe_join(root, relative)?;
-    let metadata = fs::metadata(&target).context("nota não encontrada")?;
+    let metadata = fs::metadata(&target).context("errors.noteNotFound")?;
     if metadata.len() > MAX_NOTE_BYTES {
-        bail!("nota excede o limite máximo permitido de 10 MB");
+        bail!("errors.noteTooLarge");
     }
-    fs::read_to_string(target).context("falha ao ler o conteúdo da nota")
+    fs::read_to_string(target).context("errors.noteReadFail")
 }
 
 pub fn save_note(root: &Path, relative: &str, content: &str) -> anyhow::Result<()> {
@@ -168,7 +168,12 @@ pub fn save_note(root: &Path, relative: &str, content: &str) -> anyhow::Result<(
     Ok(())
 }
 
-pub fn create_note(root: &Path, relative: &str, initial_content: Option<&str>) -> anyhow::Result<String> {
+pub fn create_note(
+    root: &Path,
+    relative: &str,
+    initial_content: Option<&str>,
+    lang: &str,
+) -> anyhow::Result<String> {
     let mut clean_relative = relative.trim().replace('\\', "/");
     if !clean_relative.ends_with(".md") && !clean_relative.ends_with(".markdown") {
         clean_relative.push_str(".md");
@@ -176,16 +181,28 @@ pub fn create_note(root: &Path, relative: &str, initial_content: Option<&str>) -
 
     let target = safe_join(root, &clean_relative)?;
     if target.exists() {
-        bail!("uma nota com este nome já existe");
+        bail!("errors.noteExists");
     }
 
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent)?;
     }
 
-    let default_content = initial_content.unwrap_or("# Nova Nota\n\nComece a escrever aqui...\n");
+    let default_content = initial_content
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| default_note_content(lang));
     fs::write(&target, default_content)?;
     Ok(clean_relative)
+}
+
+/// Template written into brand-new notes when no initial content is supplied.
+/// Mirrors the `note.default*` UI copy per supported language.
+fn default_note_content(lang: &str) -> String {
+    match lang {
+        "pt-BR" => "# Nova Nota\n\nComece a escrever aqui...\n".to_string(),
+        "es-ES" => "# Nueva Nota\n\nComienza a escribir aquí...\n".to_string(),
+        _ => "# New Note\n\nStart writing here...\n".to_string(),
+    }
 }
 
 pub fn create_folder(root: &Path, relative: &str) -> anyhow::Result<()> {
@@ -198,10 +215,10 @@ pub fn rename_item(root: &Path, old_relative: &str, new_relative: &str) -> anyho
     let source = safe_join(root, old_relative)?;
     let destination = safe_join(root, new_relative)?;
     if !source.exists() {
-        bail!("item de origem não encontrado");
+        bail!("errors.sourceNotFound");
     }
     if destination.exists() {
-        bail!("um item com o novo nome já existe");
+        bail!("errors.targetExists");
     }
     if let Some(parent) = destination.parent() {
         fs::create_dir_all(parent)?;
