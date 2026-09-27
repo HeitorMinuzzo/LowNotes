@@ -195,6 +195,10 @@ const esES: Dictionary = {
     skip: 'Omitir esta versión',
     later: 'Más tarde',
     autoCheck: 'Buscar actualizaciones automáticamente',
+    installNow: 'Actualizar ahora',
+    downloading: 'Descargando actualización... {percent}%',
+    installing: 'Instalando y reiniciando...',
+    installFailed: 'Fallo al instalar la actualización. Inténtalo de nuevo o descárgala manualmente.',
   },
   settings: {
     language: 'Idioma',

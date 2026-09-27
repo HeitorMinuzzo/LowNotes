@@ -36,14 +36,6 @@ export interface LinkOperation {
   action: 'add' | 'remove';
 }
 
-export interface UpdateInfo {
-  has_update: boolean;
-  latest: string;
-  current: string;
-  url: string;
-  notes: string;
-}
-
 export interface AiProviderConfig {
   id: string;
   name: string;

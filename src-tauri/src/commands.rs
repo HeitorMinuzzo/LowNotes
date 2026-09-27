@@ -1,7 +1,6 @@
 use std::{
     path::{Path, PathBuf},
     sync::Arc,
-    time::Duration,
 };
 
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -545,15 +544,6 @@ pub fn mark_welcome_seen(state: State<'_, AppState>) -> Result<(), String> {
     s.save().map_err(|e| e.to_string())
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct UpdateInfoDto {
-    pub has_update: bool,
-    pub latest: String,
-    pub current: String,
-    pub url: String,
-    pub notes: String,
-}
-
 #[tauri::command]
 pub fn links_get(state: State<'_, AppState>) -> Result<Vec<links::LinkEdge>, String> {
     let settings = state.settings.read();
@@ -698,80 +688,6 @@ fn parse_ai_path_list(answer: &str) -> Vec<String> {
         }
     }
     out
-}
-
-fn version_parts(value: &str) -> Vec<u32> {
-    let trimmed = value.trim();
-    let clean = trimmed.strip_prefix('v').unwrap_or(trimmed);
-    clean
-        .split('.')
-        .map(|part| part.trim().parse::<u32>().unwrap_or(0))
-        .collect()
-}
-
-fn version_greater(latest: &str, current: &str) -> bool {
-    let mut a = version_parts(latest);
-    let mut b = version_parts(current);
-    let len = a.len().max(b.len());
-    a.resize(len, 0);
-    b.resize(len, 0);
-    a > b
-}
-
-#[tauri::command]
-pub async fn check_updates() -> Result<UpdateInfoDto, String> {
-    let current = env!("CARGO_PKG_VERSION");
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(15))
-        .build()
-        .map_err(|e| format!("update check failed: {e}"))?;
-
-    let resp = client
-        .get("https://api.github.com/repos/LowBloat/LowNotes/releases/latest")
-        .header("User-Agent", "LowNotes")
-        .send()
-        .await
-        .map_err(|e| {
-            eprintln!("check_updates request failed: {e}");
-            format!("update check failed: {e}")
-        })?;
-
-    if !resp.status().is_success() {
-        let status = resp.status();
-        return Err(format!("update check failed: status {status}"));
-    }
-
-    let body: serde_json::Value = resp.json().await.map_err(|e| {
-        eprintln!("check_updates parse failed: {e}");
-        format!("update check failed: {e}")
-    })?;
-
-    let tag = body
-        .get("tag_name")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .trim();
-    let latest = tag.strip_prefix('v').unwrap_or(tag).to_string();
-    let url = body
-        .get("html_url")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
-    let notes: String = body
-        .get("body")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .chars()
-        .take(1500)
-        .collect();
-
-    Ok(UpdateInfoDto {
-        has_update: !latest.is_empty() && version_greater(&latest, current),
-        latest,
-        current: current.to_string(),
-        url,
-        notes,
-    })
 }
 
 #[tauri::command]

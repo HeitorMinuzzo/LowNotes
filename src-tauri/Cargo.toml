@@ -1,6 +1,6 @@
 [package]
 name = "lownotes"
-version = "0.1.7"
+version = "0.1.8"
 description = "Local-first Markdown notes with serverless P2P sync and real-time collaboration"
 authors = ["LowBloat"]
 edition = "2021"
@@ -38,6 +38,8 @@ rand = "0.9"
 hostname = "0.4"
 filetime = "0.2"
 reqwest = { version = "0.13", features = ["json"] }
+tauri-plugin-updater = "2.13.0"
+tauri-plugin-process = "2.4.0"
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]

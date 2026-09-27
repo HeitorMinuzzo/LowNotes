@@ -9,7 +9,6 @@ import type {
   LinkEdge,
   LinkOperation,
   LinkOrigin,
-  UpdateInfo,
   NoteReadResponse,
   PairInfo,
   RagChunk,
@@ -95,10 +94,6 @@ export async function linksApply(operations: LinkOperation[], origin?: LinkOrigi
 
 export async function aiSuggestLinks(notePath: string): Promise<string[]> {
   return await invoke('ai_suggest_links', { notePath });
-}
-
-export async function checkUpdates(): Promise<UpdateInfo> {
-  return await invoke('check_updates');
 }
 
 export async function saveUpdatePrefs(updateCheck: boolean, skippedVersion: string): Promise<void> {

@@ -193,6 +193,10 @@ const enUS = {
     skip: 'Skip this version',
     later: 'Later',
     autoCheck: 'Check for updates automatically',
+    installNow: 'Update now',
+    downloading: 'Downloading update... {percent}%',
+    installing: 'Installing and restarting...',
+    installFailed: 'Failed to install the update. Try again or download it manually.',
   },
   settings: {
     language: 'Language',

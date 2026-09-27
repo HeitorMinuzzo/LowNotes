@@ -195,6 +195,10 @@ const ptBR: Dictionary = {
     skip: 'Pular esta versão',
     later: 'Mais tarde',
     autoCheck: 'Buscar atualizações automaticamente',
+    installNow: 'Atualizar agora',
+    downloading: 'Baixando atualização... {percent}%',
+    installing: 'Instalando e reiniciando...',
+    installFailed: 'Falha ao instalar a atualização. Tente novamente ou baixe manualmente.',
   },
   settings: {
     language: 'Idioma',

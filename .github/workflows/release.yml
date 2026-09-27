@@ -73,6 +73,7 @@ jobs:
     runs-on: windows-2022
     env:
       VERSION: ${{ needs.verify.outputs.version }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
     steps:
       - name: Baixar código
         uses: actions/checkout@v7
@@ -103,6 +104,12 @@ jobs:
             Copy-Item $nsis.FullName "dist/$destName"
             $hash = (Get-FileHash "dist/$destName" -Algorithm SHA256).Hash.ToLowerInvariant()
             "$hash  $destName" | Set-Content "dist/$destName.sha256" -Encoding ascii -NoNewline
+          }
+
+          # Coletar assinatura do updater (NSIS)
+          $sig = Get-ChildItem -Path "src-tauri/target/release/bundle/nsis/*.sig" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($sig) {
+            Copy-Item $sig.FullName "dist/LowNotes-$env:VERSION-windows-x64-setup.exe.sig"
           }
 
           # Coletar instalador MSI
@@ -142,6 +149,7 @@ jobs:
     runs-on: ubuntu-22.04
     env:
       VERSION: ${{ needs.verify.outputs.version }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
     steps:
       - name: Baixar código
         uses: actions/checkout@v7
@@ -193,6 +201,12 @@ jobs:
             (cd dist && sha256sum "$dest_app" > "$dest_app.sha256")
           fi
 
+          # Coletar assinatura do updater (AppImage)
+          sig=$(find src-tauri/target/release/bundle/appimage -name "*.AppImage.sig" | head -n 1 || true)
+          if [[ -n "$sig" && -f "$sig" ]]; then
+            cp "$sig" "dist/LowNotes-${VERSION}-linux-x64.AppImage.sig"
+          fi
+
           # Criar pacote portátil tar.gz com o executável
           if [[ -f "src-tauri/target/release/lownotes" ]]; then
             portable_dir="dist/LowNotes-${VERSION}-linux-x64-portable"
@@ -217,6 +231,7 @@ jobs:
     runs-on: macos-14
     env:
       VERSION: ${{ needs.verify.outputs.version }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
     steps:
       - name: Baixar código
         uses: actions/checkout@v7
@@ -252,6 +267,16 @@ jobs:
             exit 1
           fi
 
+          # Coletar artefato de updater do macOS (.app.tar.gz + sig)
+          tarball=$(find src-tauri/target/universal-apple-darwin/release/bundle/macos -name "*.app.tar.gz" ! -name "*.sig" | head -n 1 || true)
+          if [[ -n "$tarball" && -f "$tarball" ]]; then
+            dest_t="LowNotes-${VERSION}-macos-universal.app.tar.gz"
+            cp "$tarball" "dist/$dest_t"
+            if [[ -f "$tarball.sig" ]]; then
+              cp "$tarball.sig" "dist/$dest_t.sig"
+            fi
+          fi
+
       - name: Guardar artefatos
         uses: actions/upload-artifact@v7
         with:
@@ -281,6 +306,39 @@ jobs:
           VERSION: ${{ needs.verify.outputs.version }}
         run: |
           set -euo pipefail
+          python3 - <<'PY'
+          import json, os, subprocess, datetime
+          version = os.environ["VERSION"]
+          tag = os.environ["RELEASE_TAG"]
+          repo = os.environ["GITHUB_REPOSITORY"]
+          base = f"https://github.com/{repo}/releases/download/{tag}"
+          platforms = {}
+          def add(key, asset):
+              sig_path = f"release-assets/{asset}.sig"
+              if os.path.exists(sig_path):
+                  with open(sig_path) as f:
+                      platforms[key] = {"signature": f.read().strip(), "url": f"{base}/{asset}"}
+          add("windows-x86_64", f"LowNotes-{version}-windows-x64-setup.exe")
+          add("darwin-aarch64", f"LowNotes-{version}-macos-universal.app.tar.gz")
+          add("darwin-x86_64", f"LowNotes-{version}-macos-universal.app.tar.gz")
+          add("linux-x86_64", f"LowNotes-{version}-linux-x64.AppImage")
+          notes = f"LowNotes {version}"
+          try:
+              out = subprocess.run(["gh", "release", "view", tag, "--repo", repo, "--json", "body", "-q", ".body"], capture_output=True, text=True)
+              if out.returncode == 0 and out.stdout.strip():
+                  notes = out.stdout.strip()
+          except Exception:
+              pass
+          doc = {
+              "version": version,
+              "notes": notes,
+              "pub_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "platforms": platforms,
+          }
+          with open("release-assets/latest.json", "w") as f:
+              json.dump(doc, f, indent=2)
+          print("latest.json platforms:", sorted(platforms))
+          PY
           mapfile -t files < <(find release-assets -maxdepth 1 -type f)
           if [[ ${#files[@]} -eq 0 ]]; then
             echo "Nenhum arquivo encontrado em release-assets." >&2

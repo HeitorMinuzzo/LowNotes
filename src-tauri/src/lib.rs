@@ -29,6 +29,8 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .manage(app_state)
         .setup(move |app| {
             let mut s = settings.write();
@@ -88,7 +90,6 @@ pub fn run() {
             commands::links_get,
             commands::links_apply,
             commands::ai_suggest_links,
-            commands::check_updates,
             commands::save_update_prefs,
         ])
         .run(tauri::generate_context!())

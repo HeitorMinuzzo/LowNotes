@@ -9,8 +9,8 @@
     VaultItem,
     PeerConfig,
     NetworkEventPayload,
-    UpdateInfo,
   } from '$lib/types';
+  import { check, type Update } from '@tauri-apps/plugin-updater';
   import {
     getAppState,
     listNotes,
@@ -20,7 +20,6 @@
     saveTheme,
     saveViewMode,
     networkGetPairInfo,
-    checkUpdates,
     saveUpdatePrefs,
   } from '$lib/api';
   import { locale, resolveLocale, t, trError } from '$lib/i18n';
@@ -50,7 +49,7 @@
   let isAiChatOpen = $state(false);
   let isWelcomeOpen = $state(false);
   let targetLine = $state<number | undefined>(undefined);
-  let updateInfo = $state<UpdateInfo | null>(null);
+  let pendingUpdate = $state<Update | null>(null);
   let isUpdateOpen = $state(false);
   let updateCheckLocal = $state(true);
   let updateTimer: ReturnType<typeof setInterval> | undefined;
@@ -91,9 +90,9 @@
   async function checkForUpdates() {
     if (settings?.update_check === false) return;
     try {
-      const info = await checkUpdates();
-      if (info.has_update && info.latest !== settings?.skipped_version) {
-        updateInfo = info;
+      const update = await check();
+      if (update && update.version !== settings?.skipped_version) {
+        pendingUpdate = update;
         isUpdateOpen = true;
       }
     } catch (e) {
@@ -399,7 +398,7 @@
 
   <UpdateModal
     bind:isOpen={isUpdateOpen}
-    info={updateInfo}
+    update={pendingUpdate}
     bind:autoCheck={updateCheckLocal}
     onAutoCheckChange={async (v) => {
       updateCheckLocal = v;
