@@ -6,6 +6,10 @@ import type {
   ChatMessage,
   ChatResponse,
   InitialStateResponse,
+  LinkEdge,
+  LinkOperation,
+  LinkOrigin,
+  UpdateInfo,
   NoteReadResponse,
   PairInfo,
   RagChunk,
@@ -79,6 +83,26 @@ export async function networkGetPairInfo(): Promise<PairInfo | null> {
 
 export async function saveLanguage(language: string): Promise<void> {
   return await invoke('save_language', { language });
+}
+
+export async function linksGet(): Promise<LinkEdge[]> {
+  return await invoke('links_get');
+}
+
+export async function linksApply(operations: LinkOperation[], origin?: LinkOrigin): Promise<void> {
+  return await invoke('links_apply', { operations, origin });
+}
+
+export async function aiSuggestLinks(notePath: string): Promise<string[]> {
+  return await invoke('ai_suggest_links', { notePath });
+}
+
+export async function checkUpdates(): Promise<UpdateInfo> {
+  return await invoke('check_updates');
+}
+
+export async function saveUpdatePrefs(updateCheck: boolean, skippedVersion: string): Promise<void> {
+  return await invoke('save_update_prefs', { updateCheck, skippedVersion });
 }
 
 export async function pickVaultDirectory(): Promise<string | null> {

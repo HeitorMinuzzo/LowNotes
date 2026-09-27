@@ -125,6 +125,8 @@ pub struct AiProviderConfig {
 pub struct AiSettings {
     pub active_provider_id: String,
     pub providers: Vec<AiProviderConfig>,
+    #[serde(default)]
+    pub auto_link_notes: bool,
 }
 
 impl Default for AiSettings {
@@ -173,6 +175,7 @@ impl Default for AiSettings {
                     is_custom: false,
                 },
             ],
+            auto_link_notes: false,
         }
     }
 }
@@ -192,6 +195,10 @@ pub struct AppSettings {
     pub ai: AiSettings,
     #[serde(default)]
     pub has_seen_welcome: bool,
+    #[serde(default = "default_true")]
+    pub update_check: bool,
+    #[serde(default)]
+    pub skipped_version: String,
 }
 
 impl Default for AppSettings {
@@ -210,6 +217,8 @@ impl Default for AppSettings {
             vaults: Vec::new(),
             ai: AiSettings::default(),
             has_seen_welcome: false,
+            update_check: default_true(),
+            skipped_version: String::new(),
         }
     }
 }
@@ -220,6 +229,10 @@ fn default_theme() -> String {
 
 fn default_view_mode() -> String {
     "split".to_string()
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl AppSettings {

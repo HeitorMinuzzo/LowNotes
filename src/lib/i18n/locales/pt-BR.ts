@@ -117,6 +117,9 @@ const ptBR: Dictionary = {
     errorQuery: 'Falha ao obter resposta da IA',
     errorMessage:
       '⚠️ **Erro:** {message}\n\n*Dica: Verifique se o provedor está ativo (ex: Ollama rodando) ou confira a API Key nas configurações (⚙️).*',
+    autoLink: 'Auto-vincular novas notas (IA)',
+    autoLinkHint: 'Quando ativado, o assistente vincula novas notas às relacionadas automaticamente.',
+    linksApplied: '{count} links aplicados',
   },
   pair: {
     title: 'Sincronização P2P & Dispositivos',
@@ -172,6 +175,27 @@ const ptBR: Dictionary = {
     start: 'Começar a Escrever',
     tryAi: 'Testar Assistente IA',
   },
+  graph: {
+    title: 'Mapa de Links',
+    toolbarTitle: 'Abrir Mapa de Links',
+    open: 'Abrir nota',
+    empty: 'Nenhum link ainda. Use [[Nome da Nota]] dentro das suas notas para interligá-las, ou crie links aqui.',
+    linkMode: 'Modo vínculo: clique na nota de destino',
+    startLink: 'Vincular nota selecionada',
+    unlink: 'Remover link',
+    linksOf: 'Links de {note}',
+    noLinksNote: 'Nenhum link para esta nota ainda.',
+    notes: '{count} notas',
+    links: '{count} links',
+  },
+  update: {
+    title: 'Atualização disponível',
+    body: 'LowNotes {version} foi lançada no GitHub.',
+    openRelease: 'Ver release',
+    skip: 'Pular esta versão',
+    later: 'Mais tarde',
+    autoCheck: 'Buscar atualizações automaticamente',
+  },
   settings: {
     language: 'Idioma',
   },
@@ -216,6 +240,10 @@ const ptBR: Dictionary = {
     pairTimeout: 'o outro computador demorou para responder',
     packetReceivedTooLarge: 'pacote recebido grande demais',
     metaMissing: 'metadados da nota ausentes',
+    saveLinks: 'falha ao salvar links',
+    suggestLinksFailed: 'falha ao sugerir links',
+    aiSendFailed: 'falha ao enviar mensagem para a IA',
+    aiEmptyResponse: 'a IA retornou uma resposta vazia',
   },
 };
 

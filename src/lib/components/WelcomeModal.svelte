@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { markWelcomeSeen } from '../api';
-  import { t } from '$lib/i18n';
+  import { markWelcomeSeen, saveLanguage } from '../api';
+  import { t, locale, LOCALE_LABELS, SUPPORTED_LOCALES } from '$lib/i18n';
 
   let {
     isOpen = $bindable(false),
@@ -43,6 +43,22 @@
         <p class="text-xs text-[var(--text-muted)] max-w-md mx-auto leading-relaxed">
           {$t('welcome.subtitle')}
         </p>
+        <div class="mt-4 flex items-center justify-center gap-2 flex-wrap">
+          <span class="text-[11px] text-[var(--text-dim)]">{$t('settings.language')}:</span>
+          {#each SUPPORTED_LOCALES as code}
+            <button
+              onclick={async () => {
+                locale.set(code);
+                await saveLanguage(code);
+              }}
+              class="px-2.5 py-1 text-[11px] rounded-lg border transition {$locale === code
+                ? 'bg-[var(--accent)]/15 border-[var(--accent)]/50 text-[var(--accent-light)] font-semibold'
+                : 'bg-[var(--bg-main)] border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
+            >
+              {LOCALE_LABELS[code]}
+            </button>
+          {/each}
+        </div>
       </div>
 
       <!-- Feature Pillars -->

@@ -115,6 +115,9 @@ const enUS = {
     errorQuery: 'Failed to get AI response',
     errorMessage:
       '⚠️ **Error:** {message}\n\n*Tip: Check that the provider is running (e.g. Ollama) or verify the API Key in settings (⚙️).*',
+    autoLink: 'Auto-link new notes (AI)',
+    autoLinkHint: 'When enabled, the assistant links new notes to related ones automatically.',
+    linksApplied: '{count} links applied',
   },
   pair: {
     title: 'P2P Sync & Devices',
@@ -170,6 +173,27 @@ const enUS = {
     start: 'Start Writing',
     tryAi: 'Try AI Assistant',
   },
+  graph: {
+    title: 'Link Map',
+    toolbarTitle: 'Open Link Map',
+    open: 'Open note',
+    empty: 'No links yet. Use [[Note Name]] inside your notes to interlink them, or create links here.',
+    linkMode: 'Link mode: click the target note',
+    startLink: 'Link selected note',
+    unlink: 'Remove link',
+    linksOf: 'Links of {note}',
+    noLinksNote: 'No links for this note yet.',
+    notes: '{count} notes',
+    links: '{count} links',
+  },
+  update: {
+    title: 'Update available',
+    body: 'LowNotes {version} has been released on GitHub.',
+    openRelease: 'See release',
+    skip: 'Skip this version',
+    later: 'Later',
+    autoCheck: 'Check for updates automatically',
+  },
   settings: {
     language: 'Language',
   },
@@ -214,6 +238,10 @@ const enUS = {
     pairTimeout: 'The other computer took too long to respond',
     packetReceivedTooLarge: 'Received packet is too large',
     metaMissing: 'Missing note metadata',
+    saveLinks: 'Failed to save links',
+    suggestLinksFailed: 'Failed to suggest links',
+    aiSendFailed: 'Failed to send message to the AI',
+    aiEmptyResponse: 'The AI returned an empty response',
   },
 };
 

@@ -5,11 +5,13 @@
     AiProviderConfig,
     AiSettings,
     ChatMessage,
+    LinkOperation,
     RagChunk,
   } from '../types';
   import {
     aiChatQuery,
     fetchAiModels,
+    linksApply,
     saveAiSettings,
   } from '../api';
   import { locale, t, trError, ts } from '$lib/i18n';
@@ -19,6 +21,7 @@
     aiSettings = $bindable<AiSettings>({
       active_provider_id: 'ollama',
       providers: [],
+      auto_link_notes: false,
     }),
     currentNotePath = '',
     onNavigateToSource,
@@ -38,6 +41,7 @@
   interface MessageItem extends ChatMessage {
     sources?: RagChunk[];
     timestamp: string;
+    appliedLinks?: number;
   }
 
   let messages = $state<MessageItem[]>([]);
@@ -152,6 +156,14 @@
     }
   }
 
+  async function handleAutoLinkChange() {
+    try {
+      await saveAiSettings(aiSettings);
+    } catch (e: any) {
+      errorMessage = trError(typeof e === 'string' ? e : e.message || 'ai.errorSave');
+    }
+  }
+
   async function handleAddCustomProvider() {
     if (!customName.trim() || !customUrl.trim()) return;
     const id = 'custom_' + Date.now();
@@ -196,10 +208,45 @@
       const scopePath = scope === 'note' && currentNotePath ? currentNotePath : undefined;
       const resp = await aiChatQuery(text, scopePath, history);
 
+      let content = resp.answer;
+      let appliedLinks = 0;
+      const fenceMatch = content.match(/```lownotes-links\s*\n([\s\S]*?)```/);
+      if (fenceMatch) {
+        try {
+          const payload = JSON.parse(fenceMatch[1]) as {
+            add?: Array<{ source?: unknown; target?: unknown }>;
+            remove?: Array<{ source?: unknown; target?: unknown }>;
+          };
+          const ops: LinkOperation[] = [];
+          const groups: Array<['add' | 'remove', Array<{ source?: unknown; target?: unknown }> | undefined]> = [
+            ['add', payload?.add],
+            ['remove', payload?.remove],
+          ];
+          for (const [action, entries] of groups) {
+            if (!Array.isArray(entries)) continue;
+            for (const entry of entries) {
+              if (entry && typeof entry.source === 'string' && typeof entry.target === 'string') {
+                ops.push({ source: entry.source, target: entry.target, action });
+              }
+            }
+          }
+          content = content.replace(fenceMatch[0], '').trim();
+          if (ops.length > 0) {
+            await linksApply(ops, 'agent');
+            appliedLinks = ops.length;
+          }
+        } catch (e) {
+          console.error('Failed to apply AI link operations:', e);
+          content = resp.answer;
+          appliedLinks = 0;
+        }
+      }
+
       messages.push({
         role: 'assistant',
-        content: resp.answer,
+        content,
         sources: resp.sources,
+        appliedLinks,
         timestamp: new Date().toLocaleTimeString($locale, { hour: '2-digit', minute: '2-digit' }),
       });
     } catch (err: any) {
@@ -565,6 +612,20 @@
           </div>
         {/if}
 
+        <!-- Auto-link Notes -->
+        <div class="flex flex-col gap-1 pt-2 border-t border-[var(--border)]">
+          <label class="flex items-center gap-2 text-xs text-[var(--text-main)] cursor-pointer">
+            <input
+              type="checkbox"
+              bind:checked={aiSettings.auto_link_notes}
+              onchange={handleAutoLinkChange}
+              class="accent-[var(--accent)]"
+            />
+            {$t('ai.autoLink')}
+          </label>
+          <span class="text-[10px] text-[var(--text-dim)] leading-relaxed">{$t('ai.autoLinkHint')}</span>
+        </div>
+
         <div class="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
           <button
             onclick={handleSaveSettings}
@@ -629,6 +690,12 @@
                 <div class="prose max-w-none text-xs leading-relaxed">
                   {@html marked.parse(trError(msg.content))}
                 </div>
+
+                {#if msg.appliedLinks && msg.appliedLinks > 0}
+                  <div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--bg-main)] border border-[var(--border)] text-[10px] text-[var(--accent-light)] select-none">
+                    🔗 {$t('ai.linksApplied', { count: msg.appliedLinks })}
+                  </div>
+                {/if}
 
                 <!-- Sources Chips -->
                 {#if msg.sources && msg.sources.length > 0}

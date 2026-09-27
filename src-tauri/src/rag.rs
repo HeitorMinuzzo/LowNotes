@@ -287,7 +287,7 @@ pub async fn generate_chat_completion(
         req = req.header("Authorization", format!("Bearer {}", provider.api_key.trim()));
     }
 
-    let resp = req.send().await.context("falha ao enviar mensagem para a IA")?;
+    let resp = req.send().await.context("errors.aiSendFailed")?;
     if !resp.status().is_success() {
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
@@ -303,7 +303,7 @@ pub async fn generate_chat_completion(
         .choices
         .into_iter()
         .next()
-        .context("a IA retornou uma resposta vazia")?;
+        .context("errors.aiEmptyResponse")?;
 
     let answer = choice
         .message

@@ -9,6 +9,7 @@
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { crdtApplyClientUpdate, saveNote } from '../api';
   import { renderMarkdown } from '../markdown';
+  import GraphView from './GraphView.svelte';
   import type { AppTheme, ViewMode } from '../types';
   import { t, ts } from '$lib/i18n';
 
@@ -23,6 +24,8 @@
     isAiChatOpen = false,
     onToggleAiChat,
     onContentChange,
+    onOpenNote,
+    onOpenWikilink,
   } = $props<{
     notePath: string;
     initialContent: string;
@@ -34,10 +37,13 @@
     isAiChatOpen?: boolean;
     onToggleAiChat?: () => void;
     onContentChange?: (path: string, newContent: string) => void;
+    onOpenNote?: (path: string) => void;
+    onOpenWikilink?: (title: string) => void;
   }>();
 
   let editorContainer: HTMLDivElement | null = $state(null);
   let previewContainer: HTMLDivElement | null = $state(null);
+  let isGraphOpen = $state(false);
   let saveStatus = $state<'saved' | 'saving'>('saved');
   let currentContent = $state('');
   let wordCount = $derived(
@@ -227,6 +233,15 @@
     editorView.focus();
   }
 
+  function handlePreviewClick(e: MouseEvent) {
+    const target = e.target as Element | null;
+    const link = target?.closest('a[data-wikilink]');
+    if (link) {
+      e.preventDefault();
+      onOpenWikilink?.(link.getAttribute('data-wikilink') ?? '');
+    }
+  }
+
   onMount(async () => {
     initEditor();
 
@@ -340,6 +355,14 @@
       >
         ” {$t('editor.quote')}
       </button>
+      <span class="w-[1px] h-4 bg-[var(--border)] mx-1"></span>
+      <button
+        onclick={() => (isGraphOpen = true)}
+        class="px-2 py-1 text-xs rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
+        title={$t('graph.toolbarTitle')}
+      >
+        🕸
+      </button>
     </div>
 
     <!-- Mode Selector & Status -->
@@ -398,8 +421,11 @@
 
     <!-- Rendered Markdown Container -->
     {#if viewMode === 'split' || viewMode === 'preview'}
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div
         bind:this={previewContainer}
+        role="presentation"
+        onclick={handlePreviewClick}
         class="h-full overflow-y-auto px-8 py-6 select-text {viewMode === 'preview' ? 'w-full max-w-4xl mx-auto' : 'w-1/2'}"
       >
         <article class="prose max-w-none text-[var(--text-main)]">
@@ -420,6 +446,8 @@
       <span class="text-[var(--accent-light)] font-mono">{$t('editor.p2pRealtime')}</span>
     </div>
   </footer>
+
+  <GraphView bind:isOpen={isGraphOpen} onOpenNote={(p) => onOpenNote?.(p)} />
 </div>
 
 <style>
@@ -492,6 +520,11 @@
   :global(.prose a) {
     color: var(--accent-light);
     text-decoration: underline;
+  }
+  :global(.wikilink) {
+    color: var(--accent-light);
+    text-decoration: underline;
+    cursor: pointer;
   }
   :global(.prose table) {
     width: 100%;

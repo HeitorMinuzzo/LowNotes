@@ -4,6 +4,7 @@ pub mod network;
 pub mod vault;
 pub mod commands;
 pub mod rag;
+pub mod links;
 
 use std::sync::Arc;
 use parking_lot::RwLock;
@@ -84,6 +85,11 @@ pub fn run() {
             commands::search_vault_rag,
             commands::ai_chat_query,
             commands::mark_welcome_seen,
+            commands::links_get,
+            commands::links_apply,
+            commands::ai_suggest_links,
+            commands::check_updates,
+            commands::save_update_prefs,
         ])
         .run(tauri::generate_context!())
         .expect("erro ao executar o aplicativo LowNotes");

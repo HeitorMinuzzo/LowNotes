@@ -61,3 +61,16 @@ test('preserva tarefas e diagramas sem aceitar HTML bruto', () => {
   expect(html).not.toContain('<script>');
   expect(html).toContain('&lt;script&gt;');
 });
+
+test('renderiza wikilinks com data-wikilink', () => {
+  const html = renderMarkdown('# x\n\n[[Minha Nota]]');
+  expect(html).toContain('data-wikilink="Minha Nota"');
+  expect(html).toContain('class="wikilink"');
+  expect(html).toContain('>Minha Nota</a>');
+});
+
+test('não renderiza wikilinks dentro de code fence', () => {
+  const html = renderMarkdown('```\n[[Não]]\n```');
+  expect(html).not.toContain('data-wikilink');
+  expect(html).toContain('[[Não]]');
+});

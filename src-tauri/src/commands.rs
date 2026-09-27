@@ -1,6 +1,7 @@
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::Arc,
+    time::Duration,
 };
 
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -9,8 +10,9 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
 use crate::{
-    config::{AiSettings, AppSettings, VaultConfig, decode_pair_code},
+    config::{AiProviderConfig, AiSettings, AppSettings, VaultConfig, decode_pair_code},
     crdt::CrdtManager,
+    links,
     network::{NetworkIdentity, NetworkService, PairInfo},
     rag::{self, ChatMessage, ChatResponse, RagChunk},
     vault::{self, VaultItem},
@@ -160,7 +162,11 @@ pub fn read_note(path: String, state: State<'_, AppState>) -> Result<NoteReadRes
 pub fn save_note(path: String, content: String, state: State<'_, AppState>) -> Result<(), String> {
     let settings = state.settings.read();
     let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
-    vault::save_note(&vault.path, &path, &content).map_err(|e| e.to_string())
+    vault::save_note(&vault.path, &path, &content).map_err(|e| e.to_string())?;
+    if let Err(e) = links::reconcile_wikilinks(&vault.path, &path, &content) {
+        eprintln!("reconcile_wikilinks failed for {path}: {e}");
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -173,8 +179,45 @@ pub fn create_note(
     let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
     let lang = settings.language.clone();
     let init_content = title.map(|t| format!("# {t}\n\n"));
-    vault::create_note(&vault.path, &path, init_content.as_deref(), &lang)
-        .map_err(|e| e.to_string())
+    let created = vault::create_note(&vault.path, &path, init_content.as_deref(), &lang)
+        .map_err(|e| e.to_string())?;
+
+    // Best-effort AI auto-linking for brand-new notes.
+    if settings.ai.auto_link_notes {
+        if let Some(provider) = settings
+            .ai
+            .providers
+            .iter()
+            .find(|p| p.id == settings.ai.active_provider_id)
+            .cloned()
+        {
+            let vault_path = vault.path.clone();
+            let note_path = created.clone();
+            tauri::async_runtime::spawn(async move {
+                match suggest_links_for_note(&vault_path, &note_path, &provider).await {
+                    Ok(targets) if !targets.is_empty() => {
+                        let ops: Vec<links::LinkOperation> = targets
+                            .into_iter()
+                            .map(|target| links::LinkOperation {
+                                source: note_path.clone(),
+                                target,
+                                action: links::LinkAction::add,
+                            })
+                            .collect();
+                        if let Err(e) =
+                            links::apply_operations(&vault_path, &ops, links::LinkOrigin::agent)
+                        {
+                            eprintln!("auto-link apply failed for {note_path}: {e}");
+                        }
+                    }
+                    Ok(_) => {}
+                    Err(e) => eprintln!("auto-link suggestion failed for {note_path}: {e}"),
+                }
+            });
+        }
+    }
+
+    Ok(created)
 }
 
 #[tauri::command]
@@ -227,7 +270,11 @@ pub fn crdt_apply_client_update(
     // Persist to disk
     let settings = state.settings.read();
     if let Some(vault) = settings.active_vault() {
-        let _ = vault::save_note(&vault.path, &note_path, &new_text);
+        if let Err(e) = vault::save_note(&vault.path, &note_path, &new_text) {
+            eprintln!("crdt persist failed for {note_path}: {e}");
+        } else if let Err(e) = links::reconcile_wikilinks(&vault.path, &note_path, &new_text) {
+            eprintln!("reconcile_wikilinks failed for {note_path}: {e}");
+        }
     }
 
     // Broadcast to P2P peers
@@ -458,6 +505,8 @@ pub async fn ai_chat_query(
         [Note Name](lownotes://open?path=<relative_path>&line=<line_number>)\n\
         Example: 'As recorded in [Ideias](lownotes://open?path=Ideias.md&line=12), the architecture...'\n\
         If the answer is not present in the notes context, honestly say that no record was found in the notes.\n\n\
+        LINK ORGANIZATION:\n\
+        If the user asks you to create, remove or organize links between notes, include exactly one fenced code block with language lownotes-links containing JSON {{\"add\":[{{\"source\":\"<rel path>\",\"target\":\"<rel path>\"}}],\"remove\":[...]}} using exact relative note paths from the context; never invent paths.\n\n\
         USER NOTES CONTEXT:\n\
         {context_text}"
     );
@@ -494,6 +543,247 @@ pub fn mark_welcome_seen(state: State<'_, AppState>) -> Result<(), String> {
     let mut s = state.settings.write();
     s.has_seen_welcome = true;
     s.save().map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpdateInfoDto {
+    pub has_update: bool,
+    pub latest: String,
+    pub current: String,
+    pub url: String,
+    pub notes: String,
+}
+
+#[tauri::command]
+pub fn links_get(state: State<'_, AppState>) -> Result<Vec<links::LinkEdge>, String> {
+    let settings = state.settings.read();
+    let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
+    Ok(links::load_links(&vault.path).links)
+}
+
+#[tauri::command]
+pub fn links_apply(
+    operations: Vec<links::LinkOperation>,
+    origin: Option<links::LinkOrigin>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let settings = state.settings.read();
+    let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
+    links::apply_operations(
+        &vault.path,
+        &operations,
+        origin.unwrap_or(links::LinkOrigin::manual),
+    )
+    .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn ai_suggest_links(
+    note_path: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<String>, String> {
+    let (provider, vault_path) = {
+        let settings = state.settings.read();
+        let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
+        let provider = settings
+            .ai
+            .providers
+            .iter()
+            .find(|p| p.id == settings.ai.active_provider_id)
+            .cloned()
+            .ok_or("errors.providerNotFound")?;
+        (provider, vault.path.clone())
+    };
+
+    suggest_links_for_note(&vault_path, &note_path, &provider)
+        .await
+        .map_err(|e| {
+            eprintln!("ai_suggest_links failed for {note_path}: {e}");
+            "errors.suggestLinksFailed".to_string()
+        })
+}
+
+/// Ask the active AI provider for up to 5 vault notes related to `note_path`.
+/// Shared by `ai_suggest_links` and the create-note auto-link background task.
+async fn suggest_links_for_note(
+    vault_path: &Path,
+    note_path: &str,
+    provider: &AiProviderConfig,
+) -> anyhow::Result<Vec<String>> {
+    let content = vault::read_note(vault_path, note_path)?;
+    let items = vault::list_vault_items(vault_path)?;
+
+    let others: Vec<String> = items
+        .iter()
+        .filter(|i| !i.is_dir && i.path != note_path)
+        .map(|i| format!("{} | {}", i.path, i.title))
+        .collect();
+    if others.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let truncated: String = content.chars().take(4000).collect();
+    let user_prompt = format!(
+        "Note path: {note_path}\n\nNote content:\n{truncated}\n\nOther notes (path | title):\n{}",
+        others.join("\n")
+    );
+    let messages = vec![
+        ChatMessage {
+            role: "system".to_string(),
+            content: "You are a note-linking assistant. Respond ONLY with a JSON array of up to 5 relative note paths most related to the given note. Exclude the note itself.".to_string(),
+        },
+        ChatMessage {
+            role: "user".to_string(),
+            content: user_prompt,
+        },
+    ];
+
+    let answer = rag::generate_chat_completion(provider, &messages, 0.2).await?;
+
+    let mut out: Vec<String> = Vec::new();
+    for candidate in parse_ai_path_list(&answer) {
+        let clean = candidate.trim().replace('\\', "/");
+        if clean.is_empty() || clean == note_path {
+            continue;
+        }
+        let full = match vault::safe_join(vault_path, &clean) {
+            Ok(f) => f,
+            Err(_) => continue,
+        };
+        if !full.is_file() || !vault::is_markdown(&full) {
+            continue;
+        }
+        if !out.contains(&clean) {
+            out.push(clean);
+        }
+        if out.len() >= 5 {
+            break;
+        }
+    }
+    Ok(out)
+}
+
+/// Defensive parse of an AI answer expected to be a JSON array of strings.
+/// Strips code fences; falls back to extracting double-quoted substrings.
+fn parse_ai_path_list(answer: &str) -> Vec<String> {
+    let trimmed = answer.trim();
+    let without_open = trimmed
+        .strip_prefix("```json")
+        .or_else(|| trimmed.strip_prefix("```"))
+        .unwrap_or(trimmed)
+        .trim();
+    let stripped = without_open.strip_suffix("```").unwrap_or(without_open).trim();
+
+    if let Ok(parsed) = serde_json::from_str::<Vec<String>>(stripped) {
+        return parsed;
+    }
+
+    let mut out = Vec::new();
+    let bytes = stripped.as_bytes();
+    let mut i = 0usize;
+    while i < bytes.len() {
+        if bytes[i] == b'"' {
+            let start = i + 1;
+            let mut j = start;
+            while j < bytes.len() && bytes[j] != b'"' {
+                j += 1;
+            }
+            if j >= bytes.len() {
+                break;
+            }
+            out.push(stripped[start..j].to_string());
+            i = j + 1;
+        } else {
+            i += 1;
+        }
+    }
+    out
+}
+
+fn version_parts(value: &str) -> Vec<u32> {
+    let trimmed = value.trim();
+    let clean = trimmed.strip_prefix('v').unwrap_or(trimmed);
+    clean
+        .split('.')
+        .map(|part| part.trim().parse::<u32>().unwrap_or(0))
+        .collect()
+}
+
+fn version_greater(latest: &str, current: &str) -> bool {
+    let mut a = version_parts(latest);
+    let mut b = version_parts(current);
+    let len = a.len().max(b.len());
+    a.resize(len, 0);
+    b.resize(len, 0);
+    a > b
+}
+
+#[tauri::command]
+pub async fn check_updates() -> Result<UpdateInfoDto, String> {
+    let current = env!("CARGO_PKG_VERSION");
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(15))
+        .build()
+        .map_err(|e| format!("update check failed: {e}"))?;
+
+    let resp = client
+        .get("https://api.github.com/repos/LowBloat/LowNotes/releases/latest")
+        .header("User-Agent", "LowNotes")
+        .send()
+        .await
+        .map_err(|e| {
+            eprintln!("check_updates request failed: {e}");
+            format!("update check failed: {e}")
+        })?;
+
+    if !resp.status().is_success() {
+        let status = resp.status();
+        return Err(format!("update check failed: status {status}"));
+    }
+
+    let body: serde_json::Value = resp.json().await.map_err(|e| {
+        eprintln!("check_updates parse failed: {e}");
+        format!("update check failed: {e}")
+    })?;
+
+    let tag = body
+        .get("tag_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
+    let latest = tag.strip_prefix('v').unwrap_or(tag).to_string();
+    let url = body
+        .get("html_url")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let notes: String = body
+        .get("body")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .chars()
+        .take(1500)
+        .collect();
+
+    Ok(UpdateInfoDto {
+        has_update: !latest.is_empty() && version_greater(&latest, current),
+        latest,
+        current: current.to_string(),
+        url,
+        notes,
+    })
+}
+
+#[tauri::command]
+pub fn save_update_prefs(
+    update_check: bool,
+    skipped_version: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let mut settings = state.settings.write();
+    settings.update_check = update_check;
+    settings.skipped_version = skipped_version;
+    settings.save().map_err(|e| e.to_string())
 }
 
 fn restart_network_service(

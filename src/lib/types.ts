@@ -22,6 +22,28 @@ export interface VaultConfig {
   peers: PeerConfig[];
 }
 
+export type LinkOrigin = 'wikilink' | 'manual' | 'agent';
+
+export interface LinkEdge {
+  source: string;
+  target: string;
+  origin: LinkOrigin;
+}
+
+export interface LinkOperation {
+  source: string;
+  target: string;
+  action: 'add' | 'remove';
+}
+
+export interface UpdateInfo {
+  has_update: boolean;
+  latest: string;
+  current: string;
+  url: string;
+  notes: string;
+}
+
 export interface AiProviderConfig {
   id: string;
   name: string;
@@ -34,6 +56,7 @@ export interface AiProviderConfig {
 export interface AiSettings {
   active_provider_id: string;
   providers: AiProviderConfig[];
+  auto_link_notes: boolean;
 }
 
 export interface AppSettings {
@@ -41,6 +64,8 @@ export interface AppSettings {
   theme: AppTheme;
   view_mode: ViewMode;
   language: string;
+  update_check: boolean;
+  skipped_version: string;
   active_vault_id: string | null;
   vaults: VaultConfig[];
   ai: AiSettings;

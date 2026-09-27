@@ -9,6 +9,7 @@
     VaultItem,
     PeerConfig,
     NetworkEventPayload,
+    UpdateInfo,
   } from '$lib/types';
   import {
     getAppState,
@@ -19,6 +20,8 @@
     saveTheme,
     saveViewMode,
     networkGetPairInfo,
+    checkUpdates,
+    saveUpdatePrefs,
   } from '$lib/api';
   import { locale, resolveLocale, t, trError } from '$lib/i18n';
   import Sidebar from '$lib/components/Sidebar.svelte';
@@ -27,6 +30,7 @@
   import IncomingPairDialog from '$lib/components/IncomingPairDialog.svelte';
   import AiChatSidebar from '$lib/components/AiChatSidebar.svelte';
   import WelcomeModal from '$lib/components/WelcomeModal.svelte';
+  import UpdateModal from '$lib/components/UpdateModal.svelte';
   let settings = $state<AppSettings | null>(null);
   let theme = $state<AppTheme>('dark');
   let viewMode = $state<ViewMode>('split');
@@ -46,6 +50,10 @@
   let isAiChatOpen = $state(false);
   let isWelcomeOpen = $state(false);
   let targetLine = $state<number | undefined>(undefined);
+  let updateInfo = $state<UpdateInfo | null>(null);
+  let isUpdateOpen = $state(false);
+  let updateCheckLocal = $state(true);
+  let updateTimer: ReturnType<typeof setInterval> | undefined;
   let unlisteners: UnlistenFn[] = [];
 
   async function loadInitialData() {
@@ -53,6 +61,7 @@
       const data = await getAppState();
       settings = data.settings;
       locale.set(resolveLocale(data.settings.language));
+      updateCheckLocal = data.settings.update_check;
       theme = data.settings.theme === 'light' ? 'light' : 'dark';
       viewMode = ['edit', 'split', 'preview'].includes(data.settings.view_mode)
         ? data.settings.view_mode
@@ -79,11 +88,45 @@
     }
   }
 
+  async function checkForUpdates() {
+    if (settings?.update_check === false) return;
+    try {
+      const info = await checkUpdates();
+      if (info.has_update && info.latest !== settings?.skipped_version) {
+        updateInfo = info;
+        isUpdateOpen = true;
+      }
+    } catch (e) {
+      console.error('Failed to check for updates:', e);
+    }
+  }
+
   async function refreshItems() {
     try {
       items = await listNotes();
     } catch (e) {
       console.error('Failed to refresh notes:', e);
+    }
+  }
+
+  function resolveWikilink(token: string): string | null {
+    const needle = token.trim().toLowerCase();
+    if (!needle) return null;
+    const withExt = needle.endsWith('.md') || needle.endsWith('.markdown') ? needle : `${needle}.md`;
+    const match = items.find(
+      (i) =>
+        !i.is_dir &&
+        (i.path.toLowerCase() === needle ||
+          i.path.toLowerCase() === withExt ||
+          i.title.toLowerCase() === needle)
+    );
+    return match?.path ?? null;
+  }
+
+  function handleOpenWikilink(token: string) {
+    const path = resolveWikilink(token);
+    if (path) {
+      openNote(path);
     }
   }
 
@@ -210,6 +253,8 @@
     unlisteners = [u1, u2, u3, u4, u5, u6];
 
     await loadInitialData();
+    void checkForUpdates();
+    updateTimer = setInterval(checkForUpdates, 6 * 60 * 60 * 1000);
 
     // Fallback: if pairCode is still empty after initial load, fetch it on-demand
     if (!pairCode) {
@@ -227,6 +272,7 @@
 
   onDestroy(() => {
     unlisteners.forEach((u) => u());
+    if (updateTimer) clearInterval(updateTimer);
   });
 </script>
 
@@ -295,6 +341,8 @@
           onViewModeChange={handleViewModeChange}
           {isAiChatOpen}
           onToggleAiChat={() => (isAiChatOpen = !isAiChatOpen)}
+          onOpenNote={(path) => openNote(path)}
+          onOpenWikilink={handleOpenWikilink}
         />
       {:else}
         <div class="flex-1 flex flex-col items-center justify-center text-center p-8 select-none text-[var(--text-dim)] relative">
@@ -346,6 +394,24 @@
     bind:isOpen={isWelcomeOpen}
     onOpenAiChat={() => {
       isAiChatOpen = true;
+    }}
+  />
+
+  <UpdateModal
+    bind:isOpen={isUpdateOpen}
+    info={updateInfo}
+    bind:autoCheck={updateCheckLocal}
+    onAutoCheckChange={async (v) => {
+      updateCheckLocal = v;
+      await saveUpdatePrefs(v, settings?.skipped_version ?? '');
+      if (settings) settings.update_check = v;
+    }}
+    onSkip={async (v) => {
+      await saveUpdatePrefs(updateCheckLocal, v);
+      if (settings) {
+        settings.skipped_version = v;
+      }
+      isUpdateOpen = false;
     }}
   />
 </div>

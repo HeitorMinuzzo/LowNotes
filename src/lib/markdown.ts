@@ -1,3 +1,4 @@
+import type { StateInline } from 'markdown-it';
 import MarkdownIt from 'markdown-it';
 import abbr from 'markdown-it-abbr';
 import container from 'markdown-it-container';
@@ -28,6 +29,28 @@ export const markdown = new MarkdownIt({
 for (const name of ['warning', 'info', 'tip', 'danger']) {
   markdown.use(container, name);
 }
+
+function wikilinkRule(state: StateInline, silent: boolean): boolean {
+  const src = state.src;
+  const start = state.pos;
+  if (src.charCodeAt(start) !== 0x5b /* [ */ || src.charCodeAt(start + 1) !== 0x5b) return false;
+  const close = src.indexOf(']]', start + 2);
+  if (close < 0) return false;
+  const content = src.slice(start + 2, close);
+  if (content.length === 0 || content.includes('\n') || content.includes(']]')) return false;
+  if (!silent) {
+    const token = state.push('wikilink', '', 0);
+    token.content = content;
+  }
+  state.pos = close + 2;
+  return true;
+}
+
+markdown.inline.ruler.before('link', 'wikilink', wikilinkRule);
+markdown.renderer.rules.wikilink = (tokens, index) => {
+  const label = markdown.utils.escapeHtml(tokens[index].content);
+  return `<a href="#" data-wikilink="${label}" class="wikilink">${label}</a>`;
+};
 
 const renderFence = markdown.renderer.rules.fence;
 markdown.renderer.rules.fence = (tokens, index, options, env, renderer) => {

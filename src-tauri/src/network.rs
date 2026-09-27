@@ -873,6 +873,12 @@ mod tests {
         let vault_b = temp_vault("b");
         fs::write(vault_a.join("nota_a.md"), "# Nota A\n\nConteudo de A.").unwrap();
         fs::write(vault_b.join("nota_b.md"), "# Nota B\n\nConteudo de B.").unwrap();
+        fs::create_dir_all(vault_a.join(".lownotes")).unwrap();
+        fs::write(
+            vault_a.join(".lownotes/links.json"),
+            r#"{"version":1,"links":[{"source":"nota_a.md","target":"nota_b.md","origin":"manual"}]}"#,
+        )
+        .unwrap();
 
         let ep_a = bind_endpoint().await;
         let ep_b = bind_endpoint().await;
@@ -901,7 +907,7 @@ mod tests {
         let (changed_b, _direct) = dial_sync(ep_b.clone(), vault_b.clone(), peer_a.clone())
             .await
             .unwrap();
-        assert_eq!(changed_b, 1);
+        assert_eq!(changed_b, 2, "B deveria receber nota_a.md + .lownotes/links.json");
         assert!(vault_b.join("nota_a.md").exists(), "vault B nao recebeu nota_a.md");
         assert_eq!(
             fs::read_to_string(vault_b.join("nota_a.md")).unwrap(),
@@ -911,6 +917,11 @@ mod tests {
         assert_eq!(
             fs::read_to_string(vault_a.join("nota_b.md")).unwrap(),
             "# Nota B\n\nConteudo de B."
+        );
+        // Hidden link store must travel with the sync (backup/restore guarantee)
+        assert!(
+            vault_b.join(".lownotes/links.json").exists(),
+            "vault B nao recebeu .lownotes/links.json"
         );
 
         // Incremental: edit on B, second sync must converge A without ping-pong

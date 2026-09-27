@@ -117,6 +117,9 @@ const esES: Dictionary = {
     errorQuery: 'Error al obtener respuesta de la IA',
     errorMessage:
       '⚠️ **Error:** {message}\n\n*Consejo: Verifica que el proveedor esté activo (ej: Ollama en ejecución) o revisa la API Key en la configuración (⚙️).*',
+    autoLink: 'Auto-vincular nuevas notas (IA)',
+    autoLinkHint: 'Cuando está activado, el asistente vincula nuevas notas con las relacionadas automáticamente.',
+    linksApplied: '{count} enlaces aplicados',
   },
   pair: {
     title: 'Sincronización P2P y Dispositivos',
@@ -172,6 +175,27 @@ const esES: Dictionary = {
     start: 'Comenzar a Escribir',
     tryAi: 'Probar Asistente de IA',
   },
+  graph: {
+    title: 'Mapa de Enlaces',
+    toolbarTitle: 'Abrir Mapa de Enlaces',
+    open: 'Abrir nota',
+    empty: 'Aún no hay enlaces. Usa [[Nombre de la Nota]] dentro de tus notas para interligarlas, o crea enlaces aquí.',
+    linkMode: 'Modo vínculo: haz clic en la nota de destino',
+    startLink: 'Vincular nota seleccionada',
+    unlink: 'Eliminar enlace',
+    linksOf: 'Enlaces de {note}',
+    noLinksNote: 'Ningún enlace para esta nota aún.',
+    notes: '{count} notas',
+    links: '{count} enlaces',
+  },
+  update: {
+    title: 'Actualización disponible',
+    body: 'LowNotes {version} fue publicada en GitHub.',
+    openRelease: 'Ver release',
+    skip: 'Omitir esta versión',
+    later: 'Más tarde',
+    autoCheck: 'Buscar actualizaciones automáticamente',
+  },
   settings: {
     language: 'Idioma',
   },
@@ -216,6 +240,10 @@ const esES: Dictionary = {
     pairTimeout: 'la otra computadora tardó demasiado en responder',
     packetReceivedTooLarge: 'paquete recibido demasiado grande',
     metaMissing: 'metadatos de la nota ausentes',
+    saveLinks: 'fallo al guardar enlaces',
+    suggestLinksFailed: 'fallo al sugerir enlaces',
+    aiSendFailed: 'fallo al enviar mensaje a la IA',
+    aiEmptyResponse: 'la IA devolvió una respuesta vacía',
   },
 };
 
