@@ -356,3 +356,6 @@ jobs:
               --generate-notes \
               --title "LowNotes $VERSION"
           fi
+
+          # Garante que a release esteja publicada (tags recriadas podem deixar draft)
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false || true
