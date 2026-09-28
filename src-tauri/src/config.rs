@@ -11,7 +11,7 @@ use iroh_tickets::endpoint::EndpointTicket;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 
-const PAIR_CODE_PREFIX: &str = "LOWNOTES1";
+const PAIR_CODE_PREFIX: &str = "LOWNOTES2";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PeerConfig {
@@ -200,6 +200,8 @@ pub struct AppSettings {
     pub has_seen_welcome: bool,
     #[serde(default = "default_true")]
     pub update_check: bool,
+    #[serde(default = "default_true")]
+    pub close_to_tray: bool,
     #[serde(default)]
     pub skipped_version: String,
 }
@@ -221,6 +223,7 @@ impl Default for AppSettings {
             ai: AiSettings::default(),
             has_seen_welcome: false,
             update_check: default_true(),
+            close_to_tray: default_true(),
             skipped_version: String::new(),
         }
     }
@@ -316,6 +319,14 @@ mod tests {
         let restored: AppSettings = serde_json::from_value(saved).unwrap();
         assert_eq!(restored.view_mode, "split");
         assert_eq!(restored.theme, "dark");
+    }
+
+    #[test]
+    fn existing_settings_default_to_tray_on_close() {
+        let mut saved = serde_json::to_value(AppSettings::default()).unwrap();
+        saved.as_object_mut().unwrap().remove("close_to_tray");
+        let restored: AppSettings = serde_json::from_value(saved).unwrap();
+        assert!(restored.close_to_tray);
     }
 
     #[test]

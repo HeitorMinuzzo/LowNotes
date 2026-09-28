@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { AppTheme, VaultConfig, VaultItem } from '../types';
+  import type { VaultConfig, VaultItem } from '../types';
   import type { PresenceUser } from '$lib/presence';
-  import { Moon, Sun } from 'lucide-svelte';
+  import { Settings2, RefreshCw } from 'lucide-svelte';
   import {
     createNote,
     createFolder,
@@ -10,9 +10,8 @@
     pickVaultDirectory,
     selectVault,
     networkSyncNow,
-    saveLanguage,
   } from '../api';
-  import { LOCALE_SHORT_LABELS, SUPPORTED_LOCALES, locale, t, trError, ts, type LocaleCode } from '$lib/i18n';
+  import { t, trError, ts } from '$lib/i18n';
 
   let {
     activeVault = null,
@@ -21,8 +20,7 @@
     selectedPath = '',
     syncStatus = 'idle',
     peerCount = 0,
-    theme = 'dark',
-    onToggleTheme,
+    onOpenSettings,
     onSelectNote,
     onVaultChange,
     onOpenPairModal,
@@ -35,8 +33,7 @@
     selectedPath: string;
     syncStatus: 'idle' | 'syncing' | 'synced' | 'error';
     peerCount: number;
-    theme: AppTheme;
-    onToggleTheme: () => void;
+    onOpenSettings: () => void;
     onSelectNote: (path: string) => void;
     onVaultChange: (vault: VaultConfig) => void;
     onOpenPairModal: () => void;
@@ -135,14 +132,6 @@
     }
   }
 
-  async function handleLanguageChange(next: LocaleCode) {
-    locale.set(next);
-    try {
-      await saveLanguage(next);
-    } catch (e) {
-      console.error('Failed to save language:', e);
-    }
-  }
 </script>
 
 <aside class="w-64 h-full flex flex-col border-r border-[var(--border)] bg-[var(--bg-sidebar)] select-none">
@@ -343,6 +332,12 @@
     </div>
   {/if}
 
+  <div class="px-3 py-2 border-t border-[var(--border)]">
+    <button onclick={onOpenSettings}
+      class="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--accent-light)] hover:bg-[var(--bg-hover)] transition"
+      title={$t('settings.title')}><Settings2 size={17} /> {$t('settings.title')}</button>
+  </div>
+
   <!-- P2P Status Footer -->
   <div class="p-3 border-t border-[var(--border)] bg-[var(--bg-card)] flex items-center justify-between">
     <button
@@ -368,32 +363,13 @@
     </button>
 
     <div class="flex items-center gap-1">
-      <select
-        value={$locale}
-        onchange={(e) => handleLanguageChange(e.currentTarget.value as LocaleCode)}
-        class="bg-transparent border border-[var(--border)] rounded px-1 py-0.5 text-[10px] font-medium text-[var(--text-dim)] hover:text-[var(--accent-light)] focus:outline-none focus:border-[var(--accent)] cursor-pointer"
-        title={$t('settings.language')}
-        aria-label={$t('settings.language')}
-      >
-        {#each SUPPORTED_LOCALES as code}
-          <option value={code} selected={$locale === code}>{LOCALE_SHORT_LABELS[code]}</option>
-        {/each}
-      </select>
-      <button
-        onclick={onToggleTheme}
-        class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--accent-light)] transition"
-        title={$t(theme === 'dark' ? 'sidebar.enableLightTheme' : 'sidebar.enableDarkTheme')}
-        aria-label={$t(theme === 'dark' ? 'sidebar.enableLightTheme' : 'sidebar.enableDarkTheme')}
-      >
-        {#if theme === 'dark'}<Moon size={15} />{:else}<Sun size={15} />{/if}
-      </button>
       <button
         onclick={() => networkSyncNow().catch(console.error)}
-        class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--accent-light)] transition"
+        class="w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-light)] transition"
         title={$t('sidebar.syncNow')}
         aria-label={$t('sidebar.syncNow')}
       >
-        ↻
+        <RefreshCw size={16} />
       </button>
     </div>
   </div>

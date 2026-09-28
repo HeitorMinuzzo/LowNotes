@@ -103,12 +103,13 @@ bun run build
 ## 🔗 Como Testar Pareamento P2P entre 2 Computadores
 
 1. Abra o **LowNotes** nos dois computadores e selecione uma pasta para o seu Vault.
+   - Use a versão atualizada nos dois computadores: o protocolo de sincronização CRDT é `lownotes/sync/2`.
 2. No **PC 1**:
    - Clique em **P2P Offline** ou **Gerenciar Conexões** no rodapé da barra lateral.
    - Na aba **Compartilhar Código**, clique em **Copiar Código**.
 3. No **PC 2**:
    - Abra a janela de **Sincronização P2P**.
-   - Na aba **Conectar Dispositivo**, cole o código `LOWNOTES1_...` e clique em **Solicitar Pareamento**.
+   - Na aba **Conectar Dispositivo**, cole o código `LOWNOTES2_...` e clique em **Solicitar Pareamento**.
 4. No **PC 1**:
    - Um alerta de confirmação aparecerá: *"O dispositivo Notebook (ID: ...) deseja sincronizar este vault. Deseja aceitar?"*.
    - Clique em **Aceitar Conexão**.
@@ -116,6 +117,8 @@ bun run build
    - Os dois computadores agora estão pareados de forma confiável.
    - Qualquer nota criada ou editada em um PC sincroniza instantaneamente no outro.
    - Ao abrir a mesma nota nos dois computadores, a digitação reflete em tempo real sem servidor!
+
+O histórico de mesclagem de cada nota fica em `.lownotes/crdt/` dentro do vault. Mantenha essa pasta junto com os arquivos Markdown ao fazer backup ou mover o vault.
 
 ---
 

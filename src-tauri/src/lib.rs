@@ -9,6 +9,7 @@ pub mod assistant;
 
 use std::sync::Arc;
 use parking_lot::RwLock;
+use tauri::{Manager, menu::{Menu, MenuItem}, tray::{MouseButton, TrayIconBuilder, TrayIconEvent}};
 
 use config::AppSettings;
 use crdt::CrdtManager;
@@ -61,7 +62,45 @@ pub fn run() {
                     *network.write() = Some(service);
                 }
             }
+            drop(s);
+
+            let open = MenuItem::with_id(app, "open", "Abrir LowNotes", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Sair do LowNotes", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&open, &quit])?;
+            TrayIconBuilder::new()
+                .icon(app.default_window_icon().expect("ícone do aplicativo").clone())
+                .menu(&menu)
+                .show_menu_on_left_click(false)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "open" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click { button: MouseButton::Left, .. } = event {
+                        if let Some(window) = tray.app_handle().get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if window.label() == "main" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    if window.app_handle().state::<AppState>().settings.read().close_to_tray {
+                        api.prevent_close();
+                        let _ = window.hide();
+                    }
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_app_state,
@@ -95,6 +134,7 @@ pub fn run() {
             commands::links_apply,
             commands::ai_suggest_links,
             commands::save_update_prefs,
+            commands::save_close_to_tray,
         ])
         .run(tauri::generate_context!())
         .expect("erro ao executar o aplicativo LowNotes");

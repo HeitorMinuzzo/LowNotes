@@ -287,6 +287,26 @@ pub fn build_manifest(root: &Path) -> anyhow::Result<Manifest> {
         }
     }
 
+    // CRDT history is synced separately from Markdown content and merged on receipt.
+    let state_dir = root.join(".lownotes/crdt");
+    if state_dir.is_dir() {
+        for entry in WalkDir::new(&state_dir).min_depth(1).max_depth(1).into_iter().filter_map(Result::ok) {
+            if !entry.file_type().is_file() || entry.path().extension().and_then(|e| e.to_str()) != Some("bin") {
+                continue;
+            }
+            let relative = entry.path().strip_prefix(root)?.to_string_lossy().replace('\\', "/");
+            let bytes = fs::read(entry.path())?;
+            let metadata = entry.metadata()?;
+            let modified_ms = metadata.modified().ok()
+                .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+                .map(|duration| duration.as_millis() as u64).unwrap_or(0);
+            manifest.insert(relative.clone(), NoteMeta {
+                path: relative, modified_ms, size: metadata.len(),
+                hash: blake3::hash(&bytes).to_hex().to_string(),
+            });
+        }
+    }
+
     Ok(manifest)
 }
 

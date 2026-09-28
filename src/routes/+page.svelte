@@ -17,7 +17,6 @@
     readNote,
     pickVaultDirectory,
     selectVault,
-    saveTheme,
     saveViewMode,
     networkGetPairInfo,
     saveUpdatePrefs,
@@ -38,6 +37,7 @@
   import AiChatSidebar from '$lib/components/AiChatSidebar.svelte';
   import WelcomeModal from '$lib/components/WelcomeModal.svelte';
   import UpdateModal from '$lib/components/UpdateModal.svelte';
+  import SettingsView from '$lib/components/SettingsView.svelte';
   let settings = $state<AppSettings | null>(null);
   let theme = $state<AppTheme>('dark');
   let viewMode = $state<ViewMode>('split');
@@ -55,12 +55,15 @@
   let isPairModalOpen = $state(false);
   let incomingRequest = $state<{ request_id: string; peer: PeerConfig } | null>(null);
   let isAiChatOpen = $state(false);
+  let isSettingsOpen = $state(false);
+  let settingsTab = $state<'general' | 'ai' | 'providers' | 'about'>('general');
   let isWelcomeOpen = $state(false);
   let targetLine = $state<number | undefined>(undefined);
   let pendingUpdate = $state<Update | null>(null);
   let isUpdateOpen = $state(false);
   let updateCheckLocal = $state(true);
   let updateTimer: ReturnType<typeof setInterval> | undefined;
+  let remoteRefreshTimer: ReturnType<typeof setTimeout> | undefined;
   let unlisteners: UnlistenFn[] = [];
 
   let presenceRegistry: Awareness | null = null;
@@ -116,6 +119,11 @@
   async function refreshItems() {
     try {
       items = await listNotes();
+      if (selectedNotePath && !items.some((item) => !item.is_dir && item.path === selectedNotePath)) {
+        selectedNotePath = '';
+        currentNoteContent = '';
+        currentCrdtBase64 = '';
+      }
     } catch (e) {
       console.error('Failed to refresh notes:', e);
     }
@@ -160,10 +168,10 @@
   }
   async function openNote(path: string) {
     try {
-      selectedNotePath = path;
       const res = await readNote(path);
       currentNoteContent = res.content;
       currentCrdtBase64 = res.crdt_update_base64;
+      selectedNotePath = path;
     } catch (e) {
       console.error('Failed to open note:', e);
     }
@@ -203,15 +211,22 @@
     }
   }
 
-  async function handleThemeChange() {
-    const previous = theme;
-    theme = theme === 'dark' ? 'light' : 'dark';
-    try {
-      await saveTheme(theme);
-    } catch (error) {
-      theme = previous;
-      console.error('Failed to save theme:', error);
-    }
+  function openSettings(tab: 'general' | 'ai' | 'providers' | 'about' = 'general') {
+    settingsTab = tab;
+    isSettingsOpen = true;
+  }
+
+  async function closeSettings() {
+    if (selectedNotePath) await openNote(selectedNotePath);
+    isSettingsOpen = false;
+  }
+
+  function handleSettingsChange(next: AppSettings) {
+    settings = next;
+    theme = next.theme;
+    viewMode = next.view_mode;
+    updateCheckLocal = next.update_check;
+    locale.set(resolveLocale(next.language));
   }
 
   async function handleViewModeChange(next: ViewMode) {
@@ -219,6 +234,7 @@
     viewMode = next;
     try {
       await saveViewMode(next);
+      if (settings) settings.view_mode = next;
     } catch (error) {
       viewMode = previous;
       console.error('Failed to save view mode:', error);
@@ -278,7 +294,12 @@
       }
     });
 
-    unlisteners = [u1, u2, u3, u4, u5, u6];
+    const u7 = await listen<NetworkEventPayload>('p2p:crdt-update', () => {
+      if (remoteRefreshTimer) clearTimeout(remoteRefreshTimer);
+      remoteRefreshTimer = setTimeout(refreshItems, 300);
+    });
+
+    unlisteners = [u1, u2, u3, u4, u5, u6, u7];
 
     presenceDoc = new Y.Doc();
     presenceRegistry = new Awareness(presenceDoc);
@@ -327,6 +348,7 @@
   onDestroy(() => {
     unlisteners.forEach((u) => u());
     if (updateTimer) clearInterval(updateTimer);
+    if (remoteRefreshTimer) clearTimeout(remoteRefreshTimer);
     if (unlistenAwareness) unlistenAwareness();
     if (presencePruneTimer) clearInterval(presencePruneTimer);
     if (presenceRegistry) {
@@ -341,9 +363,12 @@
 </script>
 
 <div class="flex h-screen w-screen overflow-hidden bg-[var(--bg-main)] text-[var(--text-main)]">
-  {#if !activeVault}
+  {#if isSettingsOpen && settings}
+    <SettingsView {settings} initialTab={settingsTab} onClose={() => void closeSettings()} onChange={handleSettingsChange} />
+  {:else if !activeVault}
     <!-- Welcome screen when no vault is configured -->
     <main class="flex-1 flex flex-col items-center justify-center p-8 text-center select-none">
+      <button class="absolute top-5 right-6 text-sm text-[var(--text-muted)] hover:text-[var(--accent-light)]" onclick={() => openSettings()}>{$t('settings.title')}</button>
       <div class="w-16 h-16 rounded-2xl bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center text-3xl mb-6 shadow-xl">
         ✦
       </div>
@@ -373,11 +398,13 @@
       selectedPath={selectedNotePath}
       {syncStatus}
       peerCount={activeVault.peers.length}
-      {theme}
-      onToggleTheme={handleThemeChange}
+      onOpenSettings={() => openSettings()}
       onSelectNote={(path) => openNote(path)}
       onVaultChange={(v) => {
         activeVault = v;
+        selectedNotePath = '';
+        currentNoteContent = '';
+        currentCrdtBase64 = '';
         pairCode = '';
         endpointId = '';
         refreshItems();
@@ -396,6 +423,7 @@
     <!-- Editor Surface -->
     <div class="flex-1 flex flex-col h-full overflow-hidden bg-[var(--bg-main)]">
       {#if selectedNotePath}
+        {#key selectedNotePath}
         <Editor
           notePath={selectedNotePath}
           initialContent={currentNoteContent}
@@ -411,6 +439,7 @@
           deviceName={settings?.device_name ?? ''}
           deviceId={endpointId}
         />
+        {/key}
       {:else}
         <div class="flex-1 flex flex-col items-center justify-center text-center p-8 select-none text-[var(--text-dim)] relative">
           <button
@@ -435,6 +464,7 @@
         currentNotePath={selectedNotePath}
         onNavigateToSource={handleNavigateToSource}
         onNotesCreated={refreshItems}
+        onOpenSettings={openSettings}
       />
       {/key}
     {/if}

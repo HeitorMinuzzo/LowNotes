@@ -10,15 +10,17 @@ use iroh::{Endpoint, SecretKey, endpoint::presets};
 use iroh_tickets::endpoint::EndpointTicket;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 use crate::{
+    commands::AppState,
     config::{AppSettings, PairInvite, PeerConfig, encode_pair_code},
+    crdt::CrdtManager,
     vault::{self, Manifest, NoteMeta},
 };
 
-const ALPN: &[u8] = b"lownotes/sync/1";
-const MAX_PACKET_BYTES: usize = 12 * 1024 * 1024;
+const ALPN: &[u8] = b"lownotes/sync/2";
+const MAX_PACKET_BYTES: usize = 24 * 1024 * 1024;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PairInfo {
@@ -558,7 +560,7 @@ async fn handle_incoming_connection(
                 .cloned()
                 .context("errors.unauthorizedDevice")?;
 
-            let changed = serve_sync(&mut send, &mut recv, &vault, remote_manifest).await?;
+            let changed = serve_sync(&mut send, &mut recv, &vault, remote_manifest, Some(&app)).await?;
             connection.close(0u32.into(), b"sync complete");
 
             let direct = connection_is_direct(&connection);
@@ -574,13 +576,13 @@ async fn handle_incoming_connection(
         Packet::CrdtUpdate { note_path, update } => {
             let is_peer = peers.read().iter().any(|p| p.endpoint_id == remote_id.to_string());
             if is_peer {
-                let _ = app.emit(
-                    "p2p:crdt-update",
-                    NetworkEventPayload::RemoteCrdtUpdate {
-                        note_path,
-                        update,
-                    },
-                );
+                let state = app.state::<AppState>();
+                let merged = state.crdt.apply_update(&vault, &note_path, &update)?;
+                if merged.changed {
+                    let _ = app.emit("p2p:crdt-update", NetworkEventPayload::RemoteCrdtUpdate {
+                        note_path, update: merged.state,
+                    });
+                }
             }
         }
         Packet::Awareness { note_path, update } => {
@@ -596,6 +598,10 @@ async fn handle_incoming_connection(
             let is_peer = peers.read().iter().any(|p| p.endpoint_id == remote_id.to_string());
             if is_peer {
                 let _ = vault::delete_item(&vault, &path);
+                let _ = app.state::<AppState>().crdt.remove_doc(&vault, &path);
+                let _ = app.emit("p2p:synced", NetworkEventPayload::Synced {
+                    peer: remote_id.to_string(), changed: 1, direct: None,
+                });
             }
         }
         _ => bail!("errors.unexpectedPacketStart"),
@@ -697,7 +703,7 @@ fn spawn_sync(
             },
         );
 
-        let res = dial_sync(endpoint, vault, peer.clone()).await;
+        let res = dial_sync(endpoint, vault, peer.clone(), Some(&app)).await;
         in_flight.lock().remove(&target);
 
         match res {
@@ -729,6 +735,7 @@ async fn dial_sync(
     endpoint: Endpoint,
     vault: PathBuf,
     peer: PeerConfig,
+    app: Option<&AppHandle>,
 ) -> anyhow::Result<(usize, Option<bool>)> {
     let addr = peer.endpoint_addr()?;
     let connection = endpoint.connect(addr, ALPN).await?;
@@ -742,14 +749,14 @@ async fn dial_sync(
         let packet: Packet = recv_packet(&mut recv).await?;
         match packet {
             Packet::Request { path } => {
-                let bytes = vault::read_note(&vault, &path)?;
+                let bytes = read_sync_content(&vault, &path)?;
                 let meta = my_manifest.get(&path).context("errors.metaMissing")?;
-                send_packet(&mut send, &Packet::Put { meta: meta.clone(), content: bytes.into_bytes() }).await?;
+                send_packet(&mut send, &Packet::Put { meta: meta.clone(), content: bytes }).await?;
             }
             Packet::Put { meta, content } => {
-                let str_content = String::from_utf8(content)?;
-                vault::save_note(&vault, &meta.path, &str_content)?;
-                changed += 1;
+                if write_sync_content(&vault, &meta.path, &content, app)? {
+                    changed += 1;
+                }
             }
             Packet::Done => break,
             _ => bail!("errors.unexpectedPacketSync"),
@@ -766,37 +773,41 @@ async fn serve_sync(
     recv: &mut iroh::endpoint::RecvStream,
     vault: &Path,
     remote_manifest: Manifest,
+    app: Option<&AppHandle>,
 ) -> anyhow::Result<usize> {
     let local_manifest = vault::build_manifest(vault)?;
     let mut changed = 0;
 
     // Send notes that remote doesn't have or remote has older
     for (path, local_meta) in &local_manifest {
+        if skip_markdown_sync(path, &local_manifest, &remote_manifest) { continue; }
         let needs_send = match remote_manifest.get(path) {
             None => true,
+            Some(remote_meta) if is_crdt_state(path) => local_meta.hash != remote_meta.hash,
             Some(remote_meta) => local_meta.modified_ms > remote_meta.modified_ms && local_meta.hash != remote_meta.hash,
         };
 
         if needs_send {
-            if let Ok(text) = vault::read_note(vault, path) {
-                send_packet(send, &Packet::Put { meta: local_meta.clone(), content: text.into_bytes() }).await?;
+            if let Ok(bytes) = read_sync_content(vault, path) {
+                send_packet(send, &Packet::Put { meta: local_meta.clone(), content: bytes }).await?;
             }
         }
     }
 
     // Request notes that remote has newer
     for (path, remote_meta) in &remote_manifest {
+        if skip_markdown_sync(path, &local_manifest, &remote_manifest) { continue; }
         let needs_request = match local_manifest.get(path) {
             None => true,
-            Some(local_meta) => remote_meta.modified_ms > local_meta.modified_ms && local_meta.hash != remote_meta.hash,
+            Some(local_meta) if is_crdt_state(path) => remote_meta.hash != local_meta.hash,
+            Some(local_meta) => remote_meta.modified_ms > local_meta.modified_ms && remote_meta.hash != local_meta.hash,
         };
 
         if needs_request {
             send_packet(send, &Packet::Request { path: path.clone() }).await?;
             let packet: Packet = recv_packet(recv).await?;
             if let Packet::Put { meta, content } = packet {
-                if let Ok(text) = String::from_utf8(content) {
-                    vault::save_note(vault, &meta.path, &text)?;
+                if write_sync_content(vault, &meta.path, &content, app)? {
                     changed += 1;
                 }
             }
@@ -809,6 +820,42 @@ async fn serve_sync(
     send.finish()?;
     let _ = tokio::time::timeout(Duration::from_secs(2), send.stopped()).await;
     Ok(changed)
+}
+
+fn is_crdt_state(path: &str) -> bool {
+    path.starts_with(".lownotes/crdt/") && path.ends_with(".bin")
+}
+
+fn skip_markdown_sync(path: &str, local: &Manifest, remote: &Manifest) -> bool {
+    if !vault::is_markdown(Path::new(path)) { return false; }
+    let state_path = CrdtManager::state_relative_path(path);
+    local.contains_key(&state_path) || remote.contains_key(&state_path)
+}
+
+fn read_sync_content(vault_path: &Path, path: &str) -> anyhow::Result<Vec<u8>> {
+    if is_crdt_state(path) {
+        Ok(std::fs::read(vault::safe_join(vault_path, path)?)?)
+    } else {
+        Ok(vault::read_note(vault_path, path)?.into_bytes())
+    }
+}
+
+fn write_sync_content(vault_path: &Path, path: &str, content: &[u8], app: Option<&AppHandle>) -> anyhow::Result<bool> {
+    if is_crdt_state(path) {
+        let manager = app.map(|app| app.state::<AppState>().crdt.clone()).unwrap_or_default();
+        let (note_path, result) = manager.merge_state_file(vault_path, path, content)?;
+        if result.changed {
+            if let Some(app) = app {
+                let _ = app.emit("p2p:crdt-update", NetworkEventPayload::RemoteCrdtUpdate {
+                    note_path, update: result.state,
+                });
+            }
+        }
+        Ok(result.changed)
+    } else {
+        vault::save_note(vault_path, path, std::str::from_utf8(content)?)?;
+        Ok(true)
+    }
 }
 
 async fn send_crdt_to_peer(
@@ -890,6 +937,7 @@ async fn recv_packet<T: DeserializeOwned>(stream: &mut iroh::endpoint::RecvStrea
 mod tests {
     use super::*;
     use std::fs;
+    use yrs::{Text, Transact, updates::decoder::Decode};
 
     fn temp_vault(tag: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!(
@@ -938,14 +986,14 @@ mod tests {
 
         let (accept_ep, accept_vault) = (ep_a.clone(), vault_a.clone());
         let responder = tokio::spawn(async move {
-            for _ in 0..2 {
+            for _ in 0..3 {
                 let incoming = ep_accept(&accept_ep).await;
                 let connection = incoming.await.unwrap();
                 let (mut send, mut recv) = connection.accept_bi().await.unwrap();
                 let packet: Packet = recv_packet(&mut recv).await.unwrap();
                 match packet {
                     Packet::Manifest(remote_manifest) => {
-                        serve_sync(&mut send, &mut recv, &accept_vault, remote_manifest)
+                        serve_sync(&mut send, &mut recv, &accept_vault, remote_manifest, None)
                             .await
                             .unwrap();
                     }
@@ -955,7 +1003,7 @@ mod tests {
             }
         });
 
-        let (changed_b, _direct) = dial_sync(ep_b.clone(), vault_b.clone(), peer_a.clone())
+        let (changed_b, _direct) = dial_sync(ep_b.clone(), vault_b.clone(), peer_a.clone(), None)
             .await
             .unwrap();
         assert_eq!(changed_b, 2, "B deveria receber nota_a.md + .lownotes/links.json");
@@ -977,11 +1025,9 @@ mod tests {
 
         // Incremental: edit on B, second sync must converge A without ping-pong
         fs::write(vault_b.join("nota_b.md"), "# Nota B\n\nConteudo de B atualizado.").unwrap();
-        let (changed_b2, _) = dial_sync(ep_b.clone(), vault_b.clone(), peer_a.clone())
+        let (changed_b2, _) = dial_sync(ep_b.clone(), vault_b.clone(), peer_a.clone(), None)
             .await
             .unwrap();
-        responder.await.unwrap();
-
         assert_eq!(changed_b2, 0, "B nao deveria receber nada de volta");
         assert_eq!(
             fs::read_to_string(vault_a.join("nota_b.md")).unwrap(),
@@ -991,6 +1037,30 @@ mod tests {
             fs::read_to_string(vault_b.join("nota_a.md")).unwrap(),
             "# Nota A\n\nConteudo de A."
         );
+
+        // Both peers edit the same note before the next sync. CRDT states must
+        // merge in both directions instead of choosing the newer Markdown file.
+        let crdt_a = CrdtManager::new();
+        let crdt_b = CrdtManager::new();
+        let baseline_a = crdt_a.get_or_create_doc(&vault_a, "nota_b.md").unwrap();
+        let baseline_b = crdt_b.get_or_create_doc(&vault_b, "nota_b.md").unwrap();
+        assert_eq!(baseline_a, baseline_b);
+        let editor_a = yrs::Doc::with_client_id(3001);
+        editor_a.transact_mut().apply_update(yrs::Update::decode_v1(&baseline_a).unwrap()).unwrap();
+        editor_a.get_or_insert_text("content").push(&mut editor_a.transact_mut(), " Alice");
+        let editor_b = yrs::Doc::with_client_id(3002);
+        editor_b.transact_mut().apply_update(yrs::Update::decode_v1(&baseline_b).unwrap()).unwrap();
+        editor_b.get_or_insert_text("content").push(&mut editor_b.transact_mut(), " Bob");
+        crdt_a.apply_update(&vault_a, "nota_b.md", &CrdtManager::encode_state(&editor_a)).unwrap();
+        crdt_b.apply_update(&vault_b, "nota_b.md", &CrdtManager::encode_state(&editor_b)).unwrap();
+        let (merged, _) = dial_sync(ep_b.clone(), vault_b.clone(), peer_a.clone(), None).await.unwrap();
+        assert_eq!(merged, 1);
+        responder.await.unwrap();
+        let text_a = fs::read_to_string(vault_a.join("nota_b.md")).unwrap();
+        let text_b = fs::read_to_string(vault_b.join("nota_b.md")).unwrap();
+        assert_eq!(text_a, text_b);
+        assert!(text_a.contains(" Alice"));
+        assert!(text_a.contains(" Bob"));
 
         let _ = peer_b;
         let _ = fs::remove_dir_all(&vault_a);

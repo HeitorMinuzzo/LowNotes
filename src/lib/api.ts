@@ -106,6 +106,10 @@ export async function saveUpdatePrefs(updateCheck: boolean, skippedVersion: stri
   return await invoke('save_update_prefs', { updateCheck, skippedVersion });
 }
 
+export async function saveCloseToTray(closeToTray: boolean): Promise<void> {
+  return await invoke('save_close_to_tray', { closeToTray });
+}
+
 export async function pickVaultDirectory(): Promise<string | null> {
   const selected = await open({
     directory: true,

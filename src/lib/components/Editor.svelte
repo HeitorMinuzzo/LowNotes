@@ -7,7 +7,7 @@
   import { yCollab } from 'y-codemirror.next';
   import mermaid from 'mermaid';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-  import { crdtApplyClientUpdate, saveNote, broadcastAwareness } from '../api';
+  import { crdtApplyClientUpdate, readNote, broadcastAwareness } from '../api';
   import { renderMarkdown } from '../markdown';
   import GraphView from './GraphView.svelte';
   import DocumentActions from './DocumentActions.svelte';
@@ -57,7 +57,7 @@
   let editorContainer: HTMLDivElement | null = $state(null);
   let previewContainer: HTMLDivElement | null = $state(null);
   let isGraphOpen = $state(false);
-  let saveStatus = $state<'saved' | 'saving'>('saved');
+  let saveStatus = $state<'saved' | 'saving' | 'error'>('saved');
   let currentContent = $state('');
   let wordCount = $derived(
     currentContent.trim() ? currentContent.trim().split(/\s+/).length : 0
@@ -72,7 +72,9 @@
   let awarenessSendTimer: ReturnType<typeof setTimeout> | null = null;
   let stalePruneTimer: ReturnType<typeof setInterval> | undefined;
   let unlistenAwareness: UnlistenFn | null = null;
-  let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let pendingSaves = 0;
+  let pendingRemoteUpdates: Uint8Array[] = [];
+  let disposed = false;
   let mermaidCounter = 0;
   let mermaidDebounce: ReturnType<typeof setTimeout> | null = null;
   const editorTheme = new Compartment();
@@ -147,7 +149,7 @@
     return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
 
-  function initEditor() {
+  function initEditor(content = initialContent, snapshot = crdtUpdateBase64) {
     if (!editorContainer) return;
 
     if (editorView) {
@@ -160,9 +162,9 @@
     }
 
     yDoc = new Y.Doc();
-    if (crdtUpdateBase64 && crdtUpdateBase64.trim().length > 0) {
+    if (snapshot && snapshot.trim().length > 0) {
       try {
-        const update = base64ToUint8Array(crdtUpdateBase64);
+        const update = base64ToUint8Array(snapshot);
         Y.applyUpdate(yDoc, update, 'init');
       } catch (e) {
         console.error('Failed to apply initial CRDT update:', e);
@@ -170,8 +172,8 @@
     }
 
     const yText = yDoc.getText('content');
-    if (yText.length === 0 && initialContent.length > 0) {
-      yText.insert(0, initialContent);
+    if (yText.length === 0 && content.length > 0) {
+      yText.insert(0, content);
     }
 
     currentContent = yText.toString();
@@ -212,19 +214,11 @@
 
       if (origin !== 'remote') {
         const base64 = uint8ArrayToBase64(update);
-        crdtApplyClientUpdate(notePath, base64).catch(console.error);
-
-        // Debounced save
+        pendingSaves += 1;
         saveStatus = 'saving';
-        if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
-        saveDebounceTimer = setTimeout(() => {
-          saveNote(notePath, text).then(() => {
-            saveStatus = 'saved';
-          }).catch((err) => {
-            console.error('Failed to save note:', err);
-            saveStatus = 'saved';
-          });
-        }, 500);
+        crdtApplyClientUpdate(notePath, base64)
+          .catch((error) => { console.error('Failed to persist CRDT update:', error); saveStatus = 'error'; })
+          .finally(() => { pendingSaves -= 1; if (pendingSaves === 0 && saveStatus !== 'error') saveStatus = 'saved'; });
       }
     });
 
@@ -320,19 +314,20 @@
   }
 
   onMount(async () => {
-    initEditor();
-
-    unlistenCrdt = await listen<{ note_path: string; update: number[] }>(
+    const stopCrdt = await listen<{ note_path: string; update: number[] }>(
       'p2p:crdt-update',
       (event) => {
-        if (event.payload.note_path === notePath && yDoc) {
+        if (event.payload.note_path === notePath) {
           const update = new Uint8Array(event.payload.update);
-          Y.applyUpdate(yDoc, update, 'remote');
+          if (yDoc) Y.applyUpdate(yDoc, update, 'remote');
+          else pendingRemoteUpdates.push(update);
         }
       }
     );
+    if (disposed) { stopCrdt(); return; }
+    unlistenCrdt = stopCrdt;
 
-    unlistenAwareness = await listen<{ note_path: string; update: number[] }>(
+    const stopAwareness = await listen<{ note_path: string; update: number[] }>(
       'p2p:awareness',
       (event) => {
         if (event.payload.note_path === notePath && awareness) {
@@ -341,11 +336,29 @@
         }
       }
     );
+    if (disposed) { stopAwareness(); return; }
+    unlistenAwareness = stopAwareness;
+
+    // Read after listeners are ready so edits arriving while this note opens are not lost.
+    try {
+      const latest = await readNote(notePath);
+      if (disposed) return;
+      initEditor(latest.content, latest.crdt_update_base64);
+    } catch (error) {
+      if (disposed) return;
+      console.error('Failed to refresh note before editing:', error);
+      initEditor();
+    }
+    for (const update of pendingRemoteUpdates) {
+      if (yDoc) Y.applyUpdate(yDoc, update, 'remote');
+    }
+    pendingRemoteUpdates = [];
 
     stalePruneTimer = setInterval(pruneStalePeers, 15000);
   });
 
   onDestroy(() => {
+    disposed = true;
     if (editorView) editorView.destroy();
     if (yDoc) yDoc.destroy();
     if (unlistenCrdt) unlistenCrdt();
@@ -357,13 +370,6 @@
       awareness = null;
     }
   });
-  $effect(() => {
-    // Re-initialize if notePath changes
-    if (notePath) {
-      initEditor();
-    }
-  });
-
   $effect(() => {
     if (editorView) {
       editorView.dispatch({ effects: editorTheme.reconfigure(codeMirrorTheme()) });
@@ -477,7 +483,9 @@
         </div>
       {/if}
       <div class="flex items-center gap-1.5 text-xs text-[var(--text-dim)]">
-        {#if saveStatus === 'saving'}
+        {#if saveStatus === 'error'}
+          <span class="text-[var(--danger)]">{$t('editor.saveError')}</span>
+        {:else if saveStatus === 'saving'}
           <span class="inline-block w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse"></span>
           <span>{$t('editor.saving')}</span>
         {:else}

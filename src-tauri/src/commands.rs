@@ -147,9 +147,10 @@ pub fn list_notes(state: State<'_, AppState>) -> Result<Vec<VaultItem>, String> 
 pub fn read_note(path: String, state: State<'_, AppState>) -> Result<NoteReadResponse, String> {
     let settings = state.settings.read();
     let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
-    let content = vault::read_note(&vault.path, &path).map_err(|e| e.to_string())?;
+    vault::read_note(&vault.path, &path).map_err(|e| e.to_string())?;
 
-    let crdt_bytes = state.crdt.get_or_create_doc(&path, &content);
+    let crdt_bytes = state.crdt.get_or_create_doc(&vault.path, &path).map_err(|e| e.to_string())?;
+    let content = vault::read_note(&vault.path, &path).map_err(|e| e.to_string())?;
     let crdt_update_base64 = URL_SAFE_NO_PAD.encode(crdt_bytes);
 
     Ok(NoteReadResponse {
@@ -163,6 +164,7 @@ pub fn save_note(path: String, content: String, state: State<'_, AppState>) -> R
     let settings = state.settings.read();
     let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
     vault::save_note(&vault.path, &path, &content).map_err(|e| e.to_string())?;
+    state.crdt.remove_doc(&vault.path, &path).map_err(|e| e.to_string())?;
     if let Err(e) = links::reconcile_wikilinks(&vault.path, &path, &content) {
         eprintln!("reconcile_wikilinks failed for {path}: {e}");
     }
@@ -217,6 +219,9 @@ pub fn create_note(
         }
     }
 
+    if let Some(net) = state.network.read().as_ref() {
+        net.sync_now();
+    }
     Ok(created)
 }
 
@@ -235,7 +240,13 @@ pub fn rename_item(
 ) -> Result<(), String> {
     let settings = state.settings.read();
     let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
-    vault::rename_item(&vault.path, &old_path, &new_path).map_err(|e| e.to_string())
+    vault::rename_item(&vault.path, &old_path, &new_path).map_err(|e| e.to_string())?;
+    state.crdt.remove_doc(&vault.path, &old_path).map_err(|e| e.to_string())?;
+    if let Some(net) = state.network.read().as_ref() {
+        net.broadcast_delete(old_path);
+        net.sync_now();
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -243,6 +254,7 @@ pub fn delete_item(path: String, state: State<'_, AppState>) -> Result<(), Strin
     let settings = state.settings.read();
     let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
     vault::delete_item(&vault.path, &path).map_err(|e| e.to_string())?;
+    state.crdt.remove_doc(&vault.path, &path).map_err(|e| e.to_string())?;
 
     if let Some(net) = state.network.read().as_ref() {
         net.broadcast_delete(path);
@@ -261,25 +273,16 @@ pub fn crdt_apply_client_update(
         .decode(&update_base64)
         .map_err(|_e| "errors.invalidBase64".to_string())?;
 
-    // Apply to Yrs in-memory doc and get text
-    let new_text = state
-        .crdt
-        .apply_update(&note_path, &update_bytes)
+    let settings = state.settings.read();
+    let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
+    let result = state.crdt.apply_update(&vault.path, &note_path, &update_bytes)
         .map_err(|e| e.to_string())?;
 
-    // Persist to disk
-    let settings = state.settings.read();
-    if let Some(vault) = settings.active_vault() {
-        if let Err(e) = vault::save_note(&vault.path, &note_path, &new_text) {
-            eprintln!("crdt persist failed for {note_path}: {e}");
-        } else if let Err(e) = links::reconcile_wikilinks(&vault.path, &note_path, &new_text) {
-            eprintln!("reconcile_wikilinks failed for {note_path}: {e}");
+    // Full state lets a peer recover from a missed incremental packet.
+    if result.changed {
+        if let Some(net) = state.network.read().as_ref() {
+            net.broadcast_crdt_update(note_path, result.state);
         }
-    }
-
-    // Broadcast to P2P peers
-    if let Some(net) = state.network.read().as_ref() {
-        net.broadcast_crdt_update(note_path, update_bytes);
     }
 
     Ok(())
@@ -744,6 +747,17 @@ pub fn save_update_prefs(
     settings.update_check = update_check;
     settings.skipped_version = skipped_version;
     settings.save().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_close_to_tray(close_to_tray: bool, state: State<'_, AppState>) -> Result<(), String> {
+    let mut settings = state.settings.write();
+    let previous = std::mem::replace(&mut settings.close_to_tray, close_to_tray);
+    if let Err(error) = settings.save() {
+        settings.close_to_tray = previous;
+        return Err(error.to_string());
+    }
+    Ok(())
 }
 
 fn restart_network_service(

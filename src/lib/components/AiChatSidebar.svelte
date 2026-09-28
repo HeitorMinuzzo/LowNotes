@@ -1,10 +1,9 @@
 <script lang="ts">
-  import { onDestroy, tick, untrack } from 'svelte';
+  import { onDestroy, tick } from 'svelte';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { renderChatMarkdown } from '../markdown';
   import DocumentActions from './DocumentActions.svelte';
   import type {
-    AiProviderConfig,
     AiSettings,
     AssistantSkill,
     NoteDraft,
@@ -16,7 +15,6 @@
   import {
     aiChatQuery,
     aiSaveDraft,
-    fetchAiModels,
     linksApply,
     saveAiSettings,
   } from '../api';
@@ -33,15 +31,16 @@
     currentNotePath = '',
     onNavigateToSource,
     onNotesCreated,
+    onOpenSettings,
   } = $props<{
     isOpen: boolean;
     aiSettings: AiSettings;
     currentNotePath: string;
     onNavigateToSource: (path: string, line: number) => void;
     onNotesCreated: () => Promise<void>;
+    onOpenSettings: (tab?: 'ai' | 'providers') => void;
   }>();
 
-  let isSettingsOpen = $state(false);
   let scope = $state<'vault' | 'note'>('vault');
   let skill = $state<AssistantSkill>('auto');
   let inputPrompt = $state('');
@@ -70,151 +69,13 @@
   let messages = $state<MessageItem[]>([]);
   let messagesContainer: HTMLDivElement | null = $state(null);
 
-  // Settings state
-  let selectedProviderId = $state(aiSettings.active_provider_id || 'ollama');
-  let currentProvider = $derived(
-    aiSettings.providers.find((p: AiProviderConfig) => p.id === selectedProviderId) || aiSettings.providers[0]
-  );
-
-  let apiKeyInput = $state('');
-  let baseUrlInput = $state('');
-  let selectedModelInput = $state('');
-  let availableModels = $state<string[]>([]);
-  let isFetchingModels = $state(false);
-  let showApiKey = $state(false);
-  let webKeyInput = $state(aiSettings.web_search_api_key || '');
-
-  // Add custom provider state
-  let isAddingCustom = $state(false);
-  let customName = $state('');
-  let customUrl = $state('');
-  // Unified Combobox State
-  let isModelDropdownOpen = $state(false);
-  let modelSearchQuery = $state('');
-
-  let filteredModels = $derived(
-    availableModels.filter((m: string) => {
-      const q = modelSearchQuery.trim().toLowerCase();
-      if (!q) return true;
-      return m.toLowerCase().includes(q);
-    })
-  );
-
-  function syncSettingsInputs(prov?: AiProviderConfig) {
-    const target = prov || currentProvider;
-    if (target) {
-      apiKeyInput = target.api_key;
-      baseUrlInput = target.base_url;
-      selectedModelInput = target.selected_model;
-      availableModels = [];
-      isModelDropdownOpen = false;
-      modelSearchQuery = '';
-    }
-  }
-
-  let lastActiveId = '';
-  $effect(() => {
-    const active = aiSettings?.active_provider_id;
-    if (active && active !== lastActiveId) {
-      lastActiveId = active;
-      selectedProviderId = active;
-      untrack(() => {
-        const prov = aiSettings.providers.find((p: AiProviderConfig) => p.id === active);
-        syncSettingsInputs(prov);
-      });
-    }
-  });
-
-  function handleProviderChange(id: string) {
-    if (id === selectedProviderId) return;
-
-    // Save in-flight edits to the previous provider in memory
-    const prevIndex = aiSettings.providers.findIndex((p: AiProviderConfig) => p.id === selectedProviderId);
-    if (prevIndex !== -1) {
-      aiSettings.providers[prevIndex].api_key = apiKeyInput.trim();
-      aiSettings.providers[prevIndex].base_url = baseUrlInput.trim();
-      aiSettings.providers[prevIndex].selected_model = selectedModelInput.trim();
-    }
-
-    selectedProviderId = id;
-    const target = aiSettings.providers.find((p: AiProviderConfig) => p.id === id);
-    if (target) {
-      syncSettingsInputs(target);
-    }
-  }
-
-  async function handleFetchModels() {
-    isFetchingModels = true;
-    errorMessage = null;
-    try {
-      const models = await fetchAiModels(selectedProviderId, baseUrlInput, apiKeyInput);
-      availableModels = models;
-      isModelDropdownOpen = true;
-      modelSearchQuery = '';
-      if (models.length > 0 && !selectedModelInput) {
-        selectedModelInput = models[0];
-      }
-    } catch (err: any) {
-      errorMessage = trError(typeof err === 'string' ? err : err.message || 'ai.errorFetchModels');
-    } finally {
-      isFetchingModels = false;
-    }
-  }
-
-  async function handleSaveSettings() {
-    const pIndex = aiSettings.providers.findIndex((p: AiProviderConfig) => p.id === selectedProviderId);
-    if (pIndex !== -1) {
-      aiSettings.providers[pIndex].api_key = apiKeyInput.trim();
-      aiSettings.providers[pIndex].base_url = baseUrlInput.trim();
-      aiSettings.providers[pIndex].selected_model = selectedModelInput.trim();
-    }
-    aiSettings.active_provider_id = selectedProviderId;
-    aiSettings.web_search_api_key = webKeyInput.trim();
-    lastActiveId = selectedProviderId;
-
-    try {
-      await saveAiSettings(aiSettings);
-      isSettingsOpen = false;
-      errorMessage = null;
-    } catch (e: any) {
-      errorMessage = trError(typeof e === 'string' ? e : e.message || 'ai.errorSave');
-    }
-  }
-
-  async function handleAutoLinkChange() {
-    try {
-      await saveAiSettings(aiSettings);
-    } catch (e: any) {
-      errorMessage = trError(typeof e === 'string' ? e : e.message || 'ai.errorSave');
-    }
-  }
-
-  async function handleAddCustomProvider() {
-    if (!customName.trim() || !customUrl.trim()) return;
-    const id = 'custom_' + Date.now();
-    const newProv: AiProviderConfig = {
-      id,
-      name: customName.trim(),
-      base_url: customUrl.trim(),
-      api_key: '',
-      selected_model: '',
-      is_custom: true,
-    };
-    aiSettings.providers.push(newProv);
-    selectedProviderId = id;
-    syncSettingsInputs();
-    isAddingCustom = false;
-    customName = '';
-    customUrl = '';
-  }
-
   async function sendMessage(textToSend?: string, selectedSkill?: AssistantSkill) {
     const text = (textToSend || inputPrompt).trim();
     if (!text || isLoading) return;
     if (selectedSkill) skill = selectedSkill;
     if (skill === 'research' && !aiSettings.web_search_api_key.trim()) {
       errorMessage = ts('ai.webKeyRequired');
-      isSettingsOpen = true;
+      onOpenSettings('ai');
       return;
     }
 
@@ -386,10 +247,9 @@
           value={aiSettings.active_provider_id}
           onchange={async (e) => {
             const newId = e.currentTarget.value;
-            handleProviderChange(newId);
+            const previous = aiSettings.active_provider_id;
             aiSettings.active_provider_id = newId;
-            lastActiveId = newId;
-            await saveAiSettings(aiSettings);
+            try { await saveAiSettings(aiSettings); } catch (reason) { aiSettings.active_provider_id = previous; errorMessage = trError(String(reason)); }
           }}
           class="bg-[var(--bg-main)] border border-[var(--border)] rounded px-2 py-0.5 text-[11px] font-medium text-[var(--accent-light)] focus:outline-none focus:border-[var(--accent)] cursor-pointer hover:border-[var(--accent)] transition"
           title={$t('ai.quickProviderSwitch')}
@@ -403,7 +263,7 @@
       </div>
       <div class="flex items-center gap-1.5">
         <button
-          onclick={() => (isSettingsOpen = !isSettingsOpen)}
+          onclick={() => onOpenSettings('ai')}
           class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--accent-light)] transition"
           title={$t('ai.settings')}
         >
@@ -454,279 +314,6 @@
       </p>
     </div>
 
-    <!-- Settings Overlay Drawer -->
-    {#if isSettingsOpen}
-      <div class="absolute top-[88px] left-0 right-0 bottom-0 bg-[var(--bg-card)] z-40 p-4 overflow-y-auto flex flex-col gap-4 border-b border-[var(--border)] animate-fadeIn">
-        <div class="flex items-center justify-between pb-2 border-b border-[var(--border)]">
-          <span class="text-xs font-bold text-[var(--text-main)]">{$t('ai.settingsTitle')}</span>
-          <button
-            onclick={() => (isSettingsOpen = false)}
-            class="text-xs text-[var(--text-dim)] hover:text-[var(--text-main)]"
-          >
-            ✕
-          </button>
-        </div>
-
-        <!-- Provider Selection -->
-        <!-- Provider Selection in Settings Drawer -->
-        <div class="flex flex-col gap-1.5">
-          <label for="ai-provider-select" class="text-xs text-[var(--text-dim)] font-medium">{$t('ai.provider')}</label>
-          <select
-            id="ai-provider-select"
-            value={selectedProviderId}
-            onchange={(e) => handleProviderChange(e.currentTarget.value)}
-            class="bg-[var(--bg-main)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent)] cursor-pointer"
-          >
-            {#each aiSettings.providers as prov}
-              <option value={prov.id} selected={selectedProviderId === prov.id}>
-                {prov.name}
-              </option>
-            {/each}
-          </select>
-        </div>
-
-        <!-- Base URL -->
-        <div class="flex flex-col gap-1.5">
-          <label for="ai-base-url" class="text-xs text-[var(--text-dim)] font-medium">{$t('ai.baseUrl')}</label>
-          <input
-            id="ai-base-url"
-            type="text"
-            bind:value={baseUrlInput}
-            placeholder="http://localhost:11434/v1"
-            class="bg-[var(--bg-main)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-xs font-mono text-[var(--text-main)] focus:outline-none focus:border-[var(--accent)]"
-          />
-        </div>
-
-        <!-- API Key -->
-        <div class="flex flex-col gap-1.5">
-          <div class="flex items-center justify-between">
-            <label for="ai-api-key" class="text-xs text-[var(--text-dim)] font-medium">{$t('ai.apiKey')}</label>
-            <button
-              onclick={() => (showApiKey = !showApiKey)}
-              class="text-[10px] text-[var(--text-dim)] hover:text-[var(--accent-light)]"
-            >
-              {showApiKey ? $t('ai.hide') : $t('ai.show')}
-            </button>
-          </div>
-          <input
-            id="ai-api-key"
-            type={showApiKey ? 'text' : 'password'}
-            bind:value={apiKeyInput}
-            placeholder={selectedProviderId === 'ollama' || selectedProviderId === 'lmstudio' ? $t('ai.apiKeyLocalPlaceholder') : 'sk-...'}
-            class="bg-[var(--bg-main)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-xs font-mono text-[var(--text-main)] focus:outline-none focus:border-[var(--accent)]"
-          />
-        </div>
-
-        <!-- Model Selection & Fetching -->
-        <!-- Model Selection Combobox -->
-        <div class="flex flex-col gap-1.5 relative">
-          <div class="flex items-center justify-between">
-            <label for="ai-model-input" class="text-xs text-[var(--text-dim)] font-medium">{$t('ai.selectedModel')}</label>
-            <button
-              type="button"
-              onclick={handleFetchModels}
-              disabled={isFetchingModels}
-              class="text-[11px] text-[var(--accent-light)] hover:underline flex items-center gap-1 disabled:opacity-50"
-            >
-              <span>↻</span>
-              <span>{isFetchingModels ? $t('ai.fetching') : $t('ai.listModels')}</span>
-            </button>
-          </div>
-
-          <!-- Main Unified Input / Combobox Trigger -->
-          <div class="relative flex items-center">
-            <input
-              id="ai-model-input"
-              type="text"
-              bind:value={selectedModelInput}
-              onfocus={() => { if (availableModels.length > 0) isModelDropdownOpen = true; }}
-              placeholder={$t('ai.modelPlaceholder')}
-              class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-md pl-2.5 pr-14 py-1.5 text-xs font-mono text-[var(--text-main)] focus:outline-none focus:border-[var(--accent)]"
-            />
-
-            <div class="absolute right-1.5 flex items-center gap-1">
-              {#if selectedModelInput}
-                <button
-                  type="button"
-                  onclick={() => { selectedModelInput = ''; modelSearchQuery = ''; }}
-                  class="w-4 h-4 flex items-center justify-center text-[10px] text-[var(--text-dim)] hover:text-[var(--text-main)]"
-                  title={$t('ai.clear')}
-                >
-                  ✕
-                </button>
-              {/if}
-
-              {#if availableModels.length > 0}
-                <button
-                  type="button"
-                  onclick={() => (isModelDropdownOpen = !isModelDropdownOpen)}
-                  class="w-5 h-5 flex items-center justify-center rounded text-[10px] text-[var(--text-dim)] hover:text-[var(--accent-light)] hover:bg-[var(--bg-hover)] transition"
-                  title={$t('ai.openModelList')}
-                >
-                  {isModelDropdownOpen ? '▲' : '▼'}
-                </button>
-              {/if}
-            </div>
-          </div>
-
-          <!-- Floating Dropdown Popover for Model Search & Selection -->
-          {#if isModelDropdownOpen && availableModels.length > 0}
-            <div class="mt-1 bg-[var(--bg-card)] border border-[var(--border)] rounded-lg shadow-2xl overflow-hidden flex flex-col z-50 animate-fadeIn">
-              <!-- Internal Fast Filter Search Bar -->
-              <div class="p-2 border-b border-[var(--border)] bg-[var(--bg-main)] flex items-center gap-2">
-                <span class="text-xs text-[var(--text-dim)]">🔍</span>
-                <input
-                  type="text"
-                  bind:value={modelSearchQuery}
-                  placeholder={$t('ai.searchModels', { count: availableModels.length })}
-                  class="flex-1 bg-transparent text-xs text-[var(--text-main)] placeholder-[var(--text-dim)] focus:outline-none"
-                />
-                {#if modelSearchQuery}
-                  <button
-                    type="button"
-                    onclick={() => (modelSearchQuery = '')}
-                    class="text-[11px] text-[var(--text-dim)] hover:text-[var(--text-main)]"
-                  >
-                    ✕
-                  </button>
-                {/if}
-                <button
-                  type="button"
-                  onclick={() => (isModelDropdownOpen = false)}
-                  class="text-[11px] text-[var(--text-dim)] hover:text-[var(--text-main)] ml-1"
-                  title={$t('ai.closeList')}
-                >
-                  {$t('ai.done')}
-                </button>
-              </div>
-
-              <!-- Models List -->
-              <div class="max-h-52 overflow-y-auto p-1 flex flex-col gap-0.5">
-                {#if modelSearchQuery.trim() && !availableModels.includes(modelSearchQuery.trim())}
-                  <button
-                    type="button"
-                    onclick={() => {
-                      selectedModelInput = modelSearchQuery.trim();
-                      isModelDropdownOpen = false;
-                    }}
-                    class="w-full text-left px-2.5 py-1.5 rounded-md text-xs font-mono text-[var(--accent-light)] hover:bg-[var(--bg-hover)] flex items-center gap-1.5 transition border-b border-[var(--border)]"
-                  >
-                    <span>➕</span>
-                    <span class="truncate">{$t('ai.useCustomModel', { model: modelSearchQuery.trim() })}</span>
-                  </button>
-                {/if}
-
-                {#if filteredModels.length === 0}
-                  <div class="p-4 text-center text-xs text-[var(--text-dim)]">
-                    {$t('ai.noModelsFound', { query: modelSearchQuery })}
-                  </div>
-                {:else}
-                  {#each filteredModels as mod}
-                    <button
-                      type="button"
-                      onclick={() => {
-                        selectedModelInput = mod;
-                        isModelDropdownOpen = false;
-                      }}
-                      class="w-full text-left px-2.5 py-1.5 rounded-md text-xs font-mono transition flex items-center justify-between {selectedModelInput === mod ? 'bg-[var(--bg-active)] text-[var(--accent-light)] font-semibold' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-main)]'}"
-                    >
-                      <span class="truncate">{mod}</span>
-                      {#if selectedModelInput === mod}
-                        <span class="text-xs text-[var(--accent-light)]">✓</span>
-                      {/if}
-                    </button>
-                  {/each}
-                {/if}
-              </div>
-
-              <!-- Footer with count -->
-              <div class="px-3 py-1.5 border-t border-[var(--border)] bg-[var(--bg-main)] text-[10px] text-[var(--text-dim)] flex items-center justify-between">
-                <span>{$t('ai.modelsCount', { shown: filteredModels.length, total: availableModels.length })}</span>
-                <span class="text-emerald-400">{$t('ai.available')}</span>
-              </div>
-            </div>
-          {/if}
-        </div>
-
-        {#if errorMessage}
-          <div class="p-2 bg-red-950/40 border border-red-900/60 rounded text-xs text-red-300">
-            {errorMessage}
-          </div>
-        {/if}
-
-        <!-- Add Custom Provider Toggle -->
-        {#if !isAddingCustom}
-          <button
-            onclick={() => (isAddingCustom = true)}
-            class="text-xs text-[var(--text-dim)] hover:text-[var(--accent-light)] text-left"
-          >
-            + {$t('ai.addCustomProvider')}
-          </button>
-        {:else}
-          <div class="p-3 bg-[var(--bg-main)] border border-[var(--border)] rounded-md flex flex-col gap-2">
-            <span class="text-xs font-semibold text-[var(--text-main)]">{$t('ai.newProvider')}</span>
-            <input
-              type="text"
-              bind:value={customName}
-              placeholder={$t('ai.providerNamePlaceholder')}
-              class="bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text-main)]"
-            />
-            <input
-              type="text"
-              bind:value={customUrl}
-              placeholder={$t('ai.providerUrlPlaceholder')}
-              class="bg-[var(--bg-card)] border border-[var(--border)] rounded px-2 py-1 text-xs font-mono text-[var(--text-main)]"
-            />
-            <div class="flex justify-end gap-1.5">
-              <button
-                onclick={() => (isAddingCustom = false)}
-                class="px-2 py-1 text-xs text-[var(--text-dim)] hover:text-[var(--text-main)]"
-              >
-                {$t('ai.cancel')}
-              </button>
-              <button
-                onclick={handleAddCustomProvider}
-                class="px-3 py-1 bg-[var(--accent)] text-black text-xs font-semibold rounded"
-              >
-                {$t('ai.add')}
-              </button>
-            </div>
-          </div>
-        {/if}
-
-        <div class="flex flex-col gap-1.5 pt-2 border-t border-[var(--border)]">
-          <label for="ai-web-key" class="text-xs text-[var(--text-main)]">{$t('ai.webKey')}</label>
-          <input id="ai-web-key" type="password" bind:value={webKeyInput} autocomplete="off"
-            class="bg-[var(--bg-main)] border border-[var(--border)] rounded px-2 py-1.5 text-xs text-[var(--text-main)]" />
-          <p class="text-[10px] text-[var(--text-dim)] leading-relaxed">{$t('ai.webKeyHint')}</p>
-          <button onclick={() => openUrl('https://api-dashboard.search.brave.com/')}
-            class="text-left text-[11px] text-[var(--accent-light)] hover:underline">{$t('ai.webGetKey')}</button>
-        </div>
-
-        <!-- Auto-link Notes -->
-        <div class="flex flex-col gap-1 pt-2 border-t border-[var(--border)]">
-          <label class="flex items-center gap-2 text-xs text-[var(--text-main)] cursor-pointer">
-            <input
-              type="checkbox"
-              bind:checked={aiSettings.auto_link_notes}
-              onchange={handleAutoLinkChange}
-              class="accent-[var(--accent)]"
-            />
-            {$t('ai.autoLink')}
-          </label>
-          <span class="text-[10px] text-[var(--text-dim)] leading-relaxed">{$t('ai.autoLinkHint')}</span>
-        </div>
-
-        <div class="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
-          <button
-            onclick={handleSaveSettings}
-            class="w-full py-2 bg-[var(--accent)] hover:bg-[var(--accent-light)] text-black text-xs font-semibold rounded-lg shadow-md transition"
-          >
-            {$t('ai.saveSettings')}
-          </button>
-        </div>
-      </div>
-    {/if}
 
     <!-- Chat Messages Container -->
     <div
@@ -885,7 +472,7 @@
 
     <!-- Chat Input Footer -->
     <footer class="p-3 border-t border-[var(--border)] bg-[var(--bg-card)]">
-      {#if errorMessage && !isSettingsOpen}
+      {#if errorMessage}
         <p role="alert" class="mb-2 text-xs text-red-500">{errorMessage}</p>
       {/if}
       <form
@@ -922,13 +509,3 @@
     </footer>
   </aside>
 {/if}
-
-<style>
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  .animate-fadeIn {
-    animation: fadeIn 0.15s ease-out;
-  }
-</style>

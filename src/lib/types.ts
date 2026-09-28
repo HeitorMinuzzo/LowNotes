@@ -58,6 +58,7 @@ export interface AppSettings {
   view_mode: ViewMode;
   language: string;
   update_check: boolean;
+  close_to_tray: boolean;
   skipped_version: string;
   active_vault_id: string | null;
   vaults: VaultConfig[];
