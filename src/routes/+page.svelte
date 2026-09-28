@@ -22,6 +22,7 @@
     saveUpdatePrefs,
   } from '$lib/api';
   import { locale, resolveLocale, t, trError } from '$lib/i18n';
+  import { resolveNoteLink } from '$lib/note-links';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import * as Y from 'yjs';
   import {
@@ -129,22 +130,8 @@
     }
   }
 
-  function resolveWikilink(token: string): string | null {
-    const needle = token.trim().toLowerCase();
-    if (!needle) return null;
-    const withExt = needle.endsWith('.md') || needle.endsWith('.markdown') ? needle : `${needle}.md`;
-    const match = items.find(
-      (i) =>
-        !i.is_dir &&
-        (i.path.toLowerCase() === needle ||
-          i.path.toLowerCase() === withExt ||
-          i.title.toLowerCase() === needle)
-    );
-    return match?.path ?? null;
-  }
-
   function handleOpenWikilink(token: string) {
-    const path = resolveWikilink(token);
+    const path = resolveNoteLink(items, selectedNotePath, token);
     if (path) {
       openNote(path);
     }

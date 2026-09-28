@@ -1,4 +1,7 @@
-use std::{fs, path::{Path, PathBuf}};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
@@ -178,28 +181,208 @@ pub fn extract_wikilinks(content: &str) -> Vec<String> {
     out
 }
 
-/// Resolve a wikilink token to an existing note path (relative, `/` separators).
-/// Matches case-insensitive title, exact path, or path equal to `token + ".md"`.
-pub fn resolve_link_target(vault: &Path, token: &str) -> Option<String> {
-    let clean = token.trim().replace('\\', "/");
-    if clean.is_empty() {
+/// Local Markdown links in ordinary prose (code spans and fences are ignored).
+fn markdown_link_spans(content: &str) -> Vec<(String, usize, usize, String)> {
+    let mut spans = Vec::new();
+    let mut in_fence = false;
+    let mut offset = 0;
+    for line in content.split_inclusive('\n') {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+            in_fence = !in_fence;
+            offset += line.len();
+            continue;
+        }
+        if in_fence {
+            offset += line.len();
+            continue;
+        }
+        let b = line.as_bytes();
+        let mut i = 0;
+        while i < b.len() {
+            if b[i] == b'`' {
+                let run = b[i..].iter().take_while(|&&c| c == b'`').count();
+                i += run;
+                while i < b.len() {
+                    if b[i..].starts_with(&vec![b'`'; run]) {
+                        i += run;
+                        break;
+                    }
+                    i += 1;
+                }
+                continue;
+            }
+            if b[i] == b'[' && (i == 0 || b[i - 1] != b'!' && b[i - 1] != b'[') {
+                if let Some(label_end) = b[i + 1..]
+                    .iter()
+                    .position(|&c| c == b']')
+                    .map(|p| i + 1 + p)
+                {
+                    if b.get(label_end + 1) == Some(&b'(') {
+                        if let Some(dest_end) = b[label_end + 2..]
+                            .iter()
+                            .position(|&c| c == b')')
+                            .map(|p| label_end + 2 + p)
+                        {
+                            let dest = line[label_end + 2..dest_end]
+                                .trim()
+                                .trim_matches(['<', '>']);
+                            if !dest.contains("://")
+                                && !dest.starts_with('#')
+                                && [".md", ".markdown"].iter().any(|ext| {
+                                    dest.split('#')
+                                        .next()
+                                        .unwrap_or("")
+                                        .to_ascii_lowercase()
+                                        .ends_with(ext)
+                                })
+                            {
+                                spans.push((
+                                    dest.to_string(),
+                                    offset + i,
+                                    offset + dest_end + 1,
+                                    line[i + 1..label_end].to_string(),
+                                ));
+                            }
+                            i = dest_end + 1;
+                            continue;
+                        }
+                    }
+                }
+            }
+            i += 1;
+        }
+        offset += line.len();
+    }
+    spans
+}
+
+fn note_tokens(content: &str) -> Vec<String> {
+    extract_wikilinks(content)
+        .into_iter()
+        .chain(
+            markdown_link_spans(content)
+                .into_iter()
+                .map(|(token, _, _, _)| token),
+        )
+        .collect()
+}
+
+fn normalized_path(path: &str) -> Option<String> {
+    let mut parts: Vec<&str> = Vec::new();
+    for part in path.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop()?;
+            }
+            p => parts.push(p),
+        }
+    }
+    Some(parts.join("/"))
+}
+
+fn resolve_from_items(items: &[vault::VaultItem], source: &str, token: &str) -> Option<String> {
+    let clean = token
+        .split('|')
+        .next()?
+        .split('#')
+        .next()?
+        .trim()
+        .trim_matches(['<', '>'])
+        .replace('\\', "/")
+        .replace("%20", " ");
+    if clean.is_empty() || clean.contains("://") {
         return None;
     }
-    let lower = clean.to_lowercase();
-    let items = vault::list_vault_items(vault).ok()?;
+    let parent = source.rsplit_once('/').map(|(p, _)| p).unwrap_or("");
+    let mut candidates = Vec::new();
+    if clean.starts_with("./") || clean.starts_with("../") {
+        candidates.push(format!("{parent}/{clean}"));
+    } else if clean.contains('/') {
+        candidates.push(clean.clone());
+        candidates.push(format!("{parent}/{clean}"));
+    } else {
+        candidates.push(format!("{parent}/{clean}"));
+        candidates.push(clean.clone());
+    }
+    for candidate in candidates {
+        let Some(path) = normalized_path(&candidate) else {
+            continue;
+        };
+        let lower = path.to_lowercase();
+        let with_ext = if lower.ends_with(".md") || lower.ends_with(".markdown") {
+            lower.clone()
+        } else {
+            format!("{lower}.md")
+        };
+        if let Some(item) = items.iter().find(|i| {
+            !i.is_dir && (i.path.to_lowercase() == lower || i.path.to_lowercase() == with_ext)
+        }) {
+            return Some(item.path.clone());
+        }
+    }
+    if clean.contains('/') {
+        return None;
+    }
+    let title = clean.to_lowercase();
+    let title = title
+        .strip_suffix(".markdown")
+        .or_else(|| title.strip_suffix(".md"))
+        .unwrap_or(&title);
+    let mut matches = items
+        .iter()
+        .filter(|i| !i.is_dir && i.title.to_lowercase() == title);
+    let first = matches.next()?;
+    if matches.next().is_none() {
+        Some(first.path.clone())
+    } else {
+        None
+    }
+}
 
+/// Resolve a note token from the vault root. Content links use the source-aware resolver above.
+pub fn resolve_link_target(vault: &Path, token: &str) -> Option<String> {
+    let items = vault::list_vault_items(vault).ok()?;
+    resolve_from_items(&items, "", token)
+}
+
+/// Read the graph from current files, so links to notes saved later are visible immediately.
+pub fn graph_links(vault: &Path) -> anyhow::Result<Vec<LinkEdge>> {
+    let items = vault::list_vault_items(vault)?;
+    let exists = |path: &str| items.iter().any(|i| !i.is_dir && i.path == path);
+    let mut edges: Vec<LinkEdge> = load_links(vault)
+        .links
+        .into_iter()
+        .filter(|e| {
+            e.origin != LinkOrigin::wikilink
+                && exists(&e.source)
+                && exists(&e.target)
+                && e.source != e.target
+        })
+        .collect();
     for item in items.iter().filter(|i| !i.is_dir) {
-        if item.title.to_lowercase() == lower {
-            return Some(item.path.clone());
+        let Ok(content) = vault::read_note(vault, &item.path) else {
+            continue;
+        };
+        for token in note_tokens(&content) {
+            let Some(target) = resolve_from_items(&items, &item.path, &token) else {
+                continue;
+            };
+            if target != item.path
+                && !edges
+                    .iter()
+                    .any(|e| e.source == item.path && e.target == target)
+            {
+                edges.push(LinkEdge {
+                    source: item.path.clone(),
+                    target,
+                    origin: LinkOrigin::wikilink,
+                });
+            }
         }
     }
-    for item in items.iter().filter(|i| !i.is_dir) {
-        let path_lower = item.path.to_lowercase();
-        if path_lower == lower || path_lower == format!("{lower}.md") {
-            return Some(item.path.clone());
-        }
-    }
-    None
+    Ok(edges)
 }
 
 /// Rebuild wikilink-origin edges for `source` from its current content.
@@ -212,8 +395,9 @@ pub fn reconcile_wikilinks(vault: &Path, source: &str, content: &str) -> anyhow:
         .links
         .retain(|e| !(e.origin == LinkOrigin::wikilink && e.source == source));
 
-    for token in extract_wikilinks(content) {
-        let Some(target) = resolve_link_target(vault, &token) else {
+    let items = vault::list_vault_items(vault)?;
+    for token in note_tokens(content) {
+        let Some(target) = resolve_from_items(&items, source, &token) else {
             continue;
         };
         if target == source {
@@ -247,21 +431,52 @@ fn validate_note(vault: &Path, relative: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Remove the first `[[token]]` occurrence whose token resolves to `target`.
-fn strip_wikilink_to(vault: &Path, content: &str, target: &str) -> Option<String> {
-    for (token, start, end) in wikilink_spans(content) {
-        if resolve_link_target(vault, &token).as_deref() == Some(target) {
-            let mut updated = String::with_capacity(content.len());
-            updated.push_str(&content[..start]);
-            updated.push_str(&content[end..]);
-            return Some(updated);
-        }
+/// Keep visible prose when unlinking a note from the graph.
+fn strip_links_to(vault: &Path, source: &str, content: &str, target: &str) -> Option<String> {
+    let items = vault::list_vault_items(vault).ok()?;
+    let mut replacements: Vec<(usize, usize, String)> = wikilink_spans(content)
+        .into_iter()
+        .filter(|(token, _, _)| {
+            resolve_from_items(&items, source, token).as_deref() == Some(target)
+        })
+        .map(|(token, start, end)| {
+            let label = if let Some((_, alias)) = token.split_once('|') {
+                alias.to_string()
+            } else {
+                token
+                    .split('#')
+                    .next()
+                    .unwrap_or("")
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or("")
+                    .trim_end_matches(".md")
+                    .to_string()
+            };
+            (start, end, label)
+        })
+        .collect();
+    replacements.extend(
+        markdown_link_spans(content)
+            .into_iter()
+            .filter(|(token, _, _, _)| {
+                resolve_from_items(&items, source, token).as_deref() == Some(target)
+            })
+            .map(|(_, start, end, label)| (start, end, label)),
+    );
+    if replacements.is_empty() {
+        return None;
     }
-    None
+    replacements.sort_by_key(|(start, _, _)| *start);
+    let mut updated = content.to_string();
+    for (start, end, label) in replacements.into_iter().rev() {
+        updated.replace_range(start..end, &label);
+    }
+    Some(updated)
 }
 
-/// Apply add/remove link operations. Removing a wikilink-origin edge also strips
-/// the matching `[[...]]` token from the source note content and re-reconciles.
+/// Apply add/remove link operations. Removing an edge also unwraps matching
+/// wikilinks and local Markdown links in the source note, preserving their labels.
 pub fn apply_operations(
     vault: &Path,
     ops: &[LinkOperation],
@@ -291,17 +506,10 @@ pub fn apply_operations(
                 }
             }
             LinkAction::remove => {
-                let had_wikilink = store.links.iter().any(|e| {
-                    e.source == op.source
-                        && e.target == op.target
-                        && e.origin == LinkOrigin::wikilink
-                });
                 store
                     .links
                     .retain(|e| !(e.source == op.source && e.target == op.target));
-                if had_wikilink {
-                    wikilink_removals.push((op.source.clone(), op.target.clone()));
-                }
+                wikilink_removals.push((op.source.clone(), op.target.clone()));
             }
         }
     }
@@ -312,7 +520,7 @@ pub fn apply_operations(
         let Ok(content) = vault::read_note(vault, source) else {
             continue;
         };
-        let Some(updated) = strip_wikilink_to(vault, &content, target) else {
+        let Some(updated) = strip_links_to(vault, source, &content, target) else {
             continue;
         };
         if let Err(e) = vault::save_note(vault, source, &updated) {
@@ -332,10 +540,8 @@ mod tests {
     use super::*;
 
     fn temp_vault(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!(
-            "lownotes-links-test-{}-{tag}",
-            std::process::id()
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("lownotes-links-test-{}-{tag}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir
@@ -414,8 +620,12 @@ After fence [[Gamma]].\n";
         };
         save_links(&vault, &seeded).unwrap();
 
-        reconcile_wikilinks(&vault, "a.md", &fs::read_to_string(vault.join("a.md")).unwrap())
-            .unwrap();
+        reconcile_wikilinks(
+            &vault,
+            "a.md",
+            &fs::read_to_string(vault.join("a.md")).unwrap(),
+        )
+        .unwrap();
         let store = load_links(&vault);
         // Pair already exists (manual) so no duplicate wikilink edge is added.
         assert_eq!(store.links.len(), 1);
@@ -477,8 +687,12 @@ After fence [[Gamma]].\n";
 
         // Reconcile wikilink a -> b, then remove it via operations: the
         // [[B]] token must disappear from a.md and the edge from the store.
-        reconcile_wikilinks(&vault, "a.md", &fs::read_to_string(vault.join("a.md")).unwrap())
-            .unwrap();
+        reconcile_wikilinks(
+            &vault,
+            "a.md",
+            &fs::read_to_string(vault.join("a.md")).unwrap(),
+        )
+        .unwrap();
         assert!(load_links(&vault)
             .links
             .iter()
@@ -548,6 +762,65 @@ After fence [[Gamma]].\n";
         let items = vault::list_vault_items(&vault).unwrap();
         assert!(!items.iter().any(|i| i.path.contains(".lownotes")));
 
+        let _ = fs::remove_dir_all(&vault);
+    }
+
+    #[test]
+    fn graph_finds_late_targets_and_relative_markdown_links() {
+        let vault = temp_vault("late-targets");
+        fs::create_dir_all(vault.join("Python/Etapas")).unwrap();
+        fs::write(
+            vault.join("Python/Plano.md"),
+            "# Plano\n\n[[Etapas/Fundamentos|Começar]]\n",
+        )
+        .unwrap();
+        assert!(graph_links(&vault).unwrap().is_empty());
+        fs::write(
+            vault.join("Python/Etapas/Fundamentos.md"),
+            "# Fundamentos\n\n[Voltar](../Plano.md#Objetivos)\n`[ignorar](../Plano.md)`\n",
+        )
+        .unwrap();
+        let edges = graph_links(&vault).unwrap();
+        assert_eq!(edges.len(), 2);
+        assert!(edges
+            .iter()
+            .any(|e| e.source == "Python/Plano.md" && e.target == "Python/Etapas/Fundamentos.md"));
+        assert!(edges
+            .iter()
+            .any(|e| e.source == "Python/Etapas/Fundamentos.md" && e.target == "Python/Plano.md"));
+        assert_eq!(
+            resolve_link_target(&vault, "Python/Plano"),
+            Some("Python/Plano.md".into())
+        );
+        let _ = fs::remove_dir_all(&vault);
+    }
+
+    #[test]
+    fn unlink_derived_edge_keeps_visible_text() {
+        let vault = temp_vault("unlink-derived");
+        fs::write(
+            vault.join("a.md"),
+            "Veja [[B|o plano]] e [detalhes](B.md).\n",
+        )
+        .unwrap();
+        fs::write(vault.join("B.md"), "# B\n").unwrap();
+        assert_eq!(graph_links(&vault).unwrap().len(), 1);
+        assert!(load_links(&vault).links.is_empty());
+        apply_operations(
+            &vault,
+            &[LinkOperation {
+                source: "a.md".into(),
+                target: "B.md".into(),
+                action: LinkAction::remove,
+            }],
+            LinkOrigin::manual,
+        )
+        .unwrap();
+        assert_eq!(
+            fs::read_to_string(vault.join("a.md")).unwrap(),
+            "Veja o plano e detalhes.\n"
+        );
+        assert!(graph_links(&vault).unwrap().is_empty());
         let _ = fs::remove_dir_all(&vault);
     }
 }

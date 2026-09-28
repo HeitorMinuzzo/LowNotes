@@ -618,7 +618,7 @@ pub fn mark_welcome_seen(state: State<'_, AppState>) -> Result<(), String> {
 pub fn links_get(state: State<'_, AppState>) -> Result<Vec<links::LinkEdge>, String> {
     let settings = state.settings.read();
     let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
-    Ok(links::load_links(&vault.path).links)
+    links::graph_links(&vault.path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

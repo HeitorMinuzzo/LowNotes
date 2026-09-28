@@ -196,7 +196,7 @@
 
   function toggleLinkMode() {
     linkMode = !linkMode;
-    linkSource = null;
+    linkSource = linkMode ? selectedPath : null;
   }
 
   async function addLink(source: string, target: string) {
@@ -232,7 +232,7 @@
   }
 
   function handleEdgeClick(edge: LaidOutEdge) {
-    void removeLink(edge.source, edge.target);
+    selectedPath = edge.source;
   }
 </script>
 
@@ -274,15 +274,20 @@
         <div class="flex-1 relative bg-[var(--bg-main)] overflow-hidden">
           {#if linkMode}
             <div class="absolute top-2 left-1/2 -translate-x-1/2 z-10 px-3 py-1 rounded-full bg-[var(--bg-card)] border border-[var(--accent)] text-xs text-[var(--accent-light)] shadow">
-              {$t('graph.linkMode')}
+              {linkSource ? $t('graph.linkMode') : $t('graph.chooseSource')}
             </div>
           {/if}
 
-          {#if graph.edges.length === 0}
+          {#if graph.nodes.length === 0}
             <div class="absolute inset-0 flex items-center justify-center p-8">
               <p class="text-sm text-[var(--text-dim)] text-center max-w-md">{$t('graph.empty')}</p>
             </div>
           {:else}
+            {#if graph.edges.length === 0 && !linkMode}
+              <div class="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 w-max max-w-[90%] px-3 py-1 rounded-full bg-[var(--bg-card)] border border-[var(--border)] text-xs text-center text-[var(--text-dim)] pointer-events-none">
+                {$t('graph.empty')}
+              </div>
+            {/if}
             <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" class="w-full h-full graph-svg">
               {#each graph.edges as edge (edge.source + '→' + edge.target + '→' + edge.origin)}
                 <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -300,7 +305,9 @@
                   role="button"
                   tabindex="-1"
                   onclick={() => handleNodeClick(node.path)}
+                  ondblclick={() => { isOpen = false; onOpenNote?.(node.path); }}
                 >
+                  <title>{node.path}</title>
                   <circle cx={node.x} cy={node.y} r={node.r} class="node-circle" />
                   <text x={node.x} y={node.y - node.r - 1} text-anchor="middle" class="node-label">{node.title}</text>
                 </g>
@@ -381,7 +388,7 @@
     cursor: pointer;
   }
   .graph-edge:hover .edge-line {
-    stroke: var(--danger);
+    stroke: var(--accent-light);
     stroke-width: 0.6;
   }
   .node-circle {

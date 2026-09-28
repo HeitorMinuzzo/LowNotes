@@ -48,8 +48,10 @@ function wikilinkRule(state: StateInline, silent: boolean): boolean {
 
 markdown.inline.ruler.before('link', 'wikilink', wikilinkRule);
 markdown.renderer.rules.wikilink = (tokens, index) => {
-  const label = markdown.utils.escapeHtml(tokens[index].content);
-  return `<a href="#" data-wikilink="${label}" class="wikilink">${label}</a>`;
+  const raw = tokens[index].content;
+  const label = markdown.utils.escapeHtml(raw.split('|', 2)[1] || raw.split('|', 1)[0]);
+  const target = markdown.utils.escapeHtml(raw.split('|', 1)[0]);
+  return `<a href="#" data-wikilink="${target}" class="wikilink">${label}</a>`;
 };
 
 const renderFence = markdown.renderer.rules.fence;

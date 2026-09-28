@@ -275,10 +275,13 @@
 
   function handlePreviewClick(e: MouseEvent) {
     const target = e.target as Element | null;
-    const link = target?.closest('a[data-wikilink]');
-    if (link) {
+    const link = target?.closest('a');
+    if (!link) return;
+    const wikilink = link.getAttribute('data-wikilink');
+    const href = link.getAttribute('href') ?? '';
+    if (wikilink !== null || /\.(?:md|markdown)(?:#[^?]*)?$/i.test(href)) {
       e.preventDefault();
-      onOpenWikilink?.(link.getAttribute('data-wikilink') ?? '');
+      onOpenWikilink?.(wikilink ?? href);
     }
   }
 

@@ -74,3 +74,9 @@ test('não renderiza wikilinks dentro de code fence', () => {
   expect(html).not.toContain('data-wikilink');
   expect(html).toContain('[[Não]]');
 });
+
+test('wikilink com alias mostra o rótulo e preserva o destino', () => {
+  const html = renderMarkdown('Veja [[Python/Plano|Plano de estudos]].');
+  expect(html).toContain('data-wikilink="Python/Plano"');
+  expect(html).toContain('>Plano de estudos</a>');
+});

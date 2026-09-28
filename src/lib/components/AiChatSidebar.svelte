@@ -2,6 +2,7 @@
   import { onDestroy, tick } from 'svelte';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { renderChatMarkdown } from '../markdown';
+  import { connectDraftCollection, groupDraftPaths } from '$lib/draft-paths';
   import DocumentActions from './DocumentActions.svelte';
   import type {
     AiSettings,
@@ -136,7 +137,7 @@
         content,
         sources: resp.sources,
         webSources: resp.web_sources,
-        drafts: resp.drafts,
+        drafts: connectDraftCollection(groupDraftPaths(text, resp.drafts)),
         warnings: resp.warnings,
         vaultId: resp.vault_id,
         appliedLinks,
