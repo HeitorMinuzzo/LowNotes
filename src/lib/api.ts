@@ -6,6 +6,7 @@ import type {
   NoteDraft,
   AppTheme,
   ChatMessage,
+  ChatHistory,
   ChatResponse,
   InitialStateResponse,
   LinkEdge,
@@ -162,6 +163,14 @@ export async function aiChatQuery(
 
 export async function aiSaveDraft(vaultId: string, draft: NoteDraft): Promise<string> {
   return await invoke('ai_save_draft', { vaultId, draft });
+}
+
+export async function chatHistoryGet(vaultId: string): Promise<ChatHistory> {
+  return await invoke('chat_history_get', { vaultId });
+}
+
+export async function chatHistorySave(vaultId: string, history: ChatHistory): Promise<void> {
+  return await invoke('chat_history_save', { vaultId, history });
 }
 
 export async function markWelcomeSeen(): Promise<void> {

@@ -7,6 +7,7 @@ pub mod rag;
 pub mod links;
 pub mod assistant;
 pub mod web_search;
+pub mod chat_history;
 
 use std::sync::Arc;
 use parking_lot::RwLock;
@@ -105,6 +106,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_app_state,
+            commands::chat_history_get,
+            commands::chat_history_save,
             commands::select_vault,
             commands::create_vault,
             commands::list_notes,

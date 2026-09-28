@@ -10,6 +10,7 @@ use tauri::{AppHandle, State};
 
 use crate::{
     assistant::{self, AssistantSkill, NoteDraft},
+    chat_history::{self, ChatHistory},
     config::{AiProviderConfig, AiSettings, AppSettings, VaultConfig, WebSearchSettings, decode_pair_code},
     crdt::CrdtManager,
     links,
@@ -547,8 +548,12 @@ pub async fn ai_chat_query(
         (chunks, context)
     };
 
+    let saved_memory = chat_history::load(&vault_id)
+        .map(|history| history.memory)
+        .unwrap_or_default();
     let context = serde_json::json!({
         "notes": context_text.chars().take(48_000).collect::<String>(),
+        "saved_user_memory": saved_memory.chars().take(8_000).collect::<String>(),
         "web_search_performed": skill == AssistantSkill::Research,
         "web_results": web_sources,
     }).to_string();
@@ -567,6 +572,26 @@ pub async fn ai_chat_query(
         warnings.push("ai.webNoResults".into());
     }
     Ok(ChatResponse { answer, sources, web_sources, drafts, warnings, vault_id })
+}
+
+#[tauri::command]
+pub fn chat_history_get(vault_id: String, state: State<'_, AppState>) -> Result<ChatHistory, String> {
+    if !state.settings.read().vaults.iter().any(|vault| vault.id == vault_id) {
+        return Err("ai.vaultChanged".into());
+    }
+    chat_history::load(&vault_id).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn chat_history_save(
+    vault_id: String,
+    history: ChatHistory,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    if !state.settings.read().vaults.iter().any(|vault| vault.id == vault_id) {
+        return Err("ai.vaultChanged".into());
+    }
+    chat_history::save(&vault_id, &history).map_err(|error| error.to_string())
 }
 
 #[tauri::command]

@@ -94,6 +94,41 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface StoredChatDraft extends NoteDraft {
+  savedPath?: string;
+  saving?: boolean;
+  error?: string;
+}
+
+export interface StoredChatEntry {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  sources?: RagChunk[];
+  webSources?: WebSource[];
+  drafts?: StoredChatDraft[];
+  warnings?: string[];
+  vaultId?: string;
+  appliedLinks?: number;
+  isError?: boolean;
+  errorSettingsTab?: 'web' | 'providers';
+}
+
+export interface ChatConversation {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  messages: StoredChatEntry[];
+}
+
+export interface ChatHistory {
+  version: 1;
+  activeConversationId: string | null;
+  conversations: ChatConversation[];
+  memory: string;
+}
+
 export interface ChatResponse {
   answer: string;
   sources: RagChunk[];

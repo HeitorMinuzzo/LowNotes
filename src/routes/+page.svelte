@@ -442,19 +442,23 @@
       {/if}
     </div>
 
-    <!-- AI Chat Sidebar on the Right -->
-    {#if settings}
+  {/if}
+
+  <!-- Keep chat mounted while settings are open so pending replies and drafts survive. -->
+  {#if settings && activeVault}
+    <div style:display={isSettingsOpen ? 'none' : 'contents'}>
       {#key activeVault.id}
-      <AiChatSidebar
-        bind:isOpen={isAiChatOpen}
-        bind:aiSettings={settings.ai}
-        currentNotePath={selectedNotePath}
-        onNavigateToSource={handleNavigateToSource}
-        onNotesCreated={refreshItems}
-        onOpenSettings={openSettings}
-      />
+        <AiChatSidebar
+          bind:isOpen={isAiChatOpen}
+          bind:aiSettings={settings.ai}
+          vaultId={activeVault.id}
+          currentNotePath={selectedNotePath}
+          onNavigateToSource={handleNavigateToSource}
+          onNotesCreated={refreshItems}
+          onOpenSettings={openSettings}
+        />
       {/key}
-    {/if}
+    </div>
   {/if}
 
   <!-- Modals -->
