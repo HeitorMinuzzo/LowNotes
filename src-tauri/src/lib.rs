@@ -127,6 +127,7 @@ pub fn run() {
             commands::save_web_search_settings,
             commands::network_get_pair_info,
             commands::save_theme,
+            commands::save_theme_palettes,
             commands::save_view_mode,
             commands::save_language,
             commands::fetch_ai_models,

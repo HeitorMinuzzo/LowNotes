@@ -11,7 +11,7 @@ use tauri::{AppHandle, State};
 use crate::{
     assistant::{self, AssistantSkill, NoteDraft},
     chat_history::{self, ChatHistory},
-    config::{AiProviderConfig, AiSettings, AppSettings, VaultConfig, WebSearchSettings, decode_pair_code},
+    config::{AiProviderConfig, AiSettings, AppSettings, BUILTIN_PALETTE_IDS, ThemePalettesSettings, VaultConfig, WebSearchSettings, decode_pair_code},
     crdt::CrdtManager,
     links,
     network::{NetworkIdentity, NetworkService, PairInfo},
@@ -418,6 +418,40 @@ pub fn save_theme(theme: String, state: State<'_, AppState>) -> Result<(), Strin
     if let Err(error) = settings.save() {
         settings.theme = previous;
         return Err(error.to_string());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn save_theme_palettes(palettes: ThemePalettesSettings, state: State<'_, AppState>) -> Result<(), String> {
+    validate_theme_palettes(&palettes)?;
+    let mut settings = state.settings.write();
+    let previous = std::mem::replace(&mut settings.theme_palettes, palettes);
+    if let Err(error) = settings.save() {
+        settings.theme_palettes = previous;
+        return Err(error.to_string());
+    }
+    Ok(())
+}
+
+fn validate_theme_palettes(palettes: &ThemePalettesSettings) -> Result<(), String> {
+    let mut ids = std::collections::HashSet::new();
+    for palette in &palettes.custom_palettes {
+        let id = palette.id.trim();
+        if id.is_empty()
+            || palette.name.trim().is_empty()
+            || BUILTIN_PALETTE_IDS.contains(&id)
+            || !ids.insert(id.to_string())
+            || !palette.dark.is_valid()
+            || !palette.light.is_valid()
+        {
+            return Err("errors.invalidPalette".to_string());
+        }
+    }
+    if !BUILTIN_PALETTE_IDS.contains(&palettes.active_palette_id.as_str())
+        && !ids.contains(palettes.active_palette_id.as_str())
+    {
+        return Err("errors.invalidPalette".to_string());
     }
     Ok(())
 }

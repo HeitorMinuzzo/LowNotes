@@ -23,6 +23,7 @@
   } from '$lib/api';
   import { locale, resolveLocale, t, trError } from '$lib/i18n';
   import { resolveNoteLink } from '$lib/note-links';
+  import { DEFAULT_PALETTE_ID, applyTheme } from '$lib/themes';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import * as Y from 'yjs';
   import {
@@ -57,7 +58,7 @@
   let incomingRequest = $state<{ request_id: string; peer: PeerConfig } | null>(null);
   let isAiChatOpen = $state(false);
   let isSettingsOpen = $state(false);
-  let settingsTab = $state<'general' | 'ai' | 'providers' | 'web' | 'about'>('general');
+  let settingsTab = $state<'general' | 'themes' | 'ai' | 'providers' | 'web' | 'about'>('general');
   let isWelcomeOpen = $state(false);
   let targetLine = $state<number | undefined>(undefined);
   let pendingUpdate = $state<Update | null>(null);
@@ -198,7 +199,7 @@
     }
   }
 
-  function openSettings(tab: 'general' | 'ai' | 'providers' | 'web' | 'about' = 'general') {
+  function openSettings(tab: 'general' | 'themes' | 'ai' | 'providers' | 'web' | 'about' = 'general') {
     settingsTab = tab;
     isSettingsOpen = true;
   }
@@ -229,7 +230,8 @@
   }
 
   $effect(() => {
-    document.documentElement.dataset.theme = theme;
+    const palettes = settings?.theme_palettes;
+    applyTheme(palettes?.active_palette_id ?? DEFAULT_PALETTE_ID, theme, palettes?.custom_palettes ?? []);
   });
 
   $effect(() => {

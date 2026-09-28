@@ -180,6 +180,24 @@ impl Default for AiSettings {
     }
 }
 
+impl AiSettings {
+    /// Re-applies built-in providers on load so new defaults ship in any
+    /// version; user edits to built-ins and custom providers are preserved.
+    pub fn normalize(&mut self) {
+        let saved = std::mem::take(&mut self.providers);
+        let mut providers: Vec<AiProviderConfig> = Self::default()
+            .providers
+            .into_iter()
+            .map(|default| saved.iter().find(|p| p.id == default.id).cloned().unwrap_or(default))
+            .collect();
+        providers.extend(saved.into_iter().filter(|p| p.is_custom));
+        self.providers = providers;
+        if !self.providers.iter().any(|p| p.id == self.active_provider_id) {
+            self.active_provider_id = self.providers.first().map(|p| p.id.clone()).unwrap_or_default();
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebSearchSourceConfig {
     pub id: String,
@@ -224,11 +242,111 @@ impl WebSearchSettings {
     }
 }
 
+/// Palettes shipped with the app. They live in code (and in the frontend
+/// `themes.ts` mirror) so new defaults can be added in any version without
+/// touching user data; only `custom_palettes` below is persisted.
+pub const BUILTIN_PALETTE_IDS: [&str; 2] = ["megumin", "rimuru"];
+
+/// One color per UI token, stored as `#rrggbb`. Derived tokens
+/// (glow/selection/highlight) are computed by the frontend.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
+pub struct ThemeColors {
+    pub bg_main: String,
+    pub bg_sidebar: String,
+    pub bg_card: String,
+    pub bg_hover: String,
+    pub bg_active: String,
+    pub border: String,
+    pub text_main: String,
+    pub text_muted: String,
+    pub text_dim: String,
+    pub accent: String,
+    pub accent_light: String,
+    pub accent_contrast: String,
+    pub success: String,
+    pub danger: String,
+}
+
+impl ThemeColors {
+    pub fn values(&self) -> impl Iterator<Item = &str> {
+        [
+            &self.bg_main, &self.bg_sidebar, &self.bg_card, &self.bg_hover, &self.bg_active,
+            &self.border, &self.text_main, &self.text_muted, &self.text_dim, &self.accent,
+            &self.accent_light, &self.accent_contrast, &self.success, &self.danger,
+        ]
+        .into_iter()
+        .map(|value| value.as_str())
+    }
+
+    pub fn is_valid(&self) -> bool {
+        self.values().all(is_hex_color)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ThemePalette {
+    pub id: String,
+    pub name: String,
+    pub dark: ThemeColors,
+    pub light: ThemeColors,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ThemePalettesSettings {
+    #[serde(default = "default_palette_id")]
+    pub active_palette_id: String,
+    #[serde(default)]
+    pub custom_palettes: Vec<ThemePalette>,
+}
+
+impl Default for ThemePalettesSettings {
+    fn default() -> Self {
+        Self {
+            active_palette_id: default_palette_id(),
+            custom_palettes: Vec::new(),
+        }
+    }
+}
+
+impl ThemePalettesSettings {
+    /// Mirrors the `save_theme_palettes` command validation so loading a
+    /// hand-edited/corrupted file degrades to the default palette.
+    pub fn normalize(&mut self) {
+        self.custom_palettes.retain(|palette| {
+            let id = palette.id.trim();
+            !id.is_empty()
+                && !BUILTIN_PALETTE_IDS.contains(&id)
+                && !palette.name.trim().is_empty()
+                && palette.dark.values().chain(palette.light.values()).all(is_hex_color)
+        });
+        let mut seen = std::collections::HashSet::new();
+        self.custom_palettes.retain(|palette| seen.insert(palette.id.clone()));
+        let known = self.custom_palettes.iter().any(|palette| palette.id == self.active_palette_id)
+            || BUILTIN_PALETTE_IDS.contains(&self.active_palette_id.as_str());
+        if !known {
+            self.active_palette_id = default_palette_id();
+        }
+    }
+}
+
+fn is_hex_color(value: &str) -> bool {
+    value.len() == 7
+        && value.starts_with('#')
+        && value[1..].chars().all(|c| c.is_ascii_hexdigit())
+}
+
+fn default_palette_id() -> String {
+    "megumin".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     pub device_name: String,
     #[serde(default = "default_theme")]
     pub theme: String,
+    #[serde(default)]
+    pub theme_palettes: ThemePalettesSettings,
     #[serde(default = "default_view_mode")]
     pub view_mode: String,
     #[serde(default)]
@@ -260,6 +378,7 @@ impl Default for AppSettings {
             device_name: host,
             theme: default_theme(),
             view_mode: default_view_mode(),
+            theme_palettes: ThemePalettesSettings::default(),
             language: String::new(),
             active_vault_id: None,
             vaults: Vec::new(),
@@ -291,6 +410,8 @@ impl AppSettings {
             .and_then(|key| key.as_str()).unwrap_or_default().to_owned();
         let mut settings: Self = serde_json::from_value(saved).ok()?;
         settings.web_search.normalize();
+        settings.theme_palettes.normalize();
+        settings.ai.normalize();
         if !old_brave_key.is_empty() {
             if let Some(brave) = settings.web_search.sources.iter_mut().find(|s| s.id == "brave") {
                 if brave.api_key.is_empty() {
@@ -370,7 +491,7 @@ pub fn decode_pair_code(code: &str) -> anyhow::Result<PairInvite> {
 
 #[cfg(test)]
 mod tests {
-    use super::AppSettings;
+    use super::{AppSettings, ThemeColors, ThemePalette, ThemePalettesSettings};
 
     #[test]
     fn existing_settings_without_view_mode_open_split() {
@@ -418,5 +539,95 @@ mod tests {
         assert!(brave.enabled);
         assert_eq!(brave.api_key, "old-key");
         assert!(restored.web_search.source("firecrawl").unwrap().enabled);
+    }
+
+    fn colors(hex: &str) -> ThemeColors {
+        ThemeColors {
+            bg_main: hex.into(), bg_sidebar: hex.into(), bg_card: hex.into(),
+            bg_hover: hex.into(), bg_active: hex.into(), border: hex.into(),
+            text_main: hex.into(), text_muted: hex.into(), text_dim: hex.into(),
+            accent: hex.into(), accent_light: hex.into(), accent_contrast: hex.into(),
+            success: hex.into(), danger: hex.into(),
+        }
+    }
+
+    #[test]
+    fn theme_palettes_default_to_megumin() {
+        let settings = ThemePalettesSettings::default();
+        assert_eq!(settings.active_palette_id, "megumin");
+        assert!(settings.custom_palettes.is_empty());
+    }
+
+    #[test]
+    fn normalize_keeps_valid_custom_palette_and_active_choice() {
+        let mut settings = ThemePalettesSettings {
+            active_palette_id: "custom_x".into(),
+            custom_palettes: vec![ThemePalette {
+                id: "custom_x".into(), name: "Ocean".into(),
+                dark: colors("#101010"), light: colors("#f0f0f0"),
+            }],
+        };
+        settings.normalize();
+        assert_eq!(settings.active_palette_id, "custom_x");
+        assert_eq!(settings.custom_palettes.len(), 1);
+    }
+
+    #[test]
+    fn normalize_drops_invalid_and_builtin_colliding_palettes() {
+        let mut settings = ThemePalettesSettings {
+            active_palette_id: "megumin".into(),
+            custom_palettes: vec![
+                ThemePalette { id: "rimuru".into(), name: "Clash".into(), dark: colors("#101010"), light: colors("#f0f0f0") },
+                ThemePalette { id: "custom_bad".into(), name: "Bad".into(), dark: colors("nope"), light: colors("#f0f0f0") },
+                ThemePalette { id: "".into(), name: "Empty".into(), dark: colors("#101010"), light: colors("#f0f0f0") },
+            ],
+        };
+        settings.normalize();
+        assert!(settings.custom_palettes.is_empty());
+    }
+
+    #[test]
+    fn normalize_falls_back_to_megumin_for_unknown_active() {
+        let mut settings = ThemePalettesSettings {
+            active_palette_id: "custom_gone".into(),
+            custom_palettes: vec![],
+        };
+        settings.normalize();
+        assert_eq!(settings.active_palette_id, "megumin");
+    }
+
+    #[test]
+    fn existing_settings_without_theme_palettes_default_to_megumin() {
+        let mut saved = serde_json::to_value(AppSettings::default()).unwrap();
+        saved.as_object_mut().unwrap().remove("theme_palettes");
+        let restored = AppSettings::from_saved_value(saved).unwrap();
+        assert_eq!(restored.theme_palettes.active_palette_id, "megumin");
+        assert!(restored.theme_palettes.custom_palettes.is_empty());
+    }
+
+    #[test]
+    fn normalize_restores_missing_builtin_providers_and_keeps_user_data() {
+        let mut saved = serde_json::to_value(AppSettings::default()).unwrap();
+        saved["ai"]["providers"] = serde_json::json!([
+            { "id": "openai", "name": "OpenAI", "base_url": "https://api.openai.com/v1", "api_key": "sk-user", "selected_model": "gpt-4o", "is_custom": false },
+            { "id": "custom_z", "name": "Mine", "base_url": "http://localhost:9999/v1", "api_key": "", "selected_model": "", "is_custom": true },
+        ]);
+        saved["ai"]["active_provider_id"] = "custom_z".into();
+        let restored = AppSettings::from_saved_value(saved).unwrap();
+        let ids: Vec<&str> = restored.ai.providers.iter().map(|p| p.id.as_str()).collect();
+        assert!(ids.contains(&"ollama"), "removed defaults must come back: {ids:?}");
+        assert!(ids.contains(&"custom_z"));
+        let openai = restored.ai.providers.iter().find(|p| p.id == "openai").unwrap();
+        assert_eq!(openai.api_key, "sk-user");
+        assert_eq!(openai.selected_model, "gpt-4o");
+        assert_eq!(restored.ai.active_provider_id, "custom_z");
+    }
+
+    #[test]
+    fn normalize_fixes_unknown_active_provider() {
+        let mut saved = serde_json::to_value(AppSettings::default()).unwrap();
+        saved["ai"]["active_provider_id"] = "gone".into();
+        let restored = AppSettings::from_saved_value(saved).unwrap();
+        assert_eq!(restored.ai.active_provider_id, restored.ai.providers[0].id);
     }
 }

@@ -65,6 +65,7 @@ export interface WebSearchSettings {
 export interface AppSettings {
   device_name: string;
   theme: AppTheme;
+  theme_palettes: ThemePalettesSettings;
   view_mode: ViewMode;
   language: string;
   update_check: boolean;
@@ -79,6 +80,38 @@ export interface AppSettings {
 
 export type AppTheme = 'dark' | 'light';
 export type ViewMode = 'edit' | 'split' | 'preview';
+
+/** One color per UI token, `#rrggbb`. Mirrors `ThemeColors` in src-tauri/src/config.rs. */
+export interface ThemeColors {
+  bg_main: string;
+  bg_sidebar: string;
+  bg_card: string;
+  bg_hover: string;
+  bg_active: string;
+  border: string;
+  text_main: string;
+  text_muted: string;
+  text_dim: string;
+  accent: string;
+  accent_light: string;
+  accent_contrast: string;
+  success: string;
+  danger: string;
+}
+
+export interface ThemePalette {
+  id: string;
+  name: string;
+  dark: ThemeColors;
+  light: ThemeColors;
+}
+
+/** Only user-created palettes are persisted; built-ins ship in code so new
+ *  defaults can be added in any version. */
+export interface ThemePalettesSettings {
+  active_palette_id: string;
+  custom_palettes: ThemePalette[];
+}
 
 export interface RagChunk {
   note_path: string;

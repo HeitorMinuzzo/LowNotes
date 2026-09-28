@@ -74,6 +74,10 @@ bun run tauri build
 
 O modo **Dividido** é o padrão. O tema e o modo de visualização escolhidos são salvos em `settings.json` no diretório de configuração do LowNotes, junto das demais preferências.
 
+### Temas de cores
+
+Em **Configurações → Temas** você escolhe a paleta do aplicativo: **Megumin** (padrão) e **Rimuru Tempest** vêm integradas, e é possível criar paletas personalizadas com um seletor de cor para cada parte da interface (fundos, textos, destaques e estados), com prévia ao vivo das alterações. As paletas personalizadas são salvas em `settings.json` separadas das integradas — assim, novas paletas padrão podem ser adicionadas em qualquer versão sem tocar nas suas. A mesma regra vale para providers de IA e fontes de busca web: os padrões vêm do código e, ao carregar, são mesclados com as suas alterações e adições.
+
 ## Assistente e documentos
 
 Abra o **Assistente** e selecione uma skill:

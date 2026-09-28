@@ -2,13 +2,14 @@
   import { onMount, untrack } from 'svelte';
   import { getVersion } from '@tauri-apps/api/app';
   import { openUrl } from '@tauri-apps/plugin-opener';
-  import { ArrowLeft, Bot, Check, Download, Globe2, Monitor, Plus, Settings2, Sparkles, Trash2 } from 'lucide-svelte';
-  import { fetchAiModels, saveAiSettings, saveCloseToTray, saveLanguage, saveTheme, saveUpdatePrefs, saveViewMode, saveWebSearchSettings } from '$lib/api';
+  import { ArrowLeft, Bot, Check, Download, Globe2, Monitor, Palette, Pencil, Plus, Settings2, Sparkles, Trash2 } from 'lucide-svelte';
+  import { fetchAiModels, saveAiSettings, saveCloseToTray, saveLanguage, saveTheme, saveThemePalettes, saveUpdatePrefs, saveViewMode, saveWebSearchSettings } from '$lib/api';
   import { LOCALE_LABELS, SUPPORTED_LOCALES, t, trError, type LocaleCode } from '$lib/i18n';
-  import type { AiProviderConfig, AiSettings, AppSettings, AppTheme, ViewMode, WebSearchSettings } from '$lib/types';
+  import { BUILTIN_PALETTES, DEFAULT_PALETTE_ID, TOKEN_GROUPS, applyTheme, isHexColor, newCustomPalette, resolvePalette, themeVarsStyle, type ThemeToken } from '$lib/themes';
+  import type { AiProviderConfig, AiSettings, AppSettings, AppTheme, ThemePalette, ThemePalettesSettings, ViewMode, WebSearchSettings } from '$lib/types';
   import { version as packageVersion } from '../../../package.json';
 
-  type Tab = 'general' | 'ai' | 'providers' | 'web' | 'about';
+  type Tab = 'general' | 'themes' | 'ai' | 'providers' | 'web' | 'about';
   let { settings, initialTab = 'general', onClose, onChange } = $props<{
     settings: AppSettings;
     initialTab?: Tab;
@@ -40,6 +41,12 @@
   let addingProvider = $state(false);
   let newName = $state('');
   let newUrl = $state('');
+  let palettes = $state<ThemePalettesSettings>(untrack(() => $state.snapshot(settings.theme_palettes)));
+  let editingPalette = $state<ThemePalette | null>(null);
+  let editingIsNew = $state(false);
+  let editMode = $state<AppTheme>(untrack(() => settings.theme));
+  const allPalettes = $derived([...BUILTIN_PALETTES, ...palettes.custom_palettes]);
+  const appMode = $derived<AppTheme>(settings.theme);
 
   onMount(() => { getVersion().then((value) => version = value).catch(() => {}); });
 
@@ -102,6 +109,53 @@
     if (aiDraft.active_provider_id === id) aiDraft.active_provider_id = selectedProviderId;
     models = [];
   }
+
+  function persistPalettes(next: ThemePalettesSettings) {
+    applyTheme(next.active_palette_id, settings.theme, next.custom_palettes);
+    void persist(saveThemePalettes(next), { ...settings, theme_palettes: next });
+  }
+  function selectPalette(id: string) {
+    if (id === palettes.active_palette_id) return;
+    palettes.active_palette_id = id;
+    persistPalettes({ active_palette_id: id, custom_palettes: $state.snapshot(palettes.custom_palettes) });
+  }
+  function startNewPalette() {
+    editingPalette = newCustomPalette(resolvePalette(palettes.active_palette_id, palettes.custom_palettes));
+    editingIsNew = true;
+    editMode = settings.theme;
+  }
+  function editPalette(palette: ThemePalette) {
+    editingPalette = { id: palette.id, name: palette.name, dark: { ...palette.dark }, light: { ...palette.light } };
+    editingIsNew = false;
+    editMode = settings.theme;
+  }
+  function savePalette() {
+    if (!editingPalette) return;
+    const draft = $state.snapshot(editingPalette);
+    const name = draft.name.trim();
+    if (!name) return;
+    const customs = $state.snapshot(palettes.custom_palettes);
+    const nextPalette = { ...draft, name };
+    const index = customs.findIndex((item) => item.id === draft.id);
+    if (index >= 0) customs[index] = nextPalette; else customs.push(nextPalette);
+    const activate = editingIsNew || palettes.active_palette_id === draft.id;
+    editingPalette = null;
+    palettes.custom_palettes = customs;
+    if (activate) palettes.active_palette_id = draft.id;
+    persistPalettes({ active_palette_id: palettes.active_palette_id, custom_palettes: customs });
+  }
+  function deletePalette(id: string) {
+    if (editingPalette?.id === id) editingPalette = null;
+    palettes.custom_palettes = $state.snapshot(palettes.custom_palettes).filter((item) => item.id !== id);
+    if (palettes.active_palette_id === id) palettes.active_palette_id = DEFAULT_PALETTE_ID;
+    persistPalettes({ active_palette_id: palettes.active_palette_id, custom_palettes: $state.snapshot(palettes.custom_palettes) });
+  }
+  function commitHex(token: ThemeToken, value: string) {
+    if (!editingPalette) return;
+    const trimmed = value.trim();
+    const normalized = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+    if (isHexColor(normalized)) editingPalette[editMode][token] = normalized.toLowerCase();
+  }
   async function loadModels() {
     if (!provider) return;
     error = '';
@@ -132,6 +186,7 @@
     <div class="settings-layout">
       <nav class="settings-nav" aria-label={$t('settings.title')}>
         <button class:active={tab === 'general'} onclick={() => tab = 'general'}><Monitor size={18} /> {$t('settings.general')}</button>
+        <button class:active={tab === 'themes'} onclick={() => tab = 'themes'}><Palette size={18} /> {$t('settings.themes')}</button>
         <button class:active={tab === 'ai'} onclick={() => tab = 'ai'}><Sparkles size={18} /> {$t('settings.ai')}</button>
         <button class:active={tab === 'providers'} onclick={() => tab = 'providers'}><Bot size={18} /> {$t('settings.providers')}</button>
         <button class:active={tab === 'web'} onclick={() => tab = 'web'}><Globe2 size={18} /> {$t('settings.webSearch')}</button>
@@ -156,6 +211,94 @@
           <section class="settings-section">
             <h2>{$t('settings.behavior')}</h2><p>{$t('settings.behaviorHint')}</p>
             <label class="setting-row setting-toggle"><div><strong>{$t('settings.closeToTray')}</strong><small>{$t('settings.closeToTrayHint')}</small></div><input type="checkbox" checked={settings.close_to_tray} onchange={(event) => changeTray(event.currentTarget.checked)} /></label>
+          </section>
+        {:else if tab === 'themes'}
+          <section class="settings-section">
+            <div class="settings-section-title">
+              <div><h2>{$t('settings.colorTheme')}</h2><p>{$t('settings.colorThemeHint')}</p></div>
+              <button class="settings-primary" onclick={startNewPalette}><Plus size={16} /> {$t('settings.addTheme')}</button>
+            </div>
+            <div class="palette-grid">
+              {#each allPalettes as palette (palette.id)}
+                {@const custom = !BUILTIN_PALETTES.some((builtin) => builtin.id === palette.id)}
+                {@const colors = palette[appMode]}
+                <div class="palette-card" class:active={palettes.active_palette_id === palette.id}>
+                  <button class="palette-select" onclick={() => selectPalette(palette.id)} aria-pressed={palettes.active_palette_id === palette.id}>
+                    <span class="palette-swatches">
+                      {#each [colors.bg_sidebar, colors.bg_card, colors.accent, colors.text_main, colors.danger] as swatch}<span style="background: {swatch}"></span>{/each}
+                    </span>
+                    <span class="palette-meta">
+                      <span><span class="palette-name">{palette.name}</span><span class="palette-sub">{custom ? $t('settings.paletteCustom') : $t('settings.paletteBuiltIn')}</span></span>
+                      {#if palette.id === DEFAULT_PALETTE_ID}<span class="palette-badge accent">{$t('settings.paletteDefault')}</span>{:else if palettes.active_palette_id === palette.id}<span class="palette-badge">{$t('settings.inUse')}</span>{/if}
+                    </span>
+                  </button>
+                  {#if custom}
+                    <span class="palette-tools">
+                      <button onclick={() => editPalette(palette)} title={$t('settings.editTheme')} aria-label={$t('settings.editTheme')}><Pencil size={14} /></button>
+                      <button class="danger" onclick={() => deletePalette(palette.id)} title={$t('settings.deleteTheme')} aria-label={$t('settings.deleteTheme')}><Trash2 size={14} /></button>
+                    </span>
+                  {/if}
+                </div>
+              {/each}
+            </div>
+            {#if editingPalette}
+              <div class="palette-editor">
+                <div class="palette-editor-head">
+                  <div><h3>{editingIsNew ? $t('settings.addTheme') : $t('settings.editTheme')}</h3><small>{$t('settings.editColorsHint')}</small></div>
+                  <div class="settings-segment">
+                    <button class:active={editMode === 'dark'} onclick={() => editMode = 'dark'}>{$t('settings.dark')}</button>
+                    <button class:active={editMode === 'light'} onclick={() => editMode = 'light'}>{$t('settings.light')}</button>
+                  </div>
+                </div>
+                <label class="setting-field palette-field-name">{$t('settings.themeName')}<input bind:value={editingPalette.name} placeholder={$t('settings.themeNamePlaceholder')} maxlength="40" /></label>
+                <div class="palette-editor-body">
+                  <div>
+                    {#each TOKEN_GROUPS as group (group.group)}
+                      <div class="palette-group">
+                        <h4>{$t(group.group)}</h4>
+                        <div class="palette-picker-grid">
+                          {#each group.tokens as item (item.token)}
+                            <div class="palette-picker">
+                              <input type="color" aria-label={$t(item.labelKey)} bind:value={editingPalette[editMode][item.token]} />
+                              <span class="palette-picker-label">
+                                <strong>{$t(item.labelKey)}</strong>
+                                <input value={editingPalette[editMode][item.token]} onchange={(event) => commitHex(item.token, event.currentTarget.value)} spellcheck="false" />
+                              </span>
+                            </div>
+                          {/each}
+                        </div>
+                      </div>
+                    {/each}
+                  </div>
+                  <div class="palette-demo" style={themeVarsStyle(editingPalette[editMode], editMode)}>
+                    <div class="palette-demo-bar"><span>LowNotes</span><span>✦</span></div>
+                    <div class="palette-demo-body">
+                      <div class="palette-demo-side">
+                        <span class="palette-demo-item active">{$t('settings.demoNote')}</span>
+                        <span class="palette-demo-item">Explosion!</span>
+                        <span class="palette-demo-item">Slime</span>
+                      </div>
+                      <div class="palette-demo-main">
+                        <div class="palette-demo-note">
+                          <h5>{$t('settings.demoNote')}</h5>
+                          <p>{$t('settings.demoBody')} <span class="palette-demo-link">{$t('settings.demoLink')}</span></p>
+                          <div class="palette-demo-row">
+                            <span class="palette-demo-btn">{$t('settings.demoButton')}</span>
+                            <span class="palette-demo-chip ok">{$t('settings.demoSuccess')}</span>
+                            <span class="palette-demo-chip bad">{$t('settings.demoDanger')}</span>
+                            <span class="palette-demo-swatch"></span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="settings-actions">
+                  <button onclick={() => editingPalette = null}>{$t('ai.cancel')}</button>
+                  <button class="settings-primary" onclick={savePalette} disabled={busy || !editingPalette.name.trim()}><Check size={15} /> {$t('settings.saveTheme')}</button>
+                </div>
+              </div>
+            {/if}
           </section>
         {:else if tab === 'ai'}
           <section class="settings-section">

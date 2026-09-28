@@ -17,6 +17,7 @@ import type {
   RagChunk,
   VaultItem,
   ViewMode,
+  ThemePalettesSettings,
   WebSearchSettings,
 } from './types';
 
@@ -134,6 +135,10 @@ export async function saveWebSearchSettings(settings: WebSearchSettings): Promis
 
 export async function saveTheme(theme: AppTheme): Promise<void> {
   return await invoke('save_theme', { theme });
+}
+
+export async function saveThemePalettes(palettes: ThemePalettesSettings): Promise<void> {
+  return await invoke('save_theme_palettes', { palettes });
 }
 
 export async function saveViewMode(viewMode: ViewMode): Promise<void> {
