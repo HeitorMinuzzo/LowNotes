@@ -55,7 +55,7 @@ markdown.renderer.rules.wikilink = (tokens, index) => {
 const renderFence = markdown.renderer.rules.fence;
 markdown.renderer.rules.fence = (tokens, index, options, env, renderer) => {
   const token = tokens[index];
-  if (token.info.trim().split(/\s+/, 1)[0] === 'mermaid') {
+  if (token.info.trim().split(/\s+/, 1)[0] === 'mermaid' && env?.mermaid !== false) {
     const encoded = encodeURIComponent(token.content);
     return `<div class="mermaid-block" data-mermaid="${encoded}"><div class="mermaid-svg"></div></div>`;
   }
@@ -66,4 +66,8 @@ markdown.renderer.rules.fence = (tokens, index, options, env, renderer) => {
 
 export function renderMarkdown(source: string): string {
   return markdown.render(source);
+}
+
+export function renderChatMarkdown(source: string): string {
+  return markdown.render(source, { mermaid: false });
 }

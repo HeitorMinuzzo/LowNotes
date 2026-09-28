@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
 use crate::{
+    assistant::{self, AssistantSkill, NoteDraft},
     config::{AiProviderConfig, AiSettings, AppSettings, VaultConfig, decode_pair_code},
     crdt::CrdtManager,
     links,
@@ -465,9 +466,14 @@ pub async fn ai_chat_query(
     prompt: String,
     note_path_scope: Option<String>,
     conversation: Vec<ChatMessage>,
+    skill: Option<AssistantSkill>,
     state: State<'_, AppState>,
 ) -> Result<ChatResponse, String> {
-    let (provider, vault_path) = {
+    if prompt.trim().is_empty() {
+        return Err("ai.emptyPrompt".into());
+    }
+    let skill = skill.unwrap_or_default();
+    let (provider, vault_path, vault_id, web_key, language) = {
         let settings = state.settings.read();
         let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
         let p = settings
@@ -477,7 +483,15 @@ pub async fn ai_chat_query(
             .find(|p| p.id == settings.ai.active_provider_id)
             .cloned()
             .ok_or("nenhum provedor de IA selecionado")?;
-        (p, vault.path.clone())
+        (p, vault.path.clone(), vault.id.clone(),
+            settings.ai.web_search_api_key.clone(), settings.language.clone())
+    };
+
+    let web_sources = if skill == AssistantSkill::Research {
+        assistant::search_web(&prompt, &web_key, &language)
+            .await.map_err(|e| e.to_string())?
+    } else {
+        Vec::new()
     };
 
     let (sources, context_text) = if let Some(path) = &note_path_scope {
@@ -507,46 +521,64 @@ pub async fn ai_chat_query(
         (chunks, context)
     };
 
-    let system_prompt = format!(
-        "You are LowNotes' intelligent notes assistant.\n\
-        Answer the user's question clearly, helpfully and concisely, based strictly on the user's notes provided in the context below.\n\
-        Always respond in the same language as the user's latest message.\n\n\
-        MANDATORY LINKING GUIDELINE:\n\
-        Whenever you cite or reference an excerpt or information from a note, use Markdown links in the format:\n\
-        [Note Name](lownotes://open?path=<relative_path>&line=<line_number>)\n\
-        Example: 'As recorded in [Ideias](lownotes://open?path=Ideias.md&line=12), the architecture...'\n\
-        If the answer is not present in the notes context, honestly say that no record was found in the notes.\n\n\
-        LINK ORGANIZATION:\n\
-        If the user asks you to create, remove or organize links between notes, include exactly one fenced code block with language lownotes-links containing JSON {{\"add\":[{{\"source\":\"<rel path>\",\"target\":\"<rel path>\"}}],\"remove\":[...]}} using exact relative note paths from the context; never invent paths.\n\n\
-        USER NOTES CONTEXT:\n\
-        {context_text}"
-    );
-
-    let mut messages = Vec::new();
-    messages.push(ChatMessage {
-        role: "system".to_string(),
-        content: system_prompt,
-    });
-
-    // Add recent conversation history (max 8 messages)
-    let history_slice = if conversation.len() > 8 {
-        &conversation[conversation.len() - 8..]
-    } else {
-        &conversation[..]
-    };
-    messages.extend_from_slice(history_slice);
-
-    // Add current user prompt
-    messages.push(ChatMessage {
-        role: "user".to_string(),
-        content: prompt,
-    });
+    let context = serde_json::json!({
+        "notes": context_text.chars().take(48_000).collect::<String>(),
+        "web_search_performed": skill == AssistantSkill::Research,
+        "web_results": web_sources,
+    }).to_string();
+    let messages = assistant::build_messages(skill, &prompt, &context, &conversation);
 
     let answer = rag::generate_chat_completion(&provider, &messages, 0.3)
         .await
         .map_err(|e| e.to_string())?;
 
-    Ok(ChatResponse { answer, sources })
+    let (answer, drafts, mut warnings) = if skill == AssistantSkill::Notes {
+        (answer, Vec::new(), Vec::new())
+    } else {
+        assistant::extract_drafts(&answer)
+    };
+    if skill == AssistantSkill::Research && web_sources.is_empty() {
+        warnings.push("ai.webNoResults".into());
+    }
+    Ok(ChatResponse { answer, sources, web_sources, drafts, warnings, vault_id })
+}
+
+#[tauri::command]
+pub fn ai_save_draft(
+    vault_id: String,
+    draft: NoteDraft,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let settings = state.settings.read();
+    let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
+    if vault.id != vault_id {
+        return Err("ai.vaultChanged".into());
+    }
+    let path = assistant::save_draft(&vault.path, &draft).map_err(|e| e.to_string())?;
+    if let Err(e) = links::reconcile_wikilinks(&vault.path, &path, &draft.content) {
+        eprintln!("reconcile_wikilinks failed for {path}: {e}");
+    }
+    if let Some(net) = state.network.read().as_ref() {
+        net.sync_now();
+    }
+    Ok(path)
+}
+
+/// Destination is chosen using the native save dialog, not generated by the model.
+#[tauri::command]
+pub fn export_document(path: String, bytes: Vec<u8>) -> Result<(), String> {
+    let path = Path::new(&path);
+    let extension = path.extension().and_then(|s| s.to_str())
+        .unwrap_or_default().to_ascii_lowercase();
+    let valid = match extension.as_str() {
+        "pdf" => bytes.starts_with(b"%PDF-"),
+        "docx" => bytes.starts_with(b"PK\x03\x04"),
+        _ => false,
+    };
+    if !valid || bytes.len() > 32 * 1024 * 1024 {
+        return Err("export.invalidFile".into());
+    }
+    std::fs::write(path, bytes).map_err(|e| e.to_string())
 }
 
 #[tauri::command]

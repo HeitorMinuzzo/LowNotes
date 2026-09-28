@@ -127,6 +127,8 @@ pub struct AiSettings {
     pub providers: Vec<AiProviderConfig>,
     #[serde(default)]
     pub auto_link_notes: bool,
+    #[serde(default)]
+    pub web_search_api_key: String,
 }
 
 impl Default for AiSettings {
@@ -176,6 +178,7 @@ impl Default for AiSettings {
                 },
             ],
             auto_link_notes: false,
+            web_search_api_key: String::new(),
         }
     }
 }

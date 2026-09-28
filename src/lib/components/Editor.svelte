@@ -10,6 +10,7 @@
   import { crdtApplyClientUpdate, saveNote, broadcastAwareness } from '../api';
   import { renderMarkdown } from '../markdown';
   import GraphView from './GraphView.svelte';
+  import DocumentActions from './DocumentActions.svelte';
   import type { AppTheme, ViewMode } from '../types';
   import { t, ts } from '$lib/i18n';
   import {
@@ -382,8 +383,8 @@
 
 <div class="flex flex-col h-full w-full bg-[var(--bg-main)]">
   <!-- Top Editor Toolbar -->
-  <header class="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-sidebar)] select-none">
-    <div class="flex items-center gap-1">
+  <header class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-sidebar)] select-none">
+    <div class="flex flex-wrap items-center gap-1">
       <button
         onclick={() => applyFormatting('**', '**')}
         class="px-2 py-1 text-xs font-bold rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
@@ -459,7 +460,7 @@
     </div>
 
     <!-- Mode Selector & Status -->
-    <div class="flex items-center gap-3">
+    <div class="flex flex-wrap items-center gap-3">
       {#if remoteUsers.length > 0}
         <div
           class="flex items-center -space-x-1.5"
@@ -505,6 +506,8 @@
           {$t('editor.modePreview')}
         </button>
       </div>
+
+      <DocumentActions content={currentContent} path={notePath} />
 
       {#if onToggleAiChat}
         <button

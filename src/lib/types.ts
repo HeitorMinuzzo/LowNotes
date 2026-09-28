@@ -49,6 +49,7 @@ export interface AiSettings {
   active_provider_id: string;
   providers: AiProviderConfig[];
   auto_link_notes: boolean;
+  web_search_api_key: string;
 }
 
 export interface AppSettings {
@@ -84,6 +85,23 @@ export interface ChatMessage {
 export interface ChatResponse {
   answer: string;
   sources: RagChunk[];
+  web_sources: WebSource[];
+  drafts: NoteDraft[];
+  warnings: string[];
+  vault_id: string;
+}
+
+export type AssistantSkill = 'auto' | 'notes' | 'write' | 'research';
+
+export interface NoteDraft {
+  path: string;
+  content: string;
+}
+
+export interface WebSource {
+  title: string;
+  url: string;
+  description: string;
 }
 
 export interface PairInfo {

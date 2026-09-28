@@ -2,6 +2,8 @@ import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import type {
   AiSettings,
+  AssistantSkill,
+  NoteDraft,
   AppTheme,
   ChatMessage,
   ChatResponse,
@@ -143,9 +145,14 @@ export async function searchVaultRag(query: string, limit?: number): Promise<Rag
 export async function aiChatQuery(
   prompt: string,
   notePathScope?: string,
-  conversation: ChatMessage[] = []
+  conversation: ChatMessage[] = [],
+  skill: AssistantSkill = 'auto',
 ): Promise<ChatResponse> {
-  return await invoke('ai_chat_query', { prompt, notePathScope, conversation });
+  return await invoke('ai_chat_query', { prompt, notePathScope, conversation, skill });
+}
+
+export async function aiSaveDraft(vaultId: string, draft: NoteDraft): Promise<string> {
+  return await invoke('ai_save_draft', { vaultId, draft });
 }
 
 export async function markWelcomeSeen(): Promise<void> {

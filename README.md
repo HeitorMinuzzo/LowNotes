@@ -10,7 +10,8 @@ Editor de notas Markdown desktop **local-first**, ultra-rápido, com **sincroniz
 - **100% Compatível com Markdown:** Suas notas permanecem como arquivos `.md` limpos no seu disco rígido, acessíveis por qualquer editor (VS Code, Obsidian, Notepad).
 - **Sem Servidor Central:** Sincronização direta de máquina para máquina via **Iroh** (QUIC ponta a ponta com criptografia ed25519 e transposição NAT/DERP).
 - **Colaboração em Tempo Real (CRDT):** Mais de um usuário pode editar a mesma nota simultaneamente sem conflitos, unindo **CodeMirror 6 + Yjs** no frontend e **Yrs** no backend em Rust.
-- **RAG Local & Assistente de IA:** Chat integrado na barra lateral direita compatível com qualquer provedor OpenAI (Ollama, OpenAI, OpenRouter, Groq, LM Studio ou Custom), com busca semântica local e citações clicáveis que abrem a nota na linha exata.
+- **Assistente com skills:** Criação de documentos, planos e checklists, consulta ao vault e pesquisa web com fontes. Compatível com provedores OpenAI (Ollama, OpenAI, OpenRouter, Groq, LM Studio ou Custom), com busca local por palavras-chave e citações que abrem a nota na linha exata.
+- **Exportação Word e PDF:** Exporte notas abertas ou rascunhos do assistente para `.docx` e `.pdf`, sem depender de um serviço de conversão.
 - **Visualização de Diagramas Mermaid:** Renderização vetorial SVG interativa em tempo real de fluxogramas, gráficos de pizza e sequências no Markdown.
 ---
 
@@ -72,6 +73,30 @@ bun run tauri build
 ```
 
 O modo **Dividido** é o padrão. O tema e o modo de visualização escolhidos são salvos em `settings.json` no diretório de configuração do LowNotes, junto das demais preferências.
+
+## Assistente e documentos
+
+Abra o **Assistente** e selecione uma skill:
+
+- **Assistente • criar e conversar:** responde perguntas e gera conteúdo novo, mesmo em um vault vazio.
+- **Consultar notas:** responde com base nos trechos disponíveis e cita as notas de origem.
+- **Criar documentos e planos:** gera uma ou várias notas completas. Exemplo: “Crie notas de acompanhamento para aprender Python, com etapas e checklists”.
+- **Pesquisar na web:** faz uma busca ao vivo pelo texto da mensagem e fornece resultados com links. Configure a chave **Brave Search** nas configurações da IA. A busca usa a [API oficial do Brave](https://api-dashboard.search.brave.com/documentation/guides/authentication), independente do provedor de IA. Somente a mensagem é enviada ao serviço de busca; as notas ficam fora dessa requisição. O modelo selecionado recebe os trechos do vault e os resultados para elaborar a resposta. Os resultados são descrições de busca, não leitura integral das páginas.
+
+Os documentos gerados aparecem como rascunhos com caminho e conteúdo editáveis. Use **Salvar no vault** ou **Salvar todos**; uma nota existente nunca é sobrescrita. Após salvar, **Abrir nota salva** abre o documento no editor. Respostas comuns também oferecem **Transformar em nota**, Word e PDF, inclusive quando o modelo não gera rascunhos estruturados. É possível gerar até 10 notas por resposta, com até 256 KB por nota. Rascunhos e histórico são mantidos durante a sessão do vault; salve os documentos antes de trocar de vault ou fechar o aplicativo.
+
+Os botões **Word** e **PDF** aparecem tanto nos rascunhos quanto na barra do editor. A exportação preserva títulos, parágrafos, ênfase, listas, tarefas, tabelas, código e links externos. Imagens são representadas por texto alternativo e endereço; diagramas Mermaid são exportados como código. A fonte Noto Sans acompanha o aplicativo para acentos e caracteres latinos, gregos e cirílicos; não há cobertura completa de emojis ou de todos os alfabetos. As bibliotecas de exportação são carregadas sob demanda.
+
+As instruções das skills ficam em `src-tauri/skills/` e são incorporadas ao aplicativo no build. Não é necessário suporte a chamadas de ferramentas nativas no modelo: os documentos usam um formato estruturado validado no backend. A qualidade e a adesão ao formato dependem do modelo selecionado; respostas inválidas permanecem visíveis para permitir nova geração.
+
+### Verificação
+
+```bash
+bun run check
+bun test
+cargo test --lib --manifest-path src-tauri/Cargo.toml
+bun run build
+```
 
 ---
 

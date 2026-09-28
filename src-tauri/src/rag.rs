@@ -33,6 +33,10 @@ pub struct ChatMessage {
 pub struct ChatResponse {
     pub answer: String,
     pub sources: Vec<RagChunk>,
+    pub web_sources: Vec<crate::assistant::WebSource>,
+    pub drafts: Vec<crate::assistant::NoteDraft>,
+    pub warnings: Vec<String>,
+    pub vault_id: String,
 }
 
 #[derive(Debug, Serialize)]

@@ -5,6 +5,7 @@ pub mod vault;
 pub mod commands;
 pub mod rag;
 pub mod links;
+pub mod assistant;
 
 use std::sync::Arc;
 use parking_lot::RwLock;
@@ -87,6 +88,8 @@ pub fn run() {
             commands::fetch_ai_models,
             commands::search_vault_rag,
             commands::ai_chat_query,
+            commands::ai_save_draft,
+            commands::export_document,
             commands::mark_welcome_seen,
             commands::links_get,
             commands::links_apply,

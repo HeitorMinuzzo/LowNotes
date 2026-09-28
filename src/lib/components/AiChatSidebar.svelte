@@ -1,15 +1,21 @@
 <script lang="ts">
-  import { onMount, tick, untrack } from 'svelte';
-  import { marked } from 'marked';
+  import { onDestroy, tick, untrack } from 'svelte';
+  import { openUrl } from '@tauri-apps/plugin-opener';
+  import { renderChatMarkdown } from '../markdown';
+  import DocumentActions from './DocumentActions.svelte';
   import type {
     AiProviderConfig,
     AiSettings,
+    AssistantSkill,
+    NoteDraft,
+    WebSource,
     ChatMessage,
     LinkOperation,
     RagChunk,
   } from '../types';
   import {
     aiChatQuery,
+    aiSaveDraft,
     fetchAiModels,
     linksApply,
     saveAiSettings,
@@ -22,26 +28,43 @@
       active_provider_id: 'ollama',
       providers: [],
       auto_link_notes: false,
+      web_search_api_key: '',
     }),
     currentNotePath = '',
     onNavigateToSource,
+    onNotesCreated,
   } = $props<{
     isOpen: boolean;
     aiSettings: AiSettings;
     currentNotePath: string;
     onNavigateToSource: (path: string, line: number) => void;
+    onNotesCreated: () => Promise<void>;
   }>();
 
   let isSettingsOpen = $state(false);
   let scope = $state<'vault' | 'note'>('vault');
+  let skill = $state<AssistantSkill>('auto');
   let inputPrompt = $state('');
   let isLoading = $state(false);
   let errorMessage = $state<string | null>(null);
+  let disposed = false;
+  onDestroy(() => { disposed = true; });
+
+  interface DraftItem extends NoteDraft {
+    savedPath?: string;
+    saving?: boolean;
+    error?: string;
+  }
 
   interface MessageItem extends ChatMessage {
     sources?: RagChunk[];
     timestamp: string;
     appliedLinks?: number;
+    webSources?: WebSource[];
+    drafts?: DraftItem[];
+    warnings?: string[];
+    vaultId?: string;
+    isError?: boolean;
   }
 
   let messages = $state<MessageItem[]>([]);
@@ -59,6 +82,7 @@
   let availableModels = $state<string[]>([]);
   let isFetchingModels = $state(false);
   let showApiKey = $state(false);
+  let webKeyInput = $state(aiSettings.web_search_api_key || '');
 
   // Add custom provider state
   let isAddingCustom = $state(false);
@@ -145,6 +169,7 @@
       aiSettings.providers[pIndex].selected_model = selectedModelInput.trim();
     }
     aiSettings.active_provider_id = selectedProviderId;
+    aiSettings.web_search_api_key = webKeyInput.trim();
     lastActiveId = selectedProviderId;
 
     try {
@@ -183,9 +208,15 @@
     customUrl = '';
   }
 
-  async function sendMessage(textToSend?: string) {
+  async function sendMessage(textToSend?: string, selectedSkill?: AssistantSkill) {
     const text = (textToSend || inputPrompt).trim();
     if (!text || isLoading) return;
+    if (selectedSkill) skill = selectedSkill;
+    if (skill === 'research' && !aiSettings.web_search_api_key.trim()) {
+      errorMessage = ts('ai.webKeyRequired');
+      isSettingsOpen = true;
+      return;
+    }
 
     inputPrompt = '';
     errorMessage = null;
@@ -202,16 +233,19 @@
 
     try {
       const history = messages
-        .slice(-6)
-        .map((m) => ({ role: m.role, content: m.content }));
+        .slice(0, -1).filter((m) => !m.isError).slice(-8)
+        .map((m) => ({ role: m.role, content: m.content + (m.drafts?.length
+          ? '\n' + JSON.stringify({ notes: m.drafts.map((d) => ({ path: d.savedPath || d.path, content: d.content, saved: !!d.savedPath })) })
+          : '') }));
 
       const scopePath = scope === 'note' && currentNotePath ? currentNotePath : undefined;
-      const resp = await aiChatQuery(text, scopePath, history);
+      const resp = await aiChatQuery(text, scopePath, history, skill);
+      if (disposed) return;
 
       let content = resp.answer;
       let appliedLinks = 0;
       const fenceMatch = content.match(/```lownotes-links\s*\n([\s\S]*?)```/);
-      if (fenceMatch) {
+      if (fenceMatch && skill !== 'notes' && skill !== 'research') {
         try {
           const payload = JSON.parse(fenceMatch[1]) as {
             add?: Array<{ source?: unknown; target?: unknown }>;
@@ -246,19 +280,48 @@
         role: 'assistant',
         content,
         sources: resp.sources,
+        webSources: resp.web_sources,
+        drafts: resp.drafts,
+        warnings: resp.warnings,
+        vaultId: resp.vault_id,
         appliedLinks,
         timestamp: new Date().toLocaleTimeString($locale, { hour: '2-digit', minute: '2-digit' }),
       });
     } catch (err: any) {
+      if (disposed) return;
       const msg = trError(typeof err === 'string' ? err : err.message || 'ai.errorQuery');
       messages.push({
         role: 'assistant',
         content: ts('ai.errorMessage', { message: msg }),
+        isError: true,
         timestamp: new Date().toLocaleTimeString($locale, { hour: '2-digit', minute: '2-digit' }),
       });
     } finally {
       isLoading = false;
       await scrollToBottom();
+    }
+  }
+
+  async function saveDraft(msg: MessageItem, draft: DraftItem) {
+    if (!msg.vaultId || draft.savedPath || draft.saving) return;
+    draft.saving = true;
+    draft.error = undefined;
+    try {
+      draft.savedPath = await aiSaveDraft(msg.vaultId, { path: draft.path, content: draft.content });
+    } catch (err) {
+      draft.error = trError(String(err));
+    } finally {
+      draft.saving = false;
+    }
+    if (draft.savedPath && !disposed) {
+      try { await onNotesCreated(); } catch (err) { errorMessage = trError(String(err)); }
+    }
+  }
+
+  async function saveAllDrafts(msg: MessageItem) {
+    for (const draft of msg.drafts || []) {
+      if (disposed) break;
+      await saveDraft(msg, draft);
     }
   }
 
@@ -282,6 +345,11 @@
     const link = (e.target as HTMLElement).closest('a');
     if (link && link.href) {
       const href = link.getAttribute('href') || '';
+      e.preventDefault();
+      if (/^https?:\/\//i.test(href)) {
+        void openUrl(href).catch((err) => { errorMessage = String(err); });
+        return;
+      }
       if (href.startsWith('lownotes://open')) {
         e.preventDefault();
         try {
@@ -370,6 +438,20 @@
           {$t('ai.scopeNote')}
         </button>
       </div>
+    </div>
+
+    <div class="px-4 py-2 border-b border-[var(--border)] flex flex-col gap-1.5">
+      <label for="assistant-skill" class="text-[11px] text-[var(--text-dim)]">{$t('ai.skill')}</label>
+      <select id="assistant-skill" bind:value={skill} disabled={isLoading}
+        class="w-full rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-2 py-1.5 text-xs text-[var(--text-main)]">
+        <option value="auto">{$t('ai.skillAuto')}</option>
+        <option value="notes">{$t('ai.skillNotes')}</option>
+        <option value="write">{$t('ai.skillWrite')}</option>
+        <option value="research">{$t('ai.skillResearch')}</option>
+      </select>
+      <p class="text-[10px] text-[var(--text-dim)] leading-relaxed">
+        {skill === 'research' ? $t('ai.researchHint') : $t('ai.skillsHint')}
+      </p>
     </div>
 
     <!-- Settings Overlay Drawer -->
@@ -612,6 +694,15 @@
           </div>
         {/if}
 
+        <div class="flex flex-col gap-1.5 pt-2 border-t border-[var(--border)]">
+          <label for="ai-web-key" class="text-xs text-[var(--text-main)]">{$t('ai.webKey')}</label>
+          <input id="ai-web-key" type="password" bind:value={webKeyInput} autocomplete="off"
+            class="bg-[var(--bg-main)] border border-[var(--border)] rounded px-2 py-1.5 text-xs text-[var(--text-main)]" />
+          <p class="text-[10px] text-[var(--text-dim)] leading-relaxed">{$t('ai.webKeyHint')}</p>
+          <button onclick={() => openUrl('https://api-dashboard.search.brave.com/')}
+            class="text-left text-[11px] text-[var(--accent-light)] hover:underline">{$t('ai.webGetKey')}</button>
+        </div>
+
         <!-- Auto-link Notes -->
         <div class="flex flex-col gap-1 pt-2 border-t border-[var(--border)]">
           <label class="flex items-center gap-2 text-xs text-[var(--text-main)] cursor-pointer">
@@ -655,10 +746,10 @@
 
           <div class="flex flex-col gap-1.5 w-full max-w-[260px]">
             <button
-              onclick={() => sendMessage(ts('ai.suggestionProject'))}
+              onclick={() => sendMessage(ts('ai.suggestionCreate'), 'write')}
               class="px-3 py-2 text-[11px] text-left rounded-lg bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
             >
-              {$t('ai.suggestionProject')}
+              {$t('ai.suggestionCreate')}
             </button>
             <button
               onclick={() => sendMessage(ts('ai.suggestionSummary'))}
@@ -667,10 +758,10 @@
               {$t('ai.suggestionSummary')}
             </button>
             <button
-              onclick={() => sendMessage(ts('ai.suggestionTasks'))}
+              onclick={() => sendMessage(ts('ai.suggestionResearch'), 'research')}
               class="px-3 py-2 text-[11px] text-left rounded-lg bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
             >
-              {$t('ai.suggestionTasks')}
+              {$t('ai.suggestionResearch')}
             </button>
           </div>
         </div>
@@ -688,8 +779,68 @@
             >
               {#if msg.role === 'assistant'}
                 <div class="prose max-w-none text-xs leading-relaxed">
-                  {@html marked.parse(trError(msg.content))}
+                  {@html renderChatMarkdown(trError(msg.content))}
                 </div>
+
+                {#each msg.warnings || [] as warning}
+                  <p role="status" class="mt-2 text-xs text-[var(--accent-light)]">{trError(warning)}</p>
+                {/each}
+
+                {#if !msg.drafts?.length && !msg.isError && msg.content.trim()}
+                  <div class="mt-3 flex flex-wrap items-center gap-2">
+                    <button onclick={() => { msg.drafts = [{ path: `${ts('ai.responseDocumentName')}.md`, content: msg.content }]; }}
+                      class="px-2 py-1 rounded border border-[var(--border)] text-[11px] text-[var(--accent-light)] hover:bg-[var(--bg-hover)]">
+                      {$t('ai.responseToNote')}
+                    </button>
+                    <DocumentActions content={msg.content} path={`${ts('ai.responseDocumentName')}.md`} />
+                  </div>
+                {/if}
+
+                {#if msg.drafts?.length}
+                  <div class="mt-3 flex flex-col gap-3">
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="text-[11px] font-semibold">{$t('ai.drafts', { count: msg.drafts.length })}</span>
+                      {#if msg.drafts.length > 1 && msg.drafts.some((d) => !d.savedPath)}
+                        <button onclick={() => saveAllDrafts(msg)} disabled={msg.drafts.some((d) => d.saving)}
+                          class="text-[11px] text-[var(--accent-light)] disabled:opacity-40">{$t('ai.saveAll')}</button>
+                      {/if}
+                    </div>
+                    {#each msg.drafts as draft}
+                      <div class="rounded-lg border border-[var(--border)] bg-[var(--bg-main)] p-2.5 flex flex-col gap-2">
+                        <input aria-label={$t('ai.draftPath')} bind:value={draft.path} disabled={!!draft.savedPath || draft.saving}
+                          class="w-full bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border)] rounded px-2 py-1 text-[11px] disabled:opacity-70" />
+                        <details>
+                          <summary class="cursor-pointer text-[11px] text-[var(--text-muted)]">{$t('ai.previewDraft')}</summary>
+                          <div class="prose text-xs max-h-72 overflow-auto py-2">{@html renderChatMarkdown(draft.content)}</div>
+                          <textarea aria-label={$t('ai.editDraft')} bind:value={draft.content} rows="8" disabled={!!draft.savedPath || draft.saving}
+                            class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded p-2 font-mono text-[11px] disabled:opacity-60"></textarea>
+                        </details>
+                        <div class="flex flex-wrap items-center gap-2">
+                          {#if draft.savedPath}
+                            <button onclick={() => onNavigateToSource(draft.savedPath!, 1)}
+                              class="text-[11px] text-[var(--accent-light)] hover:underline">✓ {$t('ai.openSavedNote')}</button>
+                          {:else}
+                            <button onclick={() => saveDraft(msg, draft)} disabled={draft.saving || !draft.content.trim()}
+                              class="px-2 py-1 rounded bg-[var(--accent)] text-black text-[11px] disabled:opacity-40">
+                              {draft.saving ? $t('editor.saving') : $t('ai.saveDraft')}
+                            </button>
+                          {/if}
+                          <DocumentActions content={draft.content} path={draft.path} />
+                        </div>
+                        {#if draft.error}<p role="alert" class="text-[11px] text-red-500">{draft.error}</p>{/if}
+                      </div>
+                    {/each}
+                  </div>
+                {/if}
+
+                {#if msg.webSources?.length}
+                  <div class="mt-3 pt-2 border-t border-[var(--border)] flex flex-col gap-1">
+                    <span class="text-[10px] text-[var(--text-dim)]">{$t('ai.webSources')}</span>
+                    {#each msg.webSources as source}
+                      <a href={source.url} title={source.description} class="text-[11px] text-[var(--accent-light)] hover:underline break-words">{source.title}</a>
+                    {/each}
+                  </div>
+                {/if}
 
                 {#if msg.appliedLinks && msg.appliedLinks > 0}
                   <div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--bg-main)] border border-[var(--border)] text-[10px] text-[var(--accent-light)] select-none">
@@ -734,6 +885,9 @@
 
     <!-- Chat Input Footer -->
     <footer class="p-3 border-t border-[var(--border)] bg-[var(--bg-card)]">
+      {#if errorMessage && !isSettingsOpen}
+        <p role="alert" class="mb-2 text-xs text-red-500">{errorMessage}</p>
+      {/if}
       <form
         onsubmit={(e) => { e.preventDefault(); sendMessage(); }}
         class="flex flex-col gap-2"

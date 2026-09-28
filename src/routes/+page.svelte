@@ -428,12 +428,15 @@
 
     <!-- AI Chat Sidebar on the Right -->
     {#if settings}
+      {#key activeVault.id}
       <AiChatSidebar
         bind:isOpen={isAiChatOpen}
         bind:aiSettings={settings.ai}
         currentNotePath={selectedNotePath}
         onNavigateToSource={handleNavigateToSource}
+        onNotesCreated={refreshItems}
       />
+      {/key}
     {/if}
   {/if}
 
