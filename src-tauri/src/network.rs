@@ -55,6 +55,10 @@ pub enum NetworkEventPayload {
         note_path: String,
         update: Vec<u8>,
     },
+    RemoteAwareness {
+        note_path: String,
+        update: Vec<u8>,
+    },
     Error {
         peer: Option<String>,
         message: String,
@@ -83,6 +87,10 @@ pub enum Packet {
         note_path: String,
         update: Vec<u8>,
     },
+    Awareness {
+        note_path: String,
+        update: Vec<u8>,
+    },
     Delete {
         path: String,
     },
@@ -94,6 +102,7 @@ enum NetworkCommand {
     RequestPair(PairInvite),
     AnswerPair { request_id: String, accept: bool },
     BroadcastCrdt { note_path: String, update: Vec<u8> },
+    BroadcastAwareness { note_path: String, update: Vec<u8> },
     BroadcastDelete { note_path: String },
 }
 
@@ -204,6 +213,12 @@ impl NetworkService {
         let _ = self
             .commands
             .send(NetworkCommand::BroadcastCrdt { note_path, update });
+    }
+
+    pub fn broadcast_awareness(&self, note_path: String, update: Vec<u8>) {
+        let _ = self
+            .commands
+            .send(NetworkCommand::BroadcastAwareness { note_path, update });
     }
 
     pub fn broadcast_delete(&self, note_path: String) {
@@ -375,6 +390,17 @@ async fn run_network(
                     let u_bytes = update.clone();
                     tokio::spawn(async move {
                         let _ = send_crdt_to_peer(ep, peer, n_path, u_bytes).await;
+                    });
+                }
+            }
+            NetworkCommand::BroadcastAwareness { note_path, update } => {
+                let known: Vec<PeerConfig> = peers.read().clone();
+                for peer in known {
+                    let ep = endpoint.clone();
+                    let n_path = note_path.clone();
+                    let u_bytes = update.clone();
+                    tokio::spawn(async move {
+                        let _ = send_awareness_to_peer(ep, peer, n_path, u_bytes).await;
                     });
                 }
             }
@@ -554,6 +580,15 @@ async fn handle_incoming_connection(
                         note_path,
                         update,
                     },
+                );
+            }
+        }
+        Packet::Awareness { note_path, update } => {
+            let is_peer = peers.read().iter().any(|p| p.endpoint_id == remote_id.to_string());
+            if is_peer {
+                let _ = app.emit(
+                    "p2p:awareness",
+                    NetworkEventPayload::RemoteAwareness { note_path, update },
                 );
             }
         }
@@ -789,6 +824,22 @@ async fn send_crdt_to_peer(
     send.finish()?;
     let _ = tokio::time::timeout(Duration::from_secs(2), send.stopped()).await;
     connection.close(0u32.into(), b"crdt sent");
+    Ok(())
+}
+
+async fn send_awareness_to_peer(
+    endpoint: Endpoint,
+    peer: PeerConfig,
+    note_path: String,
+    update: Vec<u8>,
+) -> anyhow::Result<()> {
+    let addr = peer.endpoint_addr()?;
+    let connection = endpoint.connect(addr, ALPN).await?;
+    let (mut send, _) = connection.open_bi().await?;
+    send_packet(&mut send, &Packet::Awareness { note_path, update }).await?;
+    send.finish()?;
+    let _ = tokio::time::timeout(Duration::from_secs(2), send.stopped()).await;
+    connection.close(0u32.into(), b"awareness sent");
     Ok(())
 }
 

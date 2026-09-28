@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { AppTheme, VaultConfig, VaultItem } from '../types';
+  import type { PresenceUser } from '$lib/presence';
   import { Moon, Sun } from 'lucide-svelte';
   import {
     createNote,
@@ -25,6 +26,7 @@
     onSelectNote,
     onVaultChange,
     onOpenPairModal,
+    presence = [],
     onRefreshItems,
   } = $props<{
     activeVault: VaultConfig | null;
@@ -39,6 +41,7 @@
     onVaultChange: (vault: VaultConfig) => void;
     onOpenPairModal: () => void;
     onRefreshItems: () => void;
+    presence?: PresenceUser[];
   }>();
 
   let searchQuery = $state('');
@@ -325,6 +328,20 @@
       {/each}
     {/if}
   </div>
+
+  <!-- Presence: who is editing right now -->
+  {#if presence.length > 0}
+    <div class="px-3 py-1.5 border-t border-[var(--border)] bg-[var(--bg-card)] flex flex-col gap-1">
+      {#each presence.slice(0, 3) as person (person.deviceId)}
+        <span class="flex items-center gap-1.5 text-[10px] text-[var(--text-dim)]">
+          <span class="w-2 h-2 rounded-full shrink-0" style="background: {person.color}"></span>
+          <span class="truncate">
+            {$t('presence.editingNote', { name: person.name, note: person.notePath })}
+          </span>
+        </span>
+      {/each}
+    </div>
+  {/if}
 
   <!-- P2P Status Footer -->
   <div class="p-3 border-t border-[var(--border)] bg-[var(--bg-card)] flex items-center justify-between">

@@ -200,6 +200,10 @@ const esES: Dictionary = {
     installing: 'Instalando y reiniciando...',
     installFailed: 'Fallo al instalar la actualización. Inténtalo de nuevo o descárgala manualmente.',
   },
+  presence: {
+    editingNote: '{name} está editando {note}',
+    active: '{count} dispositivos editando',
+  },
   settings: {
     language: 'Idioma',
   },

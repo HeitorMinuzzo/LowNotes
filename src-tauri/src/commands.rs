@@ -335,6 +335,18 @@ pub fn network_remove_peer(
 }
 
 #[tauri::command]
+pub fn network_broadcast_awareness(
+    note_path: String,
+    update: Vec<u8>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let net = state.network.read();
+    let service = net.as_ref().ok_or("errors.p2pNotStarted")?;
+    service.broadcast_awareness(note_path, update);
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn network_get_pair_info(state: State<'_, AppState>) -> Result<Option<PairInfo>, String> {
     for _ in 0..40 {
         let (has_service, maybe_info) = {

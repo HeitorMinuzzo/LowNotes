@@ -1,6 +1,6 @@
 {
   "name": "lownotes",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "",
   "type": "module",
   "scripts": {
@@ -37,6 +37,7 @@
     "marked": "^18.0.14",
     "mermaid": "^12.0.0",
     "y-codemirror.next": "^0.3.6",
+    "y-protocols": "^1.0.7",
     "yjs": "^13.6.33"
   },
   "devDependencies": {

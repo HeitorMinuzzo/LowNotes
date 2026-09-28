@@ -200,6 +200,10 @@ const ptBR: Dictionary = {
     installing: 'Instalando e reiniciando...',
     installFailed: 'Falha ao instalar a atualização. Tente novamente ou baixe manualmente.',
   },
+  presence: {
+    editingNote: '{name} está editando {note}',
+    active: '{count} dispositivos editando',
+  },
   settings: {
     language: 'Idioma',
   },

@@ -76,6 +76,10 @@ export async function networkRemovePeer(endpointId: string): Promise<void> {
   return await invoke('network_remove_peer', { endpointId });
 }
 
+export async function broadcastAwareness(notePath: string, update: number[]): Promise<void> {
+  return await invoke('network_broadcast_awareness', { notePath, update });
+}
+
 export async function networkGetPairInfo(): Promise<PairInfo | null> {
   return await invoke('network_get_pair_info');
 }

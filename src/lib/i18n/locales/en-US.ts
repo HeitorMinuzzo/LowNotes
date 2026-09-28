@@ -198,6 +198,10 @@ const enUS = {
     installing: 'Installing and restarting...',
     installFailed: 'Failed to install the update. Try again or download it manually.',
   },
+  presence: {
+    editingNote: '{name} is editing {note}',
+    active: '{count} devices editing',
+  },
   settings: {
     language: 'Language',
   },

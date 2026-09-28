@@ -24,6 +24,14 @@
   } from '$lib/api';
   import { locale, resolveLocale, t, trError } from '$lib/i18n';
   import Sidebar from '$lib/components/Sidebar.svelte';
+  import * as Y from 'yjs';
+  import {
+    Awareness,
+    applyAwarenessUpdate,
+    outdatedTimeout,
+    removeAwarenessStates,
+  } from 'y-protocols/awareness';
+  import { parsePresenceState, type PresenceUser } from '$lib/presence';
   import Editor from '$lib/components/Editor.svelte';
   import PairModal from '$lib/components/PairModal.svelte';
   import IncomingPairDialog from '$lib/components/IncomingPairDialog.svelte';
@@ -55,6 +63,11 @@
   let updateTimer: ReturnType<typeof setInterval> | undefined;
   let unlisteners: UnlistenFn[] = [];
 
+  let presenceRegistry: Awareness | null = null;
+  let presenceDoc: Y.Doc | null = null;
+  let activeEditors = $state<PresenceUser[]>([]);
+  let unlistenAwareness: UnlistenFn | null = null;
+  let presencePruneTimer: ReturnType<typeof setInterval> | undefined;
   async function loadInitialData() {
     try {
       const data = await getAppState();
@@ -129,6 +142,22 @@
     }
   }
 
+
+  function refreshActiveEditors() {
+    if (!presenceRegistry) {
+      activeEditors = [];
+      return;
+    }
+    const byDevice = new Map<string, PresenceUser>();
+    for (const [clientId, state] of presenceRegistry.getStates()) {
+      if (clientId === presenceRegistry.clientID) continue;
+      const user = parsePresenceState(state)?.user;
+      if (user?.deviceId) {
+        byDevice.set(user.deviceId, user);
+      }
+    }
+    activeEditors = [...byDevice.values()];
+  }
   async function openNote(path: string) {
     try {
       selectedNotePath = path;
@@ -251,6 +280,32 @@
 
     unlisteners = [u1, u2, u3, u4, u5, u6];
 
+    presenceDoc = new Y.Doc();
+    presenceRegistry = new Awareness(presenceDoc);
+    unlistenAwareness = await listen<{ note_path: string; update: number[] }>(
+      'p2p:awareness',
+      (event) => {
+        if (presenceRegistry) {
+          applyAwarenessUpdate(presenceRegistry, new Uint8Array(event.payload.update), 'remote');
+          refreshActiveEditors();
+        }
+      }
+    );
+    presencePruneTimer = setInterval(() => {
+      if (!presenceRegistry) return;
+      const now = Date.now();
+      const stale: number[] = [];
+      presenceRegistry.meta.forEach((meta, clientId) => {
+        if (clientId !== presenceRegistry!.clientID && now - meta.lastUpdated > outdatedTimeout) {
+          stale.push(clientId);
+        }
+      });
+      if (stale.length > 0) {
+        removeAwarenessStates(presenceRegistry, stale, 'prune');
+        refreshActiveEditors();
+      }
+    }, 15000);
+
     await loadInitialData();
     void checkForUpdates();
     updateTimer = setInterval(checkForUpdates, 6 * 60 * 60 * 1000);
@@ -272,6 +327,16 @@
   onDestroy(() => {
     unlisteners.forEach((u) => u());
     if (updateTimer) clearInterval(updateTimer);
+    if (unlistenAwareness) unlistenAwareness();
+    if (presencePruneTimer) clearInterval(presencePruneTimer);
+    if (presenceRegistry) {
+      presenceRegistry.destroy();
+      presenceRegistry = null;
+    }
+    if (presenceDoc) {
+      presenceDoc.destroy();
+      presenceDoc = null;
+    }
   });
 </script>
 
@@ -325,6 +390,7 @@
       }}
       onOpenPairModal={() => (isPairModalOpen = true)}
       onRefreshItems={refreshItems}
+      presence={activeEditors}
     />
 
     <!-- Editor Surface -->
@@ -342,6 +408,8 @@
           onToggleAiChat={() => (isAiChatOpen = !isAiChatOpen)}
           onOpenNote={(path) => openNote(path)}
           onOpenWikilink={handleOpenWikilink}
+          deviceName={settings?.device_name ?? ''}
+          deviceId={endpointId}
         />
       {:else}
         <div class="flex-1 flex flex-col items-center justify-center text-center p-8 select-none text-[var(--text-dim)] relative">

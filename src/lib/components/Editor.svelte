@@ -7,11 +7,19 @@
   import { yCollab } from 'y-codemirror.next';
   import mermaid from 'mermaid';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-  import { crdtApplyClientUpdate, saveNote } from '../api';
+  import { crdtApplyClientUpdate, saveNote, broadcastAwareness } from '../api';
   import { renderMarkdown } from '../markdown';
   import GraphView from './GraphView.svelte';
   import type { AppTheme, ViewMode } from '../types';
   import { t, ts } from '$lib/i18n';
+  import {
+    Awareness,
+    applyAwarenessUpdate,
+    encodeAwarenessUpdate,
+    outdatedTimeout,
+    removeAwarenessStates,
+  } from 'y-protocols/awareness';
+  import { colorForDevice, parsePresenceState, type PresenceUser } from '$lib/presence';
 
   let {
     notePath,
@@ -26,6 +34,8 @@
     onContentChange,
     onOpenNote,
     onOpenWikilink,
+    deviceName = '',
+    deviceId = '',
   } = $props<{
     notePath: string;
     initialContent: string;
@@ -39,6 +49,8 @@
     onContentChange?: (path: string, newContent: string) => void;
     onOpenNote?: (path: string) => void;
     onOpenWikilink?: (title: string) => void;
+    deviceName?: string;
+    deviceId?: string;
   }>();
 
   let editorContainer: HTMLDivElement | null = $state(null);
@@ -54,6 +66,11 @@
   let editorView: EditorView | null = null;
   let yDoc: Y.Doc | null = null;
   let unlistenCrdt: UnlistenFn | null = null;
+  let awareness: Awareness | null = null;
+  let remoteUsers = $state<PresenceUser[]>([]);
+  let awarenessSendTimer: ReturnType<typeof setTimeout> | null = null;
+  let stalePruneTimer: ReturnType<typeof setInterval> | undefined;
+  let unlistenAwareness: UnlistenFn | null = null;
   let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   let mermaidCounter = 0;
   let mermaidDebounce: ReturnType<typeof setTimeout> | null = null;
@@ -158,6 +175,34 @@
 
     currentContent = yText.toString();
 
+    if (awareness) {
+      awareness.destroy();
+      awareness = null;
+    }
+    awareness = new Awareness(yDoc);
+    awareness.setLocalState({
+      user: {
+        name: deviceName || 'LowNotes',
+        color: colorForDevice(deviceId || 'local'),
+        deviceId: deviceId || 'local',
+        notePath,
+      },
+    });
+    awareness.on('update', (changes: { added: number[]; updated: number[]; removed: number[] }, origin: unknown) => {
+      if (!awareness || origin === 'remote' || origin === 'prune') return;
+      const encoded = encodeAwarenessUpdate(awareness, [
+        ...changes.added,
+        ...changes.updated,
+        ...changes.removed,
+      ]);
+      if (awarenessSendTimer) clearTimeout(awarenessSendTimer);
+      awarenessSendTimer = setTimeout(() => {
+        broadcastAwareness(notePath, Array.from(encoded)).catch(() => {});
+      }, 50);
+      refreshRemoteUsers();
+    });
+    refreshRemoteUsers();
+
     // Listen to Yjs local edits to broadcast and autosave
     yDoc.on('update', (update: Uint8Array, origin: any) => {
       const text = yText.toString();
@@ -187,7 +232,7 @@
       extensions: [
         basicSetup,
         markdown(),
-        yCollab(yText, null),
+        yCollab(yText, awareness),
         editorTheme.of(codeMirrorTheme()),
       ],
     });
@@ -242,6 +287,37 @@
     }
   }
 
+  function refreshRemoteUsers() {
+    if (!awareness) {
+      remoteUsers = [];
+      return;
+    }
+    const users: PresenceUser[] = [];
+    for (const [clientId, state] of awareness.getStates()) {
+      if (clientId === awareness.clientID) continue;
+      const user = parsePresenceState(state)?.user;
+      if (user && user.notePath === notePath && user.deviceId) {
+        users.push(user);
+      }
+    }
+    remoteUsers = users;
+  }
+
+  function pruneStalePeers() {
+    if (!awareness) return;
+    const now = Date.now();
+    const stale: number[] = [];
+    awareness.meta.forEach((meta, clientId) => {
+      if (clientId !== awareness!.clientID && now - meta.lastUpdated > outdatedTimeout) {
+        stale.push(clientId);
+      }
+    });
+    if (stale.length > 0) {
+      removeAwarenessStates(awareness, stale, 'prune');
+      refreshRemoteUsers();
+    }
+  }
+
   onMount(async () => {
     initEditor();
 
@@ -254,14 +330,31 @@
         }
       }
     );
+
+    unlistenAwareness = await listen<{ note_path: string; update: number[] }>(
+      'p2p:awareness',
+      (event) => {
+        if (event.payload.note_path === notePath && awareness) {
+          applyAwarenessUpdate(awareness, new Uint8Array(event.payload.update), 'remote');
+          refreshRemoteUsers();
+        }
+      }
+    );
+
+    stalePruneTimer = setInterval(pruneStalePeers, 15000);
   });
 
   onDestroy(() => {
     if (editorView) editorView.destroy();
     if (yDoc) yDoc.destroy();
     if (unlistenCrdt) unlistenCrdt();
-    if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
-    if (mermaidDebounce) clearTimeout(mermaidDebounce);
+    if (unlistenAwareness) unlistenAwareness();
+    if (awarenessSendTimer) clearTimeout(awarenessSendTimer);
+    if (stalePruneTimer) clearInterval(stalePruneTimer);
+    if (awareness) {
+      awareness.destroy();
+      awareness = null;
+    }
   });
   $effect(() => {
     // Re-initialize if notePath changes
@@ -367,6 +460,21 @@
 
     <!-- Mode Selector & Status -->
     <div class="flex items-center gap-3">
+      {#if remoteUsers.length > 0}
+        <div
+          class="flex items-center -space-x-1.5"
+          title={remoteUsers.map((u) => u.name).join(', ')}
+        >
+          {#each remoteUsers as user (user.deviceId)}
+            <span
+              class="w-5 h-5 rounded-full border-2 border-[var(--bg-sidebar)] flex items-center justify-center text-[9px] font-bold text-black select-none"
+              style="background: {user.color}"
+            >
+              {user.name.slice(0, 1).toUpperCase()}
+            </span>
+          {/each}
+        </div>
+      {/if}
       <div class="flex items-center gap-1.5 text-xs text-[var(--text-dim)]">
         {#if saveStatus === 'saving'}
           <span class="inline-block w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse"></span>

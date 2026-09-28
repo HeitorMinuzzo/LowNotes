@@ -78,6 +78,7 @@ pub fn run() {
             commands::network_request_pair,
             commands::network_answer_pair,
             commands::network_remove_peer,
+            commands::network_broadcast_awareness,
             commands::save_ai_settings,
             commands::network_get_pair_info,
             commands::save_theme,
