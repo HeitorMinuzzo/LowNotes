@@ -266,7 +266,7 @@ pub async fn generate_chat_completion(
     temperature: f32,
 ) -> anyhow::Result<String> {
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(60))
+        .timeout(Duration::from_secs(180))
         .build()?;
 
     let mut url = provider.base_url.trim().trim_end_matches('/').to_string();
@@ -291,17 +291,31 @@ pub async fn generate_chat_completion(
         req = req.header("Authorization", format!("Bearer {}", provider.api_key.trim()));
     }
 
-    let resp = req.send().await.context("errors.aiSendFailed")?;
+    let resp = req.send().await.map_err(|error| {
+        let key = if error.is_timeout() {
+            "ai.providerTimeout"
+        } else if error.is_connect() {
+            "ai.providerConnectionFailed"
+        } else {
+            "ai.providerRequestFailed"
+        };
+        anyhow::anyhow!(key)
+    })?;
     if !resp.status().is_success() {
         let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        bail!("erro da IA (status {status}): {body}");
+        let key = match status.as_u16() {
+            401 | 403 => "ai.providerAuthFailed",
+            404 => "ai.providerEndpointNotFound",
+            429 => "ai.providerRateLimited",
+            500..=599 => "ai.providerUnavailable",
+            _ => "ai.providerRejected",
+        };
+        bail!(key);
     }
 
-    let result: OpenAiChatResponse = resp
-        .json()
-        .await
-        .context("errors.invalidAiResponse")?;
+    let result: OpenAiChatResponse = resp.json().await.map_err(|error: reqwest::Error| {
+        anyhow::anyhow!(if error.is_timeout() { "ai.providerTimeout" } else { "errors.invalidAiResponse" })
+    })?;
 
     let choice = result
         .choices

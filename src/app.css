@@ -113,6 +113,17 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .settings-inline, .settings-models { display: flex; gap: 8px; }.settings-inline input { flex: 1; min-width: 0; }.settings-inline button, .settings-models button { padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; color: var(--accent-light); font-size: 12px; }
 .settings-models select { flex: 1; min-width: 0; }
 .settings-active-choice { display: inline-flex; align-items: center; gap: 8px; margin-top: 20px; font-size: 12px; color: var(--text-muted); cursor: pointer; }
+.web-route-note { display: flex; align-items: flex-start; gap: 11px; padding: 14px 16px; border: 1px solid var(--accent); border-radius: 10px; background: var(--bg-active); color: var(--text-muted); font-size: 12px; line-height: 1.55; }
+.web-route-note svg { flex: none; color: var(--accent-light); margin-top: 1px; }
+.web-source-list { display: grid; gap: 10px; margin-top: 18px; }
+.web-source-row { padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-main); }
+.web-source-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; }
+.web-source-head input { width: 18px; height: 18px; flex: none; accent-color: var(--accent); }
+.web-source-title strong, .web-source-title small { display: block; }
+.web-source-title strong { font-size: 13px; color: var(--text-main); }
+.web-source-title small { margin-top: 3px; font-size: 11px; color: var(--text-dim); }
+.web-source-row .setting-field { margin: 12px 0 5px; }
+.web-source-row .settings-link { margin-top: 6px; }
 .settings-about { display: flex; align-items: center; gap: 16px; padding: 20px; margin: 18px 0; background: var(--bg-main); border: 1px solid var(--border); border-radius: 11px; }
 .settings-about-mark { display: grid; place-items: center; width: 45px; height: 45px; border-radius: 11px; background: #c14545; color: #f7c65d; font-size: 26px; }
 .settings-about strong, .settings-about span { display: block; }.settings-about span { color: var(--text-muted); font-size: 12px; margin-top: 3px; }

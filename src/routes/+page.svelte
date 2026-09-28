@@ -56,7 +56,7 @@
   let incomingRequest = $state<{ request_id: string; peer: PeerConfig } | null>(null);
   let isAiChatOpen = $state(false);
   let isSettingsOpen = $state(false);
-  let settingsTab = $state<'general' | 'ai' | 'providers' | 'about'>('general');
+  let settingsTab = $state<'general' | 'ai' | 'providers' | 'web' | 'about'>('general');
   let isWelcomeOpen = $state(false);
   let targetLine = $state<number | undefined>(undefined);
   let pendingUpdate = $state<Update | null>(null);
@@ -211,7 +211,7 @@
     }
   }
 
-  function openSettings(tab: 'general' | 'ai' | 'providers' | 'about' = 'general') {
+  function openSettings(tab: 'general' | 'ai' | 'providers' | 'web' | 'about' = 'general') {
     settingsTab = tab;
     isSettingsOpen = true;
   }

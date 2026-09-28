@@ -49,7 +49,17 @@ export interface AiSettings {
   active_provider_id: string;
   providers: AiProviderConfig[];
   auto_link_notes: boolean;
-  web_search_api_key: string;
+}
+
+export interface WebSearchSourceConfig {
+  id: string;
+  enabled: boolean;
+  api_key: string;
+}
+
+export interface WebSearchSettings {
+  sources: WebSearchSourceConfig[];
+  searxng_url: string;
 }
 
 export interface AppSettings {
@@ -63,6 +73,7 @@ export interface AppSettings {
   active_vault_id: string | null;
   vaults: VaultConfig[];
   ai: AiSettings;
+  web_search: WebSearchSettings;
   has_seen_welcome: boolean;
 }
 

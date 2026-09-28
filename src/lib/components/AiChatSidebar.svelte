@@ -26,7 +26,6 @@
       active_provider_id: 'ollama',
       providers: [],
       auto_link_notes: false,
-      web_search_api_key: '',
     }),
     currentNotePath = '',
     onNavigateToSource,
@@ -38,7 +37,7 @@
     currentNotePath: string;
     onNavigateToSource: (path: string, line: number) => void;
     onNotesCreated: () => Promise<void>;
-    onOpenSettings: (tab?: 'ai' | 'providers') => void;
+    onOpenSettings: (tab?: 'ai' | 'providers' | 'web') => void;
   }>();
 
   let scope = $state<'vault' | 'note'>('vault');
@@ -64,6 +63,7 @@
     warnings?: string[];
     vaultId?: string;
     isError?: boolean;
+    errorSettingsTab?: 'web' | 'providers';
   }
 
   let messages = $state<MessageItem[]>([]);
@@ -73,12 +73,6 @@
     const text = (textToSend || inputPrompt).trim();
     if (!text || isLoading) return;
     if (selectedSkill) skill = selectedSkill;
-    if (skill === 'research' && !aiSettings.web_search_api_key.trim()) {
-      errorMessage = ts('ai.webKeyRequired');
-      onOpenSettings('ai');
-      return;
-    }
-
     inputPrompt = '';
     errorMessage = null;
 
@@ -150,11 +144,13 @@
       });
     } catch (err: any) {
       if (disposed) return;
-      const msg = trError(typeof err === 'string' ? err : err.message || 'ai.errorQuery');
+      const rawError = typeof err === 'string' ? err : err.message || 'ai.errorQuery';
+      const msg = trError(rawError);
       messages.push({
         role: 'assistant',
         content: ts('ai.errorMessage', { message: msg }),
         isError: true,
+        errorSettingsTab: rawError.startsWith('ai.web') ? 'web' : 'providers',
         timestamp: new Date().toLocaleTimeString($locale, { hour: '2-digit', minute: '2-digit' }),
       });
     } finally {
@@ -263,7 +259,7 @@
       </div>
       <div class="flex items-center gap-1.5">
         <button
-          onclick={() => onOpenSettings('ai')}
+          onclick={() => onOpenSettings(skill === 'research' ? 'web' : 'ai')}
           class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--accent-light)] transition"
           title={$t('ai.settings')}
         >
@@ -368,6 +364,9 @@
                 <div class="prose max-w-none text-xs leading-relaxed">
                   {@html renderChatMarkdown(trError(msg.content))}
                 </div>
+                {#if msg.isError}
+                  <button class="mt-3 text-xs font-semibold text-[var(--accent-light)] hover:underline" onclick={() => onOpenSettings(msg.errorSettingsTab || 'providers')}>{msg.errorSettingsTab === 'web' ? $t('settings.webSearch') : $t('settings.providers')}</button>
+                {/if}
 
                 {#each msg.warnings || [] as warning}
                   <p role="status" class="mt-2 text-xs text-[var(--accent-light)]">{trError(warning)}</p>

@@ -10,12 +10,13 @@ use tauri::{AppHandle, State};
 
 use crate::{
     assistant::{self, AssistantSkill, NoteDraft},
-    config::{AiProviderConfig, AiSettings, AppSettings, VaultConfig, decode_pair_code},
+    config::{AiProviderConfig, AiSettings, AppSettings, VaultConfig, WebSearchSettings, decode_pair_code},
     crdt::CrdtManager,
     links,
     network::{NetworkIdentity, NetworkService, PairInfo},
     rag::{self, ChatMessage, ChatResponse, RagChunk},
     vault::{self, VaultItem},
+    web_search,
 };
 
 pub struct AppState {
@@ -385,6 +386,28 @@ pub fn save_ai_settings(settings: AiSettings, state: State<'_, AppState>) -> Res
 }
 
 #[tauri::command]
+pub fn save_web_search_settings(mut settings: WebSearchSettings, state: State<'_, AppState>) -> Result<(), String> {
+    settings.normalize();
+    if ["brave", "parallel"].into_iter().any(|id| settings.source(id).is_some_and(|source| source.enabled && source.api_key.trim().is_empty())) {
+        return Err("ai.webKeyRequired".into());
+    }
+    if settings.source("searxng").is_some_and(|source| source.enabled) {
+        let url = reqwest::Url::parse(settings.searxng_url.trim()).map_err(|_| "ai.webInvalidSearxngUrl")?;
+        if url.scheme() != "https" || url.host_str().is_none() || !url.username().is_empty() || url.password().is_some()
+            || url.host_str().is_some_and(|host| host == "localhost" || host.parse::<std::net::IpAddr>().is_ok()) {
+            return Err("ai.webInvalidSearxngUrl".into());
+        }
+    }
+    let mut app = state.settings.write();
+    let previous = std::mem::replace(&mut app.web_search, settings);
+    if let Err(error) = app.save() {
+        app.web_search = previous;
+        return Err(error.to_string());
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub fn save_theme(theme: String, state: State<'_, AppState>) -> Result<(), String> {
     if !matches!(theme.as_str(), "dark" | "light") {
         return Err("errors.invalidTheme".to_string());
@@ -476,7 +499,7 @@ pub async fn ai_chat_query(
         return Err("ai.emptyPrompt".into());
     }
     let skill = skill.unwrap_or_default();
-    let (provider, vault_path, vault_id, web_key, language) = {
+    let (provider, vault_path, vault_id, web_settings, language) = {
         let settings = state.settings.read();
         let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
         let p = settings
@@ -487,11 +510,11 @@ pub async fn ai_chat_query(
             .cloned()
             .ok_or("nenhum provedor de IA selecionado")?;
         (p, vault.path.clone(), vault.id.clone(),
-            settings.ai.web_search_api_key.clone(), settings.language.clone())
+            settings.web_search.clone(), settings.language.clone())
     };
 
     let web_sources = if skill == AssistantSkill::Research {
-        assistant::search_web(&prompt, &web_key, &language)
+        web_search::search_web(&prompt, &web_settings, &language)
             .await.map_err(|e| e.to_string())?
     } else {
         Vec::new()

@@ -2,13 +2,13 @@
   import { onMount, untrack } from 'svelte';
   import { getVersion } from '@tauri-apps/api/app';
   import { openUrl } from '@tauri-apps/plugin-opener';
-  import { ArrowLeft, Bot, Check, Download, Monitor, Plus, Settings2, Sparkles, Trash2 } from 'lucide-svelte';
-  import { fetchAiModels, saveAiSettings, saveCloseToTray, saveLanguage, saveTheme, saveUpdatePrefs, saveViewMode } from '$lib/api';
+  import { ArrowLeft, Bot, Check, Download, Globe2, Monitor, Plus, Settings2, Sparkles, Trash2 } from 'lucide-svelte';
+  import { fetchAiModels, saveAiSettings, saveCloseToTray, saveLanguage, saveTheme, saveUpdatePrefs, saveViewMode, saveWebSearchSettings } from '$lib/api';
   import { LOCALE_LABELS, SUPPORTED_LOCALES, t, trError, type LocaleCode } from '$lib/i18n';
-  import type { AiProviderConfig, AiSettings, AppSettings, AppTheme, ViewMode } from '$lib/types';
+  import type { AiProviderConfig, AiSettings, AppSettings, AppTheme, ViewMode, WebSearchSettings } from '$lib/types';
   import { version as packageVersion } from '../../../package.json';
 
-  type Tab = 'general' | 'ai' | 'providers' | 'about';
+  type Tab = 'general' | 'ai' | 'providers' | 'web' | 'about';
   let { settings, initialTab = 'general', onClose, onChange } = $props<{
     settings: AppSettings;
     initialTab?: Tab;
@@ -18,6 +18,16 @@
 
   let tab = $state<Tab>(untrack(() => initialTab));
   let aiDraft = $state<AiSettings>(untrack(() => $state.snapshot(settings.ai)));
+  let webDraft = $state<WebSearchSettings>(untrack(() => $state.snapshot(settings.web_search)));
+  const webSources: Record<string, { name: string; keyless: boolean; keyUrl?: string }> = {
+    firecrawl: { name: 'Firecrawl', keyless: true, keyUrl: 'https://www.firecrawl.dev/' },
+    keenable: { name: 'Keenable', keyless: true, keyUrl: 'https://keenable.ai/console' },
+    exa: { name: 'Exa MCP', keyless: true, keyUrl: 'https://dashboard.exa.ai/api-keys' },
+    duckduckgo: { name: 'DuckDuckGo', keyless: true },
+    searxng: { name: 'SearXNG', keyless: true },
+    brave: { name: 'Brave Search', keyless: false, keyUrl: 'https://api-dashboard.search.brave.com/' },
+    parallel: { name: 'Parallel', keyless: false, keyUrl: 'https://platform.parallel.ai/' },
+  };
   let selectedProviderId = $state(untrack(() => settings.ai.active_provider_id || settings.ai.providers[0]?.id || ''));
   let provider = $derived(aiDraft.providers.find((item) => item.id === selectedProviderId));
   let version = $state(packageVersion);
@@ -67,6 +77,10 @@
   function saveAi() {
     const nextAi = $state.snapshot(aiDraft);
     void persist(saveAiSettings(nextAi), { ...settings, ai: nextAi });
+  }
+  function saveWeb() {
+    const nextWeb = $state.snapshot(webDraft);
+    void persist(saveWebSearchSettings(nextWeb), { ...settings, web_search: nextWeb });
   }
   function addProvider() {
     if (!newName.trim() || !newUrl.trim()) return;
@@ -120,6 +134,7 @@
         <button class:active={tab === 'general'} onclick={() => tab = 'general'}><Monitor size={18} /> {$t('settings.general')}</button>
         <button class:active={tab === 'ai'} onclick={() => tab = 'ai'}><Sparkles size={18} /> {$t('settings.ai')}</button>
         <button class:active={tab === 'providers'} onclick={() => tab = 'providers'}><Bot size={18} /> {$t('settings.providers')}</button>
+        <button class:active={tab === 'web'} onclick={() => tab = 'web'}><Globe2 size={18} /> {$t('settings.webSearch')}</button>
         <button class:active={tab === 'about'} onclick={() => tab = 'about'}><Download size={18} /> {$t('settings.about')}</button>
       </nav>
 
@@ -148,7 +163,6 @@
             <div class="setting-row"><div><strong>{$t('settings.activeProvider')}</strong><small>{$t('settings.activeProviderHint')}</small></div>
               <select bind:value={aiDraft.active_provider_id}>{#each aiDraft.providers as item}<option value={item.id}>{item.name}</option>{/each}</select></div>
             <label class="setting-row setting-toggle"><div><strong>{$t('ai.autoLink')}</strong><small>{$t('ai.autoLinkHint')}</small></div><input type="checkbox" bind:checked={aiDraft.auto_link_notes} /></label>
-            <div class="setting-field"><label for="brave-key">{$t('ai.webKey')}</label><input id="brave-key" type="password" bind:value={aiDraft.web_search_api_key} autocomplete="off" /><small>{$t('ai.webKeyHint')}</small><button class="settings-link" onclick={() => openUrl('https://api-dashboard.search.brave.com/')}>{$t('ai.webGetKey')}</button></div>
             <div class="settings-actions"><button class="settings-primary" onclick={saveAi} disabled={busy}>{$t('settings.saveAi')}</button></div>
           </section>
         {:else if tab === 'providers'}
@@ -169,6 +183,29 @@
               </div>{/if}
             </div>
             <div class="settings-actions"><button class="settings-primary" onclick={saveAi} disabled={busy}>{$t('settings.saveProviders')}</button></div>
+          </section>
+        {:else if tab === 'web'}
+          <section class="settings-section">
+            <h2>{$t('settings.webSearch')}</h2><p>{$t('settings.webSearchHint')}</p>
+            <div class="web-route-note"><Globe2 size={19} /><span>{$t('settings.webRouteHint')}</span></div>
+            <div class="web-source-list">
+              {#each webDraft.sources as source (source.id)}
+                {@const info = webSources[source.id]}
+                {#if info}
+                  <div class="web-source-row">
+                    <label class="web-source-head"><span class="web-source-title"><strong>{info.name}</strong><small>{info.keyless ? $t('settings.keyless') : $t('settings.requiresKey')}</small></span><input type="checkbox" bind:checked={source.enabled} /></label>
+                    {#if source.id === 'searxng'}
+                      <label class="setting-field">{$t('settings.publicInstance')}<input type="url" bind:value={webDraft.searxng_url} placeholder="https://search.lumy.live/" /><small>{$t('settings.publicInstanceHint')}</small></label>
+                    {/if}
+                    {#if info.keyUrl}
+                      <label class="setting-field">{info.keyless ? $t('settings.optionalKey') : $t('settings.apiKey')}<input type="password" bind:value={source.api_key} autocomplete="off" placeholder={info.keyless ? $t('settings.optionalKey') : $t('settings.requiresKey')} /></label>
+                      <button class="settings-link" onclick={() => openUrl(info.keyUrl!)}>{$t('settings.getKey')}</button>
+                    {/if}
+                  </div>
+                {/if}
+              {/each}
+            </div>
+            <div class="settings-actions"><button class="settings-primary" onclick={saveWeb} disabled={busy}>{$t('settings.saveWeb')}</button></div>
           </section>
         {:else}
           <section class="settings-section">

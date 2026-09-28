@@ -1,4 +1,4 @@
-use std::{collections::HashSet, fs, io::Write, path::Path, time::Duration};
+use std::{collections::HashSet, fs, io::Write, path::Path};
 
 use anyhow::{bail, Context};
 use serde::{Deserialize, Serialize};
@@ -223,91 +223,6 @@ pub struct WebSource {
     pub description: String,
 }
 
-#[derive(Deserialize)]
-struct SearchResults {
-    #[serde(default)]
-    results: Vec<WebSource>,
-}
-#[derive(Deserialize)]
-struct SearchResponse {
-    web: Option<SearchResults>,
-}
-
-pub async fn search_web(
-    query: &str,
-    api_key: &str,
-    language: &str,
-) -> anyhow::Result<Vec<WebSource>> {
-    search_web_at(
-        query,
-        api_key,
-        language,
-        "https://api.search.brave.com/res/v1/web/search",
-    )
-    .await
-}
-
-async fn search_web_at(
-    query: &str,
-    api_key: &str,
-    language: &str,
-    endpoint: &str,
-) -> anyhow::Result<Vec<WebSource>> {
-    if api_key.trim().is_empty() {
-        bail!("ai.webKeyRequired");
-    }
-    let query: String = query
-        .split_whitespace()
-        .take(75)
-        .collect::<Vec<_>>()
-        .join(" ")
-        .chars()
-        .take(400)
-        .collect();
-    let (country, search_lang) = match language {
-        "pt-BR" => ("BR", "pt-br"),
-        "es-ES" => ("ES", "es"),
-        _ => ("US", "en"),
-    };
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(20))
-        .build()?;
-    let mut url = reqwest::Url::parse(endpoint)?;
-    url.query_pairs_mut().extend_pairs([
-        ("q", query.as_str()),
-        ("count", "5"),
-        ("country", country),
-        ("search_lang", search_lang),
-        ("text_decorations", "false"),
-    ]);
-    let response = client
-        .get(url)
-        .header("X-Subscription-Token", api_key.trim())
-        .send()
-        .await
-        .context("ai.webSearchFailed")?;
-    if !response.status().is_success() {
-        // Do not expose provider bodies or request headers containing credentials.
-        bail!("ai.webSearchFailed");
-    }
-    let results: SearchResponse = response.json().await.context("ai.webSearchFailed")?;
-    Ok(results
-        .web
-        .map(|w| w.results)
-        .unwrap_or_default()
-        .into_iter()
-        .filter(|r| {
-            reqwest::Url::parse(&r.url).is_ok_and(|url| matches!(url.scheme(), "https" | "http"))
-        })
-        .take(5)
-        .map(|mut result| {
-            result.description = result.description.chars().take(3000).collect();
-            result.title = result.title.chars().take(300).collect();
-            result
-        })
-        .collect())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -471,47 +386,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn research_requires_key_without_network_request() {
-        assert_eq!(
-            search_web("Python", "", "pt-BR")
-                .await
-                .unwrap_err()
-                .to_string(),
-            "ai.webKeyRequired"
-        );
-    }
-
-    #[tokio::test]
-    async fn search_uses_encoded_query_and_filters_unsafe_sources() {
-        let body = serde_json::json!({"web":{"results":[
-            {"title":"Python", "url":"https://docs.python.org/3/", "description":"Reference"},
-            {"title":"unsafe", "url":"javascript:alert(1)"}
-        ]}})
-        .to_string();
-        let (url, request) = mock_http(body, "200 OK").await;
-        let results = search_web_at("funções & Python", "test-only-token", "pt-BR", &url)
-            .await
-            .unwrap();
-        assert_eq!(results.len(), 1);
-        let request = request.await.unwrap();
-        assert!(request.contains("q=fun%C3%A7%C3%B5es+%26+Python"));
-        assert!(request.contains("search_lang=pt-br"));
-        assert!(request
-            .to_lowercase()
-            .contains("x-subscription-token: test-only-token"));
-        let (url, request) =
-            mock_http("secret provider error".into(), "429 Too Many Requests").await;
-        assert_eq!(
-            search_web_at("Python", "test-token", "en-US", &url)
-                .await
-                .unwrap_err()
-                .to_string(),
-            "ai.webSearchFailed"
-        );
-        request.await.unwrap();
-    }
-
-    #[tokio::test]
     async fn compatible_provider_creates_draft_for_an_empty_vault() {
         let answer = format!(
             "Rascunho pronto.\n```lownotes-notes\n{}\n```",
@@ -558,7 +432,6 @@ mod tests {
             r#"{"active_provider_id":"custom","providers":[],"auto_link_notes":true}"#,
         )
         .unwrap();
-        assert!(settings.web_search_api_key.is_empty());
         assert!(settings.auto_link_notes);
     }
 }

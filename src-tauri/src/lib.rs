@@ -6,6 +6,7 @@ pub mod commands;
 pub mod rag;
 pub mod links;
 pub mod assistant;
+pub mod web_search;
 
 use std::sync::Arc;
 use parking_lot::RwLock;
@@ -120,6 +121,7 @@ pub fn run() {
             commands::network_remove_peer,
             commands::network_broadcast_awareness,
             commands::save_ai_settings,
+            commands::save_web_search_settings,
             commands::network_get_pair_info,
             commands::save_theme,
             commands::save_view_mode,

@@ -16,6 +16,7 @@ import type {
   RagChunk,
   VaultItem,
   ViewMode,
+  WebSearchSettings,
 } from './types';
 
 export async function getAppState(): Promise<InitialStateResponse> {
@@ -124,6 +125,10 @@ export async function pickVaultDirectory(): Promise<string | null> {
 
 export async function saveAiSettings(settings: AiSettings): Promise<void> {
   return await invoke('save_ai_settings', { settings });
+}
+
+export async function saveWebSearchSettings(settings: WebSearchSettings): Promise<void> {
+  return await invoke('save_web_search_settings', { settings });
 }
 
 export async function saveTheme(theme: AppTheme): Promise<void> {

@@ -38,6 +38,7 @@ rand = "0.9"
 hostname = "0.4"
 filetime = "0.2"
 reqwest = { version = "0.13", features = ["json"] }
+html-escape = "0.2"
 tauri-plugin-updater = "2.13.0"
 tauri-plugin-process = "2.4.0"
 

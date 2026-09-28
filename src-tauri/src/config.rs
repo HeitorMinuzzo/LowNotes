@@ -127,8 +127,6 @@ pub struct AiSettings {
     pub providers: Vec<AiProviderConfig>,
     #[serde(default)]
     pub auto_link_notes: bool,
-    #[serde(default)]
-    pub web_search_api_key: String,
 }
 
 impl Default for AiSettings {
@@ -178,8 +176,51 @@ impl Default for AiSettings {
                 },
             ],
             auto_link_notes: false,
-            web_search_api_key: String::new(),
         }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebSearchSourceConfig {
+    pub id: String,
+    pub enabled: bool,
+    #[serde(default)]
+    pub api_key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct WebSearchSettings {
+    pub sources: Vec<WebSearchSourceConfig>,
+    pub searxng_url: String,
+}
+
+impl Default for WebSearchSettings {
+    fn default() -> Self {
+        Self {
+            sources: ["firecrawl", "keenable", "exa", "duckduckgo", "searxng", "brave", "parallel"]
+                .into_iter()
+                .map(|id| WebSearchSourceConfig {
+                    id: id.into(),
+                    enabled: !matches!(id, "brave" | "parallel"),
+                    api_key: String::new(),
+                })
+                .collect(),
+            searxng_url: "https://search.lumy.live/".into(),
+        }
+    }
+}
+
+impl WebSearchSettings {
+    pub fn source(&self, id: &str) -> Option<&WebSearchSourceConfig> {
+        self.sources.iter().find(|source| source.id == id)
+    }
+
+    pub fn normalize(&mut self) {
+        let defaults = Self::default();
+        self.sources = defaults.sources.into_iter().map(|default| {
+            self.sources.iter().find(|source| source.id == default.id).cloned().unwrap_or(default)
+        }).collect();
     }
 }
 
@@ -196,6 +237,8 @@ pub struct AppSettings {
     pub vaults: Vec<VaultConfig>,
     #[serde(default)]
     pub ai: AiSettings,
+    #[serde(default)]
+    pub web_search: WebSearchSettings,
     #[serde(default)]
     pub has_seen_welcome: bool,
     #[serde(default = "default_true")]
@@ -221,6 +264,7 @@ impl Default for AppSettings {
             active_vault_id: None,
             vaults: Vec::new(),
             ai: AiSettings::default(),
+            web_search: WebSearchSettings::default(),
             has_seen_welcome: false,
             update_check: default_true(),
             close_to_tray: default_true(),
@@ -242,6 +286,22 @@ fn default_true() -> bool {
 }
 
 impl AppSettings {
+    fn from_saved_value(saved: serde_json::Value) -> Option<Self> {
+        let old_brave_key = saved.pointer("/ai/web_search_api_key")
+            .and_then(|key| key.as_str()).unwrap_or_default().to_owned();
+        let mut settings: Self = serde_json::from_value(saved).ok()?;
+        settings.web_search.normalize();
+        if !old_brave_key.is_empty() {
+            if let Some(brave) = settings.web_search.sources.iter_mut().find(|s| s.id == "brave") {
+                if brave.api_key.is_empty() {
+                    brave.api_key = old_brave_key;
+                    brave.enabled = true;
+                }
+            }
+        }
+        Some(settings)
+    }
+
     pub fn config_file() -> anyhow::Result<PathBuf> {
         let dirs = ProjectDirs::from("dev", "lowbloat", "lownotes")
             .context("errors.configDir")?;
@@ -254,7 +314,8 @@ impl AppSettings {
         Self::config_file()
             .ok()
             .and_then(|p| fs::read_to_string(p).ok())
-            .and_then(|s| serde_json::from_str(&s).ok())
+            .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+            .and_then(Self::from_saved_value)
             .unwrap_or_default()
     }
 
@@ -345,5 +406,17 @@ mod tests {
         assert!(vault.secret_key().is_ok());
         // Second time should not change anything
         assert!(!vault.ensure_keys());
+    }
+
+    #[test]
+    fn migrates_old_brave_key_without_making_brave_default() {
+        let mut saved = serde_json::to_value(AppSettings::default()).unwrap();
+        saved.as_object_mut().unwrap().remove("web_search");
+        saved["ai"]["web_search_api_key"] = "old-key".into();
+        let restored = AppSettings::from_saved_value(saved).unwrap();
+        let brave = restored.web_search.source("brave").unwrap();
+        assert!(brave.enabled);
+        assert_eq!(brave.api_key, "old-key");
+        assert!(restored.web_search.source("firecrawl").unwrap().enabled);
     }
 }
