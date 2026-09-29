@@ -226,20 +226,19 @@ const enUS = {
   welcome: {
     title: 'Meet LowNotes',
     subtitle:
-      'Your new local-first Markdown notes editor: fast, no central servers, and with AI connected to your vault.',
-    feature1Title: '100% Markdown with Mermaid',
+      'Your notes, on your computer. Sync across devices and use AI when it helps.',
+    feature1Title: 'Real Markdown files',
     feature1Body:
-      'Your notes stay as .md files on your disk. Supports rich editing with CodeMirror 6 and instant rendering of Mermaid diagrams and charts.',
-    feature2Title: 'Serverless P2P Sync',
+      'Notes stay in your vault as .md files. Edit and preview Markdown and Mermaid, or open them in another editor.',
+    feature2Title: 'Collaboration that keeps both versions',
     feature2Body:
-      'Connect your computers directly via encrypted Iroh QUIC with ed25519 keys. Even allows real-time collaborative editing on the same note using CRDT (Yrs/Yjs).',
-    feature3Title: 'AI Assistant & Local RAG',
-    new: 'NEW',
+      'Pair devices to edit together. Divergent offline versions are both kept for review.',
+    feature3Title: 'Optional AI assistant',
     feature3Body:
-      "Click the chat button 💬 in the top right bar to ask questions to your vault. The AI searches excerpts and cites clickable links that take you straight to the note's line!",
+      'Ask about your vault, create drafts and search the web. Choose a local or remote provider before using it.',
     skip: 'Skip Presentation',
     start: 'Start Writing',
-    tryAi: 'Try AI Assistant',
+    tryAi: 'Open Assistant',
   },
   graph: {
     title: 'Link Map',

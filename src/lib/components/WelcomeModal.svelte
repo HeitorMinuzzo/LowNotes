@@ -1,6 +1,7 @@
 <script lang="ts">
   import { markWelcomeSeen, saveLanguage } from '../api';
   import { t, locale, LOCALE_LABELS, SUPPORTED_LOCALES } from '$lib/i18n';
+  import logoUrl from '../../../assets/brand/lownotes_logo.png';
 
   let {
     isOpen = $bindable(false),
@@ -36,9 +37,7 @@
     >
       <!-- Hero Header -->
       <div class="px-8 pt-8 pb-6 text-center border-b border-[var(--border)] bg-gradient-to-b from-[var(--bg-hover)] to-[var(--bg-card)]">
-        <div class="w-14 h-14 rounded-2xl bg-[var(--bg-main)] border border-[var(--accent)]/40 flex items-center justify-center text-2xl mx-auto mb-4 shadow-lg text-[var(--accent-light)]">
-          ✦
-        </div>
+        <img src={logoUrl} alt="" class="w-[70px] h-[70px] object-contain mx-auto mb-4" style="image-rendering: pixelated" />
         <h2 class="text-xl font-bold text-[var(--text-main)] mb-1.5">{$t('welcome.title')}</h2>
         <p class="text-xs text-[var(--text-muted)] max-w-md mx-auto leading-relaxed">
           {$t('welcome.subtitle')}
@@ -89,10 +88,7 @@
         <div class="flex items-start gap-3.5 p-3 rounded-xl bg-[var(--bg-main)] border border-[var(--accent)]/30">
           <span class="text-xl mt-0.5">🤖</span>
           <div>
-            <h4 class="text-xs font-bold text-[var(--text-main)] mb-0.5 flex items-center gap-1.5">
-              <span>{$t('welcome.feature3Title')}</span>
-              <span class="px-1.5 py-0.2 text-[9px] font-mono rounded bg-[var(--accent)] text-black font-bold">{$t('welcome.new')}</span>
-            </h4>
+            <h4 class="text-xs font-bold text-[var(--text-main)] mb-0.5">{$t('welcome.feature3Title')}</h4>
             <p class="text-[11px] text-[var(--text-muted)] leading-relaxed">
               {$t('welcome.feature3Body')}
             </p>

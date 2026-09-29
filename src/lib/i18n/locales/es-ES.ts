@@ -228,20 +228,19 @@ const esES: Dictionary = {
   welcome: {
     title: 'Conoce LowNotes',
     subtitle:
-      'Tu nuevo editor de notas Markdown local-first: rápido, sin servidores centrales y con IA conectada a tu vault.',
-    feature1Title: '100% Markdown con Mermaid',
+      'Tus notas, en tu computadora. Sincroniza dispositivos y usa IA cuando te sirva.',
+    feature1Title: 'Archivos Markdown de verdad',
     feature1Body:
-      'Tus notas permanecen como archivos .md en tu disco. Soporta edición rica con CodeMirror 6 y renderizado instantáneo de diagramas y gráficos Mermaid.',
-    feature2Title: 'Sincronización P2P sin Servidor',
+      'Las notas siguen en tu vault como archivos .md. Edita y visualiza Markdown y Mermaid, o ábrelas en otro editor.',
+    feature2Title: 'Colaboración que conserva ambas versiones',
     feature2Body:
-      'Conecta tus computadoras directamente vía Iroh QUIC cifrado con claves ed25519. Permite incluso edición colaborativa en la misma nota en tiempo real usando CRDT (Yrs/Yjs).',
-    feature3Title: 'Asistente de IA y RAG Local',
-    new: 'NUEVO',
+      'Vincula dispositivos para editar juntos. Las versiones divergentes sin conexión se guardan para revisión.',
+    feature3Title: 'Asistente de IA opcional',
     feature3Body:
-      'Haz clic en el botón de chat 💬 en la barra superior derecha para hacer preguntas a tu vault. ¡La IA busca fragmentos y cita enlaces clicables que te llevan directo a la línea de la nota!',
+      'Consulta el vault, crea borradores y busca en la web. Elige un provider local o remoto antes de usarlo.',
     skip: 'Omitir Presentación',
     start: 'Comenzar a Escribir',
-    tryAi: 'Probar Asistente de IA',
+    tryAi: 'Abrir Asistente',
   },
   graph: {
     title: 'Mapa de Enlaces',
