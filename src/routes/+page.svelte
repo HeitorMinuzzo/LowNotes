@@ -463,20 +463,24 @@
         />
         {/key}
       {:else}
-        <div class="flex-1 flex flex-col items-center justify-center text-center p-8 select-none text-[var(--text-dim)] relative">
-          <button
-            onclick={() => (isGraphOpen = true)}
-            class="absolute top-3 left-4 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-xs text-[var(--text-muted)] hover:text-[var(--accent-light)] transition"
-          >🕸 {$t('graph.button')}</button>
-          <button
-            onclick={() => (isAiChatOpen = !isAiChatOpen)}
-            class="absolute top-3 right-4 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-xs text-[var(--text-muted)] hover:text-[var(--accent-light)] flex items-center gap-1.5 transition shadow"
-          >
-            <span>💬</span>
-            <span>{$t('app.openAiChat')}</span>
-          </button>
-          <span class="text-4xl mb-3 opacity-60">📄</span>
-          <p class="text-sm">{$t('app.emptyState')}</p>
+        <div class="flex-1 flex flex-col min-h-0 select-none text-[var(--text-dim)]">
+          <header class="app-topbar flex items-center justify-between gap-2 px-4 border-b border-[var(--border)] bg-[var(--bg-sidebar)]">
+            <button
+              onclick={() => (isGraphOpen = true)}
+              class="px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-xs text-[var(--text-muted)] hover:text-[var(--accent-light)] transition"
+            >🕸 {$t('graph.button')}</button>
+            <button
+              onclick={() => (isAiChatOpen = !isAiChatOpen)}
+              class="px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-xs text-[var(--text-muted)] hover:text-[var(--accent-light)] flex items-center gap-1.5 transition shadow"
+            >
+              <span>💬</span>
+              <span>{$t('app.openAiChat')}</span>
+            </button>
+          </header>
+          <div class="flex-1 flex flex-col items-center justify-center text-center p-8">
+            <span class="text-4xl mb-3 opacity-60">📄</span>
+            <p class="text-sm">{$t('app.emptyState')}</p>
+          </div>
         </div>
       {/if}
     </div>

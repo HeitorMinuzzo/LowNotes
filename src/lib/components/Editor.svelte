@@ -392,8 +392,8 @@
 
 <div class="flex flex-col h-full w-full bg-[var(--bg-main)]">
   <!-- Top Editor Toolbar -->
-  <header class="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-sidebar)] select-none">
-    <div class="flex flex-wrap items-center gap-1">
+  <header class="app-topbar flex items-center gap-3 overflow-x-auto whitespace-nowrap px-4 border-b border-[var(--border)] bg-[var(--bg-sidebar)] select-none">
+    <div class="flex shrink-0 items-center gap-1">
       <button
         onclick={() => applyFormatting('**', '**')}
         class="px-2 py-1 text-xs font-bold rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
@@ -469,7 +469,7 @@
     </div>
 
     <!-- Mode Selector & Status -->
-    <div class="flex flex-wrap items-center gap-3">
+    <div class="flex shrink-0 items-center gap-3 ml-auto">
       {#if remoteUsers.length > 0}
         <div
           class="flex items-center -space-x-1.5"

@@ -321,7 +321,7 @@
     class="w-96 h-full flex flex-col border-l border-[var(--border)] bg-[var(--bg-sidebar)] z-30 select-none shadow-2xl relative transition-all"
   >
     <!-- Top Header -->
-    <header class="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-card)] min-w-0">
+    <header class="app-topbar flex items-center justify-between gap-2 px-4 border-b border-[var(--border)] bg-[var(--bg-card)] min-w-0">
       <div class="flex items-center gap-2 min-w-0">
         <span class="text-[var(--accent-light)] font-bold text-sm shrink-0">✦</span>
         <h3 class="text-xs font-bold text-[var(--text-main)] truncate">{$t('ai.title')}</h3>

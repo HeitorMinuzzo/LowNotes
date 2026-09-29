@@ -281,7 +281,7 @@
 </script>
 
 <section class="flex flex-col h-full min-h-0 w-full bg-[var(--bg-main)]" aria-label={$t('graph.title')}>
-  <header class="graph-toolbar flex items-center gap-3 px-4 border-b border-[var(--border)] bg-[var(--bg-sidebar)] select-none">
+  <header class="app-topbar flex items-center gap-3 px-4 border-b border-[var(--border)] bg-[var(--bg-sidebar)] select-none">
     <button onclick={onClose} class="graph-button" title={$t('graph.back')} aria-label={$t('graph.back')}>←</button>
     <div class="min-w-0 mr-auto">
       <h2 class="font-semibold text-sm text-[var(--text-main)]">{$t('graph.title')}</h2>
@@ -397,7 +397,6 @@
 </section>
 
 <style>
-  .graph-toolbar { min-height: var(--app-toolbar-height, 58px); }
   .graph-area { background-color: var(--bg-main); background-image: radial-gradient(var(--border) 0.6px, transparent 0.6px); background-size: 20px 20px; }
   .graph-button { min-width: 28px; min-height: 28px; padding: 0 7px; border-radius: 5px; color: var(--text-muted); }
   .graph-button:hover, .graph-button:focus-visible { background: var(--bg-hover); color: var(--text-main); outline: none; }

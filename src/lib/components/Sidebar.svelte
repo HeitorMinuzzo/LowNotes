@@ -134,7 +134,7 @@
 
 <aside class="w-64 h-full flex flex-col border-r border-[var(--border)] bg-[var(--bg-sidebar)] select-none">
   <!-- Vault Switcher Header -->
-  <div class="relative border-b border-[var(--border)] p-3">
+  <div class="app-topbar relative flex items-center border-b border-[var(--border)] px-3">
     <button
       onclick={() => (isVaultDropdownOpen = !isVaultDropdownOpen)}
       class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-left transition group"
