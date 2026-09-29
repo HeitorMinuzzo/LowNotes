@@ -57,6 +57,10 @@ pub enum NetworkEventPayload {
         note_path: String,
         update: Vec<u8>,
     },
+    Conflict {
+        note_path: String,
+        conflict_path: String,
+    },
     RemoteAwareness {
         note_path: String,
         update: Vec<u8>,
@@ -330,6 +334,12 @@ async fn run_network(
             });
         }
     });
+
+    // Reconcile immediately after a restart; the periodic pass remains a
+    // fallback for peers that were unavailable at launch.
+    for peer in peers.read().clone() {
+        spawn_sync(endpoint.clone(), vault.clone(), peer, app.clone(), sync_in_flight.clone());
+    }
 
     // Command loop
     let pair_in_flight = Arc::new(parking_lot::Mutex::new(HashSet::<String>::new()));
@@ -703,19 +713,24 @@ fn spawn_sync(
             },
         );
 
-        let res = dial_sync(endpoint, vault, peer.clone(), Some(&app)).await;
+        let res = dial_sync(endpoint.clone(), vault.clone(), peer.clone(), Some(&app)).await;
         in_flight.lock().remove(&target);
 
         match res {
-            Ok((changed, direct)) => {
+            Ok((changed, direct, conflict_created)) => {
                 let _ = app.emit(
                     "p2p:synced",
                     NetworkEventPayload::Synced {
-                        peer: peer.name,
+                        peer: peer.name.clone(),
                         changed,
                         direct,
                     },
                 );
+                // The conflict copy was created after this pass's manifest.
+                // Send it to the other computer without waiting for the tick.
+                if conflict_created {
+                    spawn_sync(endpoint, vault, peer, app, in_flight);
+                }
             }
             Err(e) => {
                 eprintln!("[p2p] sync failed: {e:#}");
@@ -736,7 +751,7 @@ async fn dial_sync(
     vault: PathBuf,
     peer: PeerConfig,
     app: Option<&AppHandle>,
-) -> anyhow::Result<(usize, Option<bool>)> {
+) -> anyhow::Result<(usize, Option<bool>, bool)> {
     let addr = peer.endpoint_addr()?;
     let connection = endpoint.connect(addr, ALPN).await?;
     let (mut send, mut recv) = connection.open_bi().await?;
@@ -745,6 +760,7 @@ async fn dial_sync(
     send_packet(&mut send, &Packet::Manifest(my_manifest.clone())).await?;
 
     let mut changed = 0;
+    let mut conflict_created = false;
     loop {
         let packet: Packet = recv_packet(&mut recv).await?;
         match packet {
@@ -754,9 +770,11 @@ async fn dial_sync(
                 send_packet(&mut send, &Packet::Put { meta: meta.clone(), content: bytes }).await?;
             }
             Packet::Put { meta, content } => {
-                if write_sync_content(&vault, &meta.path, &content, app)? {
+                let outcome = write_sync_content(&vault, &meta.path, &content, app)?;
+                if outcome.changed {
                     changed += 1;
                 }
+                conflict_created |= outcome.conflict_created;
             }
             Packet::Done => break,
             _ => bail!("errors.unexpectedPacketSync"),
@@ -765,7 +783,7 @@ async fn dial_sync(
 
     let direct = connection_is_direct(&connection);
     connection.close(0u32.into(), b"sync done");
-    Ok((changed, direct))
+    Ok((changed, direct, conflict_created))
 }
 
 async fn serve_sync(
@@ -807,7 +825,7 @@ async fn serve_sync(
             send_packet(send, &Packet::Request { path: path.clone() }).await?;
             let packet: Packet = recv_packet(recv).await?;
             if let Packet::Put { meta, content } = packet {
-                if write_sync_content(vault, &meta.path, &content, app)? {
+                if write_sync_content(vault, &meta.path, &content, app)?.changed {
                     changed += 1;
                 }
             }
@@ -840,10 +858,21 @@ fn read_sync_content(vault_path: &Path, path: &str) -> anyhow::Result<Vec<u8>> {
     }
 }
 
-fn write_sync_content(vault_path: &Path, path: &str, content: &[u8], app: Option<&AppHandle>) -> anyhow::Result<bool> {
+struct WriteOutcome {
+    changed: bool,
+    conflict_created: bool,
+}
+
+fn write_sync_content(vault_path: &Path, path: &str, content: &[u8], app: Option<&AppHandle>) -> anyhow::Result<WriteOutcome> {
     if is_crdt_state(path) {
         let manager = app.map(|app| app.state::<AppState>().crdt.clone()).unwrap_or_default();
         let (note_path, result) = manager.merge_state_file(vault_path, path, content)?;
+        if let (Some(app), Some(conflict_path)) = (app, result.conflict_path.as_ref()) {
+            let _ = app.emit("p2p:conflict", NetworkEventPayload::Conflict {
+                note_path: note_path.clone(),
+                conflict_path: conflict_path.clone(),
+            });
+        }
         if result.changed {
             if let Some(app) = app {
                 let _ = app.emit("p2p:crdt-update", NetworkEventPayload::RemoteCrdtUpdate {
@@ -851,10 +880,10 @@ fn write_sync_content(vault_path: &Path, path: &str, content: &[u8], app: Option
                 });
             }
         }
-        Ok(result.changed)
+        Ok(WriteOutcome { changed: result.changed, conflict_created: result.conflict_path.is_some() })
     } else {
         vault::save_note(vault_path, path, std::str::from_utf8(content)?)?;
-        Ok(true)
+        Ok(WriteOutcome { changed: true, conflict_created: false })
     }
 }
 
@@ -986,7 +1015,7 @@ mod tests {
 
         let (accept_ep, accept_vault) = (ep_a.clone(), vault_a.clone());
         let responder = tokio::spawn(async move {
-            for _ in 0..3 {
+            for _ in 0..4 {
                 let incoming = ep_accept(&accept_ep).await;
                 let connection = incoming.await.unwrap();
                 let (mut send, mut recv) = connection.accept_bi().await.unwrap();
@@ -1003,7 +1032,7 @@ mod tests {
             }
         });
 
-        let (changed_b, _direct) = dial_sync(ep_b.clone(), vault_b.clone(), peer_a.clone(), None)
+        let (changed_b, _direct, _) = dial_sync(ep_b.clone(), vault_b.clone(), peer_a.clone(), None)
             .await
             .unwrap();
         assert_eq!(changed_b, 2, "B deveria receber nota_a.md + .lownotes/links.json");
@@ -1025,7 +1054,7 @@ mod tests {
 
         // Incremental: edit on B, second sync must converge A without ping-pong
         fs::write(vault_b.join("nota_b.md"), "# Nota B\n\nConteudo de B atualizado.").unwrap();
-        let (changed_b2, _) = dial_sync(ep_b.clone(), vault_b.clone(), peer_a.clone(), None)
+        let (changed_b2, _, _) = dial_sync(ep_b.clone(), vault_b.clone(), peer_a.clone(), None)
             .await
             .unwrap();
         assert_eq!(changed_b2, 0, "B nao deveria receber nada de volta");
@@ -1038,8 +1067,8 @@ mod tests {
             "# Nota A\n\nConteudo de A."
         );
 
-        // Both peers edit the same note before the next sync. CRDT states must
-        // merge in both directions instead of choosing the newer Markdown file.
+        // Offline edits to the same note keep both complete versions rather
+        // than interleaving their text into one line.
         let crdt_a = CrdtManager::new();
         let crdt_b = CrdtManager::new();
         let baseline_a = crdt_a.get_or_create_doc(&vault_a, "nota_b.md").unwrap();
@@ -1053,14 +1082,24 @@ mod tests {
         editor_b.get_or_insert_text("content").push(&mut editor_b.transact_mut(), " Bob");
         crdt_a.apply_update(&vault_a, "nota_b.md", &CrdtManager::encode_state(&editor_a)).unwrap();
         crdt_b.apply_update(&vault_b, "nota_b.md", &CrdtManager::encode_state(&editor_b)).unwrap();
-        let (merged, _) = dial_sync(ep_b.clone(), vault_b.clone(), peer_a.clone(), None).await.unwrap();
+        let (merged, _, conflict_created) = dial_sync(ep_b.clone(), vault_b.clone(), peer_a.clone(), None).await.unwrap();
         assert_eq!(merged, 1);
-        responder.await.unwrap();
+        assert!(conflict_created);
         let text_a = fs::read_to_string(vault_a.join("nota_b.md")).unwrap();
         let text_b = fs::read_to_string(vault_b.join("nota_b.md")).unwrap();
         assert_eq!(text_a, text_b);
-        assert!(text_a.contains(" Alice"));
-        assert!(text_a.contains(" Bob"));
+        assert!(text_a.ends_with(" Alice") || text_a.ends_with(" Bob"));
+        assert!(!text_a.contains(" Alice Bob") && !text_a.contains(" Bob Alice"));
+        let conflict_notes: Vec<_> = vault::list_vault_items(&vault_b).unwrap().into_iter()
+            .filter(|item| item.path.contains("(conflict ")).collect();
+        assert_eq!(conflict_notes.len(), 1);
+        let other = vault::read_note(&vault_b, &conflict_notes[0].path).unwrap();
+        assert_ne!(text_b, other);
+        assert!(other.ends_with(" Alice") || other.ends_with(" Bob"));
+        let (_, _, second_conflict) = dial_sync(ep_b.clone(), vault_b.clone(), peer_a.clone(), None).await.unwrap();
+        assert!(!second_conflict);
+        responder.await.unwrap();
+        assert_eq!(vault::read_note(&vault_a, &conflict_notes[0].path).unwrap(), other);
 
         let _ = peer_b;
         let _ = fs::remove_dir_all(&vault_a);

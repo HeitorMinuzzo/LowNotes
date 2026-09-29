@@ -9,6 +9,10 @@ const esES: Dictionary = {
     filesReadable: 'Tus archivos permanecen 100% legibles como archivos .md en tu computadora.',
     emptyState: 'Selecciona una nota en la barra lateral o crea una nueva para comenzar.',
     openAiChat: 'Abrir Asistente de IA',
+    conflictDetected: 'Se detectaron ediciones sin conexión divergentes',
+    conflictExplanation: 'Se conservaron ambas versiones. Revisa la copia en conflicto y combina lo que necesites.',
+    openConflict: 'Abrir copia',
+    dismissConflict: 'Descartar aviso',
   },
   sidebar: {
     selectVault: 'Seleccionar Vault',

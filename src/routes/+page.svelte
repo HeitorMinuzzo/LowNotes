@@ -53,6 +53,7 @@
   let pairCode = $state<string>('');
   let endpointId = $state<string>('');
   let syncStatus = $state<'idle' | 'syncing' | 'synced' | 'error'>('idle');
+  let conflictNotice = $state<{ note_path: string; conflict_path: string } | null>(null);
 
   let isPairModalOpen = $state(false);
   let incomingRequest = $state<{ request_id: string; peer: PeerConfig } | null>(null);
@@ -288,7 +289,16 @@
       remoteRefreshTimer = setTimeout(refreshItems, 300);
     });
 
-    unlisteners = [u1, u2, u3, u4, u5, u6, u7];
+    const u8 = await listen<NetworkEventPayload>('p2p:conflict', (event) => {
+      if (event.payload.type !== 'Conflict') return;
+      conflictNotice = {
+        note_path: event.payload.note_path,
+        conflict_path: event.payload.conflict_path,
+      };
+      void refreshItems();
+    });
+
+    unlisteners = [u1, u2, u3, u4, u5, u6, u7, u8];
 
     presenceDoc = new Y.Doc();
     presenceRegistry = new Awareness(presenceDoc);
@@ -411,6 +421,17 @@
 
     <!-- Editor Surface -->
     <div class="flex-1 flex flex-col h-full overflow-hidden bg-[var(--bg-main)]">
+      {#if conflictNotice}
+        <div role="alert" class="flex items-center gap-3 px-4 py-2 border-b border-[var(--danger)] bg-[var(--bg-card)] text-xs">
+          <div class="flex-1 min-w-0">
+            <strong class="text-[var(--accent-light)]">{$t('app.conflictDetected')}</strong>
+            <span class="ml-2 text-[var(--text-muted)]">{$t('app.conflictExplanation')}</span>
+            <span class="block truncate mt-1 text-[var(--text-dim)]">{conflictNotice.note_path} → {conflictNotice.conflict_path}</span>
+          </div>
+          <button class="shrink-0 rounded px-3 py-1.5 bg-[var(--accent)] text-[var(--accent-contrast)] font-semibold" onclick={() => { if (conflictNotice) void openNote(conflictNotice.conflict_path); conflictNotice = null; }}>{$t('app.openConflict')}</button>
+          <button class="shrink-0 px-2 py-1 text-[var(--text-muted)] hover:text-[var(--text-main)]" aria-label={$t('app.dismissConflict')} title={$t('app.dismissConflict')} onclick={() => (conflictNotice = null)}>×</button>
+        </div>
+      {/if}
       {#if selectedNotePath}
         {#key selectedNotePath}
         <Editor

@@ -9,6 +9,10 @@ const ptBR: Dictionary = {
     filesReadable: 'Seus arquivos permanecem 100% legíveis como arquivos .md no seu computador.',
     emptyState: 'Selecione uma nota na barra lateral ou crie uma nova para começar.',
     openAiChat: 'Abrir Assistente IA',
+    conflictDetected: 'Edições offline divergentes detectadas',
+    conflictExplanation: 'As duas versões foram preservadas. Revise a cópia de conflito e una o que desejar.',
+    openConflict: 'Abrir cópia',
+    dismissConflict: 'Dispensar aviso',
   },
   sidebar: {
     selectVault: 'Selecionar Vault',

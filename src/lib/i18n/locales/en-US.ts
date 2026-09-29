@@ -7,6 +7,10 @@ const enUS = {
     filesReadable: 'Your files remain 100% readable as .md files on your computer.',
     emptyState: 'Select a note in the sidebar or create a new one to get started.',
     openAiChat: 'Open AI Assistant',
+    conflictDetected: 'Conflicting offline edits detected',
+    conflictExplanation: 'Both versions were preserved. Review the conflict copy and combine them as needed.',
+    openConflict: 'Open copy',
+    dismissConflict: 'Dismiss notice',
   },
   sidebar: {
     selectVault: 'Select Vault',

@@ -9,7 +9,7 @@ Editor de notas Markdown desktop **local-first**, ultra-rápido, com **sincroniz
 - **Zero Bloat:** Binário leve nativo compilado com **Tauri v2** e **Rust**.
 - **100% Compatível com Markdown:** Suas notas permanecem como arquivos `.md` limpos no seu disco rígido, acessíveis por qualquer editor (VS Code, Obsidian, Notepad).
 - **Sem Servidor Central:** Sincronização direta de máquina para máquina via **Iroh** (QUIC ponta a ponta com criptografia ed25519 e transposição NAT/DERP).
-- **Colaboração em Tempo Real (CRDT):** Mais de um usuário pode editar a mesma nota simultaneamente sem conflitos, unindo **CodeMirror 6 + Yjs** no frontend e **Yrs** no backend em Rust.
+- **Colaboração em Tempo Real (CRDT):** Mais de um usuário pode editar a mesma nota simultaneamente, unindo **CodeMirror 6 + Yjs** no frontend e **Yrs** no backend em Rust. Edições offline divergentes da mesma nota geram uma cópia de conflito para revisão, preservando as duas versões completas.
 - **Assistente com skills:** Criação de documentos, planos e checklists, consulta ao vault e pesquisa web com fontes. Compatível com provedores OpenAI (Ollama, OpenAI, OpenRouter, Groq, LM Studio ou Custom), com busca local por palavras-chave e citações que abrem a nota na linha exata.
 - **Exportação Word e PDF:** Exporte notas abertas ou rascunhos do assistente para `.docx` e `.pdf`, sem depender de um serviço de conversão.
 - **Visualização de Diagramas Mermaid:** Renderização vetorial SVG interativa em tempo real de fluxogramas, gráficos de pizza e sequências no Markdown.

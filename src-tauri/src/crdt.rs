@@ -21,6 +21,7 @@ pub struct CrdtManager {
 pub struct AppliedUpdate {
     pub state: Vec<u8>,
     pub changed: bool,
+    pub conflict_path: Option<String>,
 }
 
 impl CrdtManager {
@@ -164,11 +165,92 @@ impl CrdtManager {
         path: &str,
         bytes: &[u8],
     ) -> anyhow::Result<AppliedUpdate> {
+        self.apply_update_inner(vault_path, path, bytes, false)
+    }
+
+    fn apply_update_inner(
+        &self,
+        vault_path: &Path,
+        path: &str,
+        bytes: &[u8],
+        detect_offline_conflict: bool,
+    ) -> anyhow::Result<AppliedUpdate> {
         let update = Update::decode_v1(bytes)?;
         let mut docs = self.docs.lock();
+        let target = vault::safe_join(vault_path, path)?;
         let doc = Self::ensure_doc(&mut docs, vault_path, path)?;
         let before = Self::encode_state(doc);
+        let mut resolution = None;
+        if detect_offline_conflict {
+            let remote = Doc::new();
+            remote.transact_mut().apply_update(Update::decode_v1(bytes)?)?;
+            let local_content = doc.get_or_insert_text("content");
+            let remote_content = remote.get_or_insert_text("content");
+            let local_txn = doc.transact();
+            let remote_txn = remote.transact();
+            let local_vector = local_txn.state_vector();
+            let remote_vector = remote_txn.state_vector();
+            let local_has_unique = local_vector.iter().any(|(id, clock)| *clock > remote_vector.get(id));
+            let remote_has_unique = remote_vector.iter().any(|(id, clock)| *clock > local_vector.get(id));
+            let local_text = local_content.get_string(&local_txn);
+            let remote_text = remote_content.get_string(&remote_txn);
+            if local_text != remote_text && local_has_unique && remote_has_unique {
+                // Neither history contains the other. Keep the complete losing
+                // version as a note instead of silently interleaving its words.
+                let local_wins = blake3::hash(local_text.as_bytes()).as_bytes()
+                    >= blake3::hash(remote_text.as_bytes()).as_bytes();
+                let (winner, loser) = if local_wins {
+                    (local_text, remote_text)
+                } else {
+                    (remote_text, local_text)
+                };
+                let local_hash = blake3::hash(&before);
+                let remote_hash = blake3::hash(bytes);
+                let (left, right) = if local_hash.as_bytes() <= remote_hash.as_bytes() {
+                    (local_hash, remote_hash)
+                } else {
+                    (remote_hash, local_hash)
+                };
+                let mut seed = blake3::Hasher::new();
+                seed.update(path.as_bytes());
+                seed.update(left.as_bytes());
+                seed.update(right.as_bytes());
+                let resolver_id = u64::from_le_bytes(seed.finalize().as_bytes()[..8].try_into()?)
+                    & ((1u64 << 53) - 1);
+                resolution = Some((winner, loser, resolver_id));
+            }
+        }
         doc.transact_mut().apply_update(update)?;
+        let mut conflict_path = None;
+        if let Some((winner, loser, resolver_id)) = resolution {
+            let copy_path = Self::conflict_path(path, &loser)?;
+            let copy_file = vault::safe_join(vault_path, &copy_path)?;
+            if copy_file.exists() {
+                if vault::read_note(vault_path, &copy_path)? != loser {
+                    bail!("conflict copy already exists with different content");
+                }
+            } else {
+                vault::save_note(vault_path, &copy_path, &loser)?;
+                conflict_path = Some(copy_path);
+            }
+            // Both peers derive the same client ID from the two input states.
+            // Concurrent syncs therefore produce the same replacement blocks
+            // instead of inserting the winning text twice on reconciliation.
+            let resolved = Doc::with_client_id(resolver_id);
+            resolved.transact_mut().apply_update(Update::decode_v1(&Self::encode_state(doc))?)?;
+            let text = resolved.get_or_insert_text("content");
+            let mut txn = resolved.transact_mut();
+            let len = text.len(&txn);
+            if len > 0 {
+                text.remove_range(&mut txn, 0, len);
+            }
+            if !winner.is_empty() {
+                text.insert(&mut txn, 0, &winner);
+            }
+            drop(txn);
+            docs.insert(target.clone(), resolved);
+        }
+        let doc = docs.get(&target).expect("document was loaded");
         let state = Self::encode_state(doc);
         let changed = state != before;
         if changed {
@@ -181,7 +263,16 @@ impl CrdtManager {
                 eprintln!("reconcile_wikilinks failed for {path}: {error}");
             }
         }
-        Ok(AppliedUpdate { state, changed })
+        Ok(AppliedUpdate { state, changed, conflict_path })
+    }
+
+    fn conflict_path(path: &str, content: &str) -> anyhow::Result<String> {
+        let note = Path::new(path);
+        let stem = note.file_stem().and_then(|s| s.to_str()).context("invalid note name")?;
+        let extension = note.extension().and_then(|s| s.to_str()).context("invalid note extension")?;
+        let hash = blake3::hash(content.as_bytes()).to_hex();
+        let name = format!("{} (conflict {}).{}", stem.chars().take(170).collect::<String>(), &hash[..16], extension);
+        Ok(note.with_file_name(name).to_string_lossy().replace('\\', "/"))
     }
 
     pub fn merge_state_file(
@@ -192,7 +283,7 @@ impl CrdtManager {
     ) -> anyhow::Result<(String, AppliedUpdate)> {
         let (path, update) = Self::decode_file(relative, bytes)?;
         vault::safe_join(vault_path, &path)?;
-        let result = self.apply_update(vault_path, &path, update)?;
+        let result = self.apply_update_inner(vault_path, &path, update, true)?;
         Ok((path, result))
     }
 
@@ -275,6 +366,112 @@ mod tests {
         assert_eq!(text_a, text_b);
         assert!(text_a.contains("Alice"));
         assert!(text_a.contains("Bob"));
+        let _ = fs::remove_dir_all(a);
+        let _ = fs::remove_dir_all(b);
+    }
+
+    #[test]
+    fn offline_same_line_edits_keep_a_conflict_copy_and_converge() {
+        let a = temp_vault("offline-a");
+        let b = temp_vault("offline-b");
+        let baseline = format!("{}Original line\n", "Unchanged line\n".repeat(246));
+        vault::save_note(&a, "shared.md", &baseline).unwrap();
+        vault::save_note(&b, "shared.md", &baseline).unwrap();
+        let manager_a = CrdtManager::new();
+        let manager_b = CrdtManager::new();
+        let state_a = manager_a.get_or_create_doc(&a, "shared.md").unwrap();
+        let state_b = manager_b.get_or_create_doc(&b, "shared.md").unwrap();
+        assert_eq!(state_a, state_b);
+
+        let first = "Seila vei, coisa pra carai";
+        let second = "E agora? O que fazer?";
+        for (manager, vault_path, state, client_id, replacement) in [
+            (&manager_a, &a, &state_a, 1001, first),
+            (&manager_b, &b, &state_b, 1002, second),
+        ] {
+            let editor = Doc::with_client_id(client_id);
+            editor.transact_mut().apply_update(Update::decode_v1(state).unwrap()).unwrap();
+            let text = editor.get_or_insert_text("content");
+            let mut txn = editor.transact_mut();
+            let start = (baseline.len() - "Original line\n".len()) as u32;
+            text.remove_range(&mut txn, start, "Original line".len() as u32);
+            text.insert(&mut txn, start, replacement);
+            drop(txn);
+            manager.apply_update(vault_path, "shared.md", &CrdtManager::encode_state(&editor)).unwrap();
+        }
+
+        let incoming = manager_a.get_or_create_doc(&a, "shared.md").unwrap();
+        let merged = manager_b.merge_state_file(&b, &CrdtManager::state_relative_path("shared.md"), &{
+            let mut file = Vec::new();
+            file.extend_from_slice(&("shared.md".len() as u32).to_be_bytes());
+            file.extend_from_slice(b"shared.md");
+            file.extend_from_slice(&incoming);
+            file
+        }).unwrap().1;
+        let copy = merged.conflict_path.expect("offline conflict must create a review copy");
+        let original = vault::read_note(&b, "shared.md").unwrap();
+        let duplicate = vault::read_note(&b, &copy).unwrap();
+        assert!(original.ends_with(&format!("{first}\n")) || original.ends_with(&format!("{second}\n")));
+        assert!(!original.contains(&format!("{first}{second}")));
+        assert_ne!(original, duplicate);
+        assert!(duplicate.ends_with(&format!("{first}\n")) || duplicate.ends_with(&format!("{second}\n")));
+
+        manager_a.apply_update(&a, "shared.md", &merged.state).unwrap();
+        assert_eq!(vault::read_note(&a, "shared.md").unwrap(), original);
+        let again = manager_b.merge_state_file(&b, &CrdtManager::state_relative_path("shared.md"), &{
+            let mut file = Vec::new();
+            file.extend_from_slice(&("shared.md".len() as u32).to_be_bytes());
+            file.extend_from_slice(b"shared.md");
+            file.extend_from_slice(&incoming);
+            file
+        }).unwrap().1;
+        assert!(again.conflict_path.is_none());
+        let _ = fs::remove_dir_all(a);
+        let _ = fs::remove_dir_all(b);
+    }
+
+    #[test]
+    fn simultaneous_offline_reconciliation_stays_single_version() {
+        let a = temp_vault("parallel-a");
+        let b = temp_vault("parallel-b");
+        for root in [&a, &b] {
+            vault::save_note(root, "shared.md", "Original").unwrap();
+        }
+        let manager_a = CrdtManager::new();
+        let manager_b = CrdtManager::new();
+        for (manager, root, id, word) in [
+            (&manager_a, &a, 401, "First"),
+            (&manager_b, &b, 402, "Second"),
+        ] {
+            let state = manager.get_or_create_doc(root, "shared.md").unwrap();
+            let editor = Doc::with_client_id(id);
+            editor.transact_mut().apply_update(Update::decode_v1(&state).unwrap()).unwrap();
+            let text = editor.get_or_insert_text("content");
+            let mut txn = editor.transact_mut();
+            text.remove_range(&mut txn, 0, 8);
+            text.insert(&mut txn, 0, word);
+            drop(txn);
+            manager.apply_update(root, "shared.md", &CrdtManager::encode_state(&editor)).unwrap();
+        }
+        let before_a = manager_a.get_or_create_doc(&a, "shared.md").unwrap();
+        let before_b = manager_b.get_or_create_doc(&b, "shared.md").unwrap();
+        let wrap = |state: &[u8]| {
+            let mut file = Vec::new();
+            file.extend_from_slice(&("shared.md".len() as u32).to_be_bytes());
+            file.extend_from_slice(b"shared.md");
+            file.extend_from_slice(state);
+            file
+        };
+        manager_a.merge_state_file(&a, &CrdtManager::state_relative_path("shared.md"), &wrap(&before_b)).unwrap();
+        manager_b.merge_state_file(&b, &CrdtManager::state_relative_path("shared.md"), &wrap(&before_a)).unwrap();
+        let after_a = manager_a.get_or_create_doc(&a, "shared.md").unwrap();
+        let after_b = manager_b.get_or_create_doc(&b, "shared.md").unwrap();
+        manager_a.apply_update(&a, "shared.md", &after_b).unwrap();
+        manager_b.apply_update(&b, "shared.md", &after_a).unwrap();
+        let final_a = vault::read_note(&a, "shared.md").unwrap();
+        let final_b = vault::read_note(&b, "shared.md").unwrap();
+        assert_eq!(final_a, final_b);
+        assert!(final_a == "First" || final_a == "Second", "{final_a:?}");
         let _ = fs::remove_dir_all(a);
         let _ = fs::remove_dir_all(b);
     }

@@ -209,5 +209,6 @@ export type NetworkEventPayload =
   | { type: 'PairApproved'; peer: PeerConfig }
   | { type: 'PairRejected'; peer: string }
   | { type: 'RemoteCrdtUpdate'; note_path: string; update: number[] }
+  | { type: 'Conflict'; note_path: string; conflict_path: string }
   | { type: 'RemoteAwareness'; note_path: string; update: number[] }
   | { type: 'Error'; peer?: string; message: string };
