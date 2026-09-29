@@ -408,5 +408,7 @@
   .node-link-source .node-circle { fill: var(--success); stroke: var(--success); }
   .node-label { fill: var(--text-main); font-size: 1.45px; font-weight: 500; paint-order: stroke; stroke: var(--bg-main); stroke-width: 0.3px; pointer-events: none; }
   .node-dimmed { opacity: 0.2; }
+  /* An outline on the SVG group scales with the viewBox and covers nearby nodes. */
+  .graph-node:focus, .graph-node:focus-visible { outline: none; }
   .graph-node:focus-visible .node-circle { stroke: var(--success); stroke-width: 0.45; }
 </style>
