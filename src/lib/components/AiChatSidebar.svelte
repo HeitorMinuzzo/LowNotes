@@ -321,31 +321,12 @@
     class="w-96 h-full flex flex-col border-l border-[var(--border)] bg-[var(--bg-sidebar)] z-30 select-none shadow-2xl relative transition-all"
   >
     <!-- Top Header -->
-    <header class="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-card)]">
-      <div class="flex items-center gap-2">
-        <span class="text-[var(--accent-light)] font-bold text-sm">✦</span>
-        <h3 class="text-xs font-bold text-[var(--text-main)]">{$t('ai.title')}</h3>
-
-        <!-- Quick Provider Switcher in Header -->
-        <select
-          value={aiSettings.active_provider_id}
-          onchange={async (e) => {
-            const newId = e.currentTarget.value;
-            const previous = aiSettings.active_provider_id;
-            aiSettings.active_provider_id = newId;
-            try { await saveAiSettings(aiSettings); } catch (reason) { aiSettings.active_provider_id = previous; errorMessage = trError(String(reason)); }
-          }}
-          class="bg-[var(--bg-main)] border border-[var(--border)] rounded px-2 py-0.5 text-[11px] font-medium text-[var(--accent-light)] focus:outline-none focus:border-[var(--accent)] cursor-pointer hover:border-[var(--accent)] transition"
-          title={$t('ai.quickProviderSwitch')}
-        >
-          {#each aiSettings.providers as prov}
-            <option value={prov.id} selected={aiSettings.active_provider_id === prov.id}>
-              {prov.name}
-            </option>
-          {/each}
-        </select>
+    <header class="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-card)] min-w-0">
+      <div class="flex items-center gap-2 min-w-0">
+        <span class="text-[var(--accent-light)] font-bold text-sm shrink-0">✦</span>
+        <h3 class="text-xs font-bold text-[var(--text-main)] truncate">{$t('ai.title')}</h3>
       </div>
-      <div class="flex items-center gap-1.5">
+      <div class="flex items-center gap-0.5 shrink-0">
         <button onclick={newChat} disabled={!historyReady}
           class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--accent-light)] disabled:opacity-40"
           title={$t('ai.newChat')} aria-label={$t('ai.newChat')}>＋</button>
@@ -358,19 +339,37 @@
         <button
           onclick={() => onOpenSettings(skill === 'research' ? 'web' : 'ai')}
           class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--accent-light)] transition"
-          title={$t('ai.settings')}
-        >
-          ⚙️
-        </button>
+          title={$t('ai.settings')} aria-label={$t('ai.settings')}
+        >⚙️</button>
         <button
           onclick={() => (isOpen = false)}
           class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-main)] transition"
-          title={$t('ai.close')}
-        >
-          ✕
-        </button>
+          title={$t('ai.close')} aria-label={$t('ai.close')}
+        >✕</button>
       </div>
     </header>
+
+    <div class="px-4 py-2 border-b border-[var(--border)] bg-[var(--bg-sidebar)] min-w-0">
+      <label class="flex items-center gap-2 min-w-0 text-[11px] text-[var(--text-dim)]">
+        <span class="shrink-0">{$t('ai.quickProviderSwitch')}</span>
+        <select
+          value={aiSettings.active_provider_id}
+          onchange={async (e) => {
+            const newId = e.currentTarget.value;
+            const previous = aiSettings.active_provider_id;
+            aiSettings.active_provider_id = newId;
+            try { await saveAiSettings(aiSettings); } catch (reason) { aiSettings.active_provider_id = previous; errorMessage = trError(String(reason)); }
+          }}
+          class="min-w-0 flex-1 bg-[var(--bg-main)] border border-[var(--border)] rounded px-2 py-1 text-[11px] font-medium text-[var(--accent-light)] focus:outline-none focus:border-[var(--accent)] cursor-pointer hover:border-[var(--accent)] transition"
+        >
+          {#each aiSettings.providers as prov}
+            <option value={prov.id} selected={aiSettings.active_provider_id === prov.id}>
+              {prov.name}
+            </option>
+          {/each}
+        </select>
+      </label>
+    </div>
 
     {#if errorMessage}
       <p role="alert" class="px-4 py-1.5 text-xs text-red-500 border-b border-[var(--border)]">{errorMessage}</p>
