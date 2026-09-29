@@ -34,6 +34,7 @@
   } from 'y-protocols/awareness';
   import { parsePresenceState, type PresenceUser } from '$lib/presence';
   import Editor from '$lib/components/Editor.svelte';
+  import GraphView from '$lib/components/GraphView.svelte';
   import PairModal from '$lib/components/PairModal.svelte';
   import IncomingPairDialog from '$lib/components/IncomingPairDialog.svelte';
   import AiChatSidebar from '$lib/components/AiChatSidebar.svelte';
@@ -43,6 +44,7 @@
   let settings = $state<AppSettings | null>(null);
   let theme = $state<AppTheme>('dark');
   let viewMode = $state<ViewMode>('split');
+  let isGraphOpen = $state(false);
   let activeVault = $state<VaultConfig | null>(null);
   let vaults = $state<VaultConfig[]>([]);
   let items = $state<VaultItem[]>([]);
@@ -161,6 +163,7 @@
       currentNoteContent = res.content;
       currentCrdtBase64 = res.crdt_update_base64;
       selectedNotePath = path;
+      isGraphOpen = false;
     } catch (e) {
       console.error('Failed to open note:', e);
     }
@@ -402,6 +405,7 @@
       onVaultChange={(v) => {
         activeVault = v;
         selectedNotePath = '';
+        isGraphOpen = false;
         currentNoteContent = '';
         currentCrdtBase64 = '';
         pairCode = '';
@@ -432,7 +436,14 @@
           <button class="shrink-0 px-2 py-1 text-[var(--text-muted)] hover:text-[var(--text-main)]" aria-label={$t('app.dismissConflict')} title={$t('app.dismissConflict')} onclick={() => (conflictNotice = null)}>×</button>
         </div>
       {/if}
-      {#if selectedNotePath}
+      {#if isGraphOpen}
+        <GraphView
+          {items}
+          vaultId={activeVault.id}
+          onClose={() => (isGraphOpen = false)}
+          onOpenNote={(path) => void openNote(path)}
+        />
+      {:else if selectedNotePath}
         {#key selectedNotePath}
         <Editor
           notePath={selectedNotePath}
@@ -445,6 +456,7 @@
           {isAiChatOpen}
           onToggleAiChat={() => (isAiChatOpen = !isAiChatOpen)}
           onOpenNote={(path) => openNote(path)}
+          onOpenGraph={() => (isGraphOpen = true)}
           onOpenWikilink={handleOpenWikilink}
           deviceName={settings?.device_name ?? ''}
           deviceId={endpointId}
@@ -452,6 +464,10 @@
         {/key}
       {:else}
         <div class="flex-1 flex flex-col items-center justify-center text-center p-8 select-none text-[var(--text-dim)] relative">
+          <button
+            onclick={() => (isGraphOpen = true)}
+            class="absolute top-3 left-4 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-xs text-[var(--text-muted)] hover:text-[var(--accent-light)] transition"
+          >🕸 {$t('graph.button')}</button>
           <button
             onclick={() => (isAiChatOpen = !isAiChatOpen)}
             class="absolute top-3 right-4 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-xs text-[var(--text-muted)] hover:text-[var(--accent-light)] flex items-center gap-1.5 transition shadow"

@@ -9,7 +9,6 @@
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { crdtApplyClientUpdate, readNote, broadcastAwareness } from '../api';
   import { renderMarkdown } from '../markdown';
-  import GraphView from './GraphView.svelte';
   import DocumentActions from './DocumentActions.svelte';
   import type { AppTheme, ViewMode } from '../types';
   import { t, ts } from '$lib/i18n';
@@ -34,6 +33,7 @@
     onToggleAiChat,
     onContentChange,
     onOpenNote,
+    onOpenGraph,
     onOpenWikilink,
     deviceName = '',
     deviceId = '',
@@ -49,6 +49,7 @@
     onToggleAiChat?: () => void;
     onContentChange?: (path: string, newContent: string) => void;
     onOpenNote?: (path: string) => void;
+    onOpenGraph?: () => void;
     onOpenWikilink?: (title: string) => void;
     deviceName?: string;
     deviceId?: string;
@@ -56,7 +57,6 @@
 
   let editorContainer: HTMLDivElement | null = $state(null);
   let previewContainer: HTMLDivElement | null = $state(null);
-  let isGraphOpen = $state(false);
   let saveStatus = $state<'saved' | 'saving' | 'error'>('saved');
   let currentContent = $state('');
   let wordCount = $derived(
@@ -460,11 +460,11 @@
       </button>
       <span class="w-[1px] h-4 bg-[var(--border)] mx-1"></span>
       <button
-        onclick={() => (isGraphOpen = true)}
-        class="px-2 py-1 text-xs rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
+        onclick={() => onOpenGraph?.()}
+        class="px-2 py-1 text-xs rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition inline-flex items-center gap-1.5"
         title={$t('graph.toolbarTitle')}
       >
-        🕸
+        <span aria-hidden="true">🕸</span><span>{$t('graph.button')}</span>
       </button>
     </div>
 
@@ -569,7 +569,6 @@
     </div>
   </footer>
 
-  <GraphView bind:isOpen={isGraphOpen} onOpenNote={(p) => onOpenNote?.(p)} />
 </div>
 
 <style>
