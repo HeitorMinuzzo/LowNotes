@@ -4,7 +4,7 @@ use std::{
 };
 
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
@@ -16,6 +16,7 @@ use crate::{
     links,
     network::{NetworkIdentity, NetworkService, PairInfo},
     rag::{self, ChatMessage, ChatResponse, RagChunk},
+    undo::{DeletedSnapshot, RestoredItem, UndoHistory},
     vault::{self, VaultItem},
     web_search,
 };
@@ -24,6 +25,7 @@ pub struct AppState {
     pub settings: Arc<RwLock<AppSettings>>,
     pub crdt: CrdtManager,
     pub network: Arc<RwLock<Option<NetworkService>>>,
+    pub undo: Mutex<UndoHistory>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -255,14 +257,34 @@ pub fn rename_item(
 pub fn delete_item(path: String, state: State<'_, AppState>) -> Result<(), String> {
     let settings = state.settings.read();
     let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
+    // The undo history lives only in AppState: hiding to tray retains it, exiting clears it.
+    let mut undo = state.undo.lock();
+    let snapshot = DeletedSnapshot::capture(&vault.path, &path).map_err(|e| e.to_string())?;
     vault::delete_item(&vault.path, &path).map_err(|e| e.to_string())?;
-    state.crdt.remove_doc(&vault.path, &path).map_err(|e| e.to_string())?;
+    if let Err(error) = state.crdt.remove_doc(&vault.path, &path) {
+        eprintln!("Failed to remove CRDT state for {path}: {error}");
+    }
+    undo.push(vault.id.clone(), snapshot);
 
     if let Some(net) = state.network.read().as_ref() {
         net.broadcast_delete(path);
     }
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn undo_last_delete(state: State<'_, AppState>) -> Result<Option<RestoredItem>, String> {
+    let settings = state.settings.read();
+    let vault = settings.active_vault().ok_or("errors.noActiveVault")?;
+    let restored = state.undo.lock().undo_last_for(&vault.id, &vault.path)
+        .map_err(|e| e.to_string())?;
+    if restored.is_some() {
+        if let Some(net) = state.network.read().as_ref() {
+            net.sync_now();
+        }
+    }
+    Ok(restored)
 }
 
 #[tauri::command]

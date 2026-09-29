@@ -27,6 +27,7 @@
     onOpenPairModal,
     presence = [],
     onRefreshItems,
+    onItemDeleted,
   } = $props<{
     activeVault: VaultConfig | null;
     vaults: VaultConfig[];
@@ -39,6 +40,7 @@
     onVaultChange: (vault: VaultConfig) => void;
     onOpenPairModal: () => void;
     onRefreshItems: () => void;
+    onItemDeleted?: () => void;
     presence?: PresenceUser[];
   }>();
 
@@ -107,9 +109,10 @@
     if (confirm(ts('sidebar.confirmDelete', { path }))) {
       try {
         await deleteItem(path);
+        onItemDeleted?.();
         onRefreshItems();
       } catch (e) {
-        console.error('Failed to delete:', e);
+        alert(trError(String(e)));
       }
     }
   }

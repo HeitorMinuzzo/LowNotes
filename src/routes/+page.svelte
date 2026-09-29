@@ -20,6 +20,7 @@
     saveViewMode,
     networkGetPairInfo,
     saveUpdatePrefs,
+    undoLastDelete,
   } from '$lib/api';
   import { locale, resolveLocale, t, trError } from '$lib/i18n';
   import { resolveNoteLink } from '$lib/note-links';
@@ -76,6 +77,33 @@
   let activeEditors = $state<PresenceUser[]>([]);
   let unlistenAwareness: UnlistenFn | null = null;
   let presencePruneTimer: ReturnType<typeof setInterval> | undefined;
+  let undoPending = false;
+  let lastUndoableAction: 'delete' | 'text' = 'text';
+
+  async function handleUndoDeletedItem(event: KeyboardEvent) {
+    if (event.key.toLowerCase() !== 'z' || !(event.ctrlKey || event.metaKey)
+      || event.shiftKey || event.altKey || event.repeat || event.defaultPrevented || undoPending
+      || isSettingsOpen || !activeVault || document.querySelector('[data-modal-backdrop]')) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest('.cm-editor')) {
+      if (lastUndoableAction !== 'delete') return;
+    } else if (target?.closest('input, textarea, select, [contenteditable="true"]')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    undoPending = true;
+    try {
+      const restored = await undoLastDelete();
+      if (restored) {
+        await refreshItems();
+        if (!restored.is_dir) await openNote(restored.path);
+        lastUndoableAction = restored.has_more ? 'delete' : 'text';
+      } else lastUndoableAction = 'text';
+    } catch (error) {
+      alert(trError(String(error)));
+    } finally {
+      undoPending = false;
+    }
+  }
   async function loadInitialData() {
     try {
       const data = await getAppState();
@@ -181,6 +209,7 @@
     if (path) {
       const res = await selectVault(path);
       activeVault = res.active_vault;
+      lastUndoableAction = 'text';
       settings = res.settings;
       vaults = res.settings.vaults;
       items = res.items;
@@ -243,6 +272,7 @@
   });
 
   onMount(async () => {
+    window.addEventListener('keydown', handleUndoDeletedItem, true);
     // Setup P2P event listeners first so no events are lost
     const u1 = await listen<NetworkEventPayload>('p2p:ready', (event) => {
       if (event.payload.type === 'Ready') {
@@ -348,6 +378,7 @@
   });
 
   onDestroy(() => {
+    window.removeEventListener('keydown', handleUndoDeletedItem, true);
     unlisteners.forEach((u) => u());
     if (updateTimer) clearInterval(updateTimer);
     if (remoteRefreshTimer) clearTimeout(remoteRefreshTimer);
@@ -404,6 +435,7 @@
       onSelectNote={(path) => openNote(path)}
       onVaultChange={(v) => {
         activeVault = v;
+        lastUndoableAction = 'text';
         selectedNotePath = '';
         isGraphOpen = false;
         currentNoteContent = '';
@@ -420,6 +452,7 @@
       }}
       onOpenPairModal={() => (isPairModalOpen = true)}
       onRefreshItems={refreshItems}
+      onItemDeleted={() => (lastUndoableAction = 'delete')}
       presence={activeEditors}
     />
 
@@ -457,6 +490,7 @@
           onToggleAiChat={() => (isAiChatOpen = !isAiChatOpen)}
           onOpenNote={(path) => openNote(path)}
           onOpenGraph={() => (isGraphOpen = true)}
+          onLocalEdit={() => (lastUndoableAction = 'text')}
           onOpenWikilink={handleOpenWikilink}
           deviceName={settings?.device_name ?? ''}
           deviceId={endpointId}

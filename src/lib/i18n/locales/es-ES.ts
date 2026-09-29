@@ -330,6 +330,8 @@ const esES: Dictionary = {
     noteExists: 'ya existe una nota con este nombre',
     sourceNotFound: 'elemento de origen no encontrado',
     targetExists: 'ya existe un elemento con el nuevo nombre',
+    undoTooLarge: 'esta eliminación supera el límite de 128 MB para deshacer en esta sesión',
+    undoUnsupportedItem: 'esta carpeta contiene un enlace o tipo de archivo que no se puede restaurar de forma segura',
     invalidModelsResponse: 'respuesta de modelos en formato inválido',
     invalidAiResponse: 'respuesta de la IA en formato inválido',
     aiEmptyContent: 'La IA no devolvió contenido.',

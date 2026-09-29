@@ -328,6 +328,8 @@ const enUS = {
     noteExists: 'A note with this name already exists',
     sourceNotFound: 'Source item not found',
     targetExists: 'An item with the new name already exists',
+    undoTooLarge: 'This deletion exceeds the 128 MB session undo limit',
+    undoUnsupportedItem: 'This folder contains a link or file type that cannot be restored safely',
     invalidModelsResponse: 'Models response in invalid format',
     invalidAiResponse: 'AI response in invalid format',
     aiEmptyContent: 'No content returned by the AI.',

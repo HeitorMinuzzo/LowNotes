@@ -61,6 +61,10 @@ export async function deleteItem(path: string): Promise<void> {
   return await invoke('delete_item', { path });
 }
 
+export async function undoLastDelete(): Promise<{ path: string; is_dir: boolean; has_more: boolean } | null> {
+  return await invoke('undo_last_delete');
+}
+
 export async function crdtApplyClientUpdate(notePath: string, updateBase64: string): Promise<void> {
   return await invoke('crdt_apply_client_update', { notePath, updateBase64 });
 }

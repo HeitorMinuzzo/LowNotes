@@ -32,6 +32,7 @@
     isAiChatOpen = false,
     onToggleAiChat,
     onContentChange,
+    onLocalEdit,
     onOpenNote,
     onOpenGraph,
     onOpenWikilink,
@@ -48,6 +49,7 @@
     isAiChatOpen?: boolean;
     onToggleAiChat?: () => void;
     onContentChange?: (path: string, newContent: string) => void;
+    onLocalEdit?: () => void;
     onOpenNote?: (path: string) => void;
     onOpenGraph?: () => void;
     onOpenWikilink?: (title: string) => void;
@@ -213,6 +215,7 @@
       onContentChange?.(notePath, text);
 
       if (origin !== 'remote') {
+        onLocalEdit?.();
         const base64 = uint8ArrayToBase64(update);
         pendingSaves += 1;
         saveStatus = 'saving';

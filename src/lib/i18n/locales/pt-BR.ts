@@ -330,6 +330,8 @@ const ptBR: Dictionary = {
     noteExists: 'uma nota com este nome já existe',
     sourceNotFound: 'item de origem não encontrado',
     targetExists: 'um item com o novo nome já existe',
+    undoTooLarge: 'a exclusão excede o limite de 128 MB para restauração nesta sessão',
+    undoUnsupportedItem: 'esta pasta contém um atalho ou tipo de arquivo que não pode ser restaurado com segurança',
     invalidModelsResponse: 'resposta de modelos em formato inválido',
     invalidAiResponse: 'resposta da IA em formato inválido',
     aiEmptyContent: 'Nenhum conteúdo retornado pela IA.',

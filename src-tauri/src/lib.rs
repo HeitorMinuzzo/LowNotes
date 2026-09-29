@@ -8,15 +8,17 @@ pub mod links;
 pub mod assistant;
 pub mod web_search;
 pub mod chat_history;
+pub mod undo;
 
 use std::sync::Arc;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use tauri::{Manager, menu::{Menu, MenuItem}, tray::{MouseButton, TrayIconBuilder, TrayIconEvent}};
 
 use config::AppSettings;
 use crdt::CrdtManager;
 use network::{NetworkIdentity, NetworkService};
 use commands::AppState;
+use undo::UndoHistory;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -28,6 +30,7 @@ pub fn run() {
         settings: settings.clone(),
         crdt,
         network: network.clone(),
+        undo: Mutex::new(UndoHistory::default()),
     };
 
     tauri::Builder::default()
@@ -117,6 +120,7 @@ pub fn run() {
             commands::create_folder,
             commands::rename_item,
             commands::delete_item,
+            commands::undo_last_delete,
             commands::crdt_apply_client_update,
             commands::network_sync_now,
             commands::network_request_pair,
