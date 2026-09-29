@@ -110,7 +110,7 @@ const PALETTE_VARS: Record<ThemeToken, string> = {
   danger: '--danger',
 };
 
-const DERIVED_VARS = ['--accent-glow', '--accent-hover', '--selection', '--line-highlight'];
+const DERIVED_VARS = ['--accent-glow', '--accent-hover', '--selection', '--line-highlight', '--editor-link', '--editor-link-hover'];
 
 export function isHexColor(value: string): boolean {
   return /^#[0-9a-fA-F]{6}$/.test(value);
@@ -145,6 +145,8 @@ export function themeVarsStyle(colors: ThemeColors, mode: AppTheme): string {
   parts.push(`--accent-hover: ${lighten(colors.accent, 0.25)}`);
   parts.push(`--selection: ${mode === 'dark' ? withAlpha(colors.accent, 0.3) : withAlpha(colors.danger, 0.2)}`);
   parts.push(`--line-highlight: ${mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.045)'}`);
+  parts.push(`--editor-link: ${mode === 'dark' ? '#7dd3fc' : '#0284c7'}`);
+  parts.push(`--editor-link-hover: ${mode === 'dark' ? '#bae6fd' : '#0369a1'}`);
   return parts.map((part) => `${part};`).join(' ');
 }
 
@@ -169,6 +171,8 @@ function applyThemeColors(colors: ThemeColors, mode: AppTheme): void {
   root.style.setProperty('--accent-hover', lighten(colors.accent, 0.25));
   root.style.setProperty('--selection', mode === 'dark' ? withAlpha(colors.accent, 0.3) : withAlpha(colors.danger, 0.2));
   root.style.setProperty('--line-highlight', mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.045)');
+  root.style.setProperty('--editor-link', mode === 'dark' ? '#7dd3fc' : '#0284c7');
+  root.style.setProperty('--editor-link-hover', mode === 'dark' ? '#bae6fd' : '#0369a1');
 }
 
 /**

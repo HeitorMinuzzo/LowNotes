@@ -3,6 +3,7 @@
   import { linksGet, linksApply } from '../api';
   import type { LinkEdge, VaultItem } from '../types';
   import { t } from '$lib/i18n';
+  import { ArrowLeft, Search, Plus, Minus, RotateCcw, Link2, X, FileText, Maximize2 } from 'lucide-svelte';
 
   let { items, vaultId, onClose, onOpenNote } = $props<{
     items: VaultItem[];
@@ -280,47 +281,84 @@
   }
 </script>
 
-<section class="flex flex-col h-full min-h-0 w-full bg-[var(--bg-main)]" aria-label={$t('graph.title')}>
-  <header class="app-topbar flex items-center gap-3 px-4 border-b border-[var(--border)] bg-[var(--bg-sidebar)] select-none">
-    <button onclick={onClose} class="graph-button" title={$t('graph.back')} aria-label={$t('graph.back')}>←</button>
-    <div class="min-w-0 mr-auto">
-      <h2 class="font-semibold text-sm text-[var(--text-main)]">{$t('graph.title')}</h2>
-      <p class="text-[10px] text-[var(--text-dim)]">{$t('graph.notes', { count: notes.length })} · {$t('graph.links', { count: links.length })}</p>
+<section class="flex flex-col h-full min-h-0 w-full bg-[var(--bg-main)] select-none" aria-label={$t('graph.title')}>
+  <!-- Header Bar -->
+  <header class="app-topbar h-11 flex items-center justify-between gap-3 px-3 border-b border-[var(--border)] bg-[var(--bg-sidebar)]/80 backdrop-blur-xl shrink-0">
+    <div class="flex items-center gap-3">
+      <button
+        onclick={onClose}
+        class="h-7 flex items-center gap-1.5 px-2.5 rounded-md border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors shadow-sm cursor-pointer"
+        title={$t('graph.back')}
+        aria-label={$t('graph.back')}
+      >
+        <ArrowLeft size={13} />
+        <span>{$t('graph.back')}</span>
+      </button>
+
+      <div class="flex items-center gap-2">
+        <h2 class="font-bold text-xs text-[var(--text-main)] tracking-tight">{$t('graph.title')}</h2>
+        <span class="text-[11px] text-[var(--text-dim)] font-mono">
+          ({$t('graph.notes', { count: notes.length })} · {$t('graph.links', { count: links.length })})
+        </span>
+      </div>
     </div>
-    <button
-      onclick={() => { linkMode = !linkMode; linkSource = null; }}
-      class="graph-button text-xs {linkMode ? 'graph-button-active' : ''}"
-      aria-pressed={linkMode}
-    >{$t('graph.startLink')}</button>
-    <button onclick={resetPositions} class="graph-button text-xs" title={$t('graph.resetPositions')}>{$t('graph.resetPositions')}</button>
+
+    <div class="flex items-center gap-2">
+      <button
+        onclick={() => { linkMode = !linkMode; linkSource = null; }}
+        class="h-7 flex items-center gap-1.5 px-2.5 rounded-md border text-xs font-medium transition-colors shadow-sm cursor-pointer {linkMode ? 'bg-[var(--accent)] text-[var(--accent-contrast)] border-[var(--accent)] shadow-[0_0_12px_var(--accent-glow)]' : 'bg-[var(--bg-card)] border-[var(--border)] hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
+        aria-pressed={linkMode}
+      >
+        <Link2 size={13} />
+        <span>{$t('graph.startLink')}</span>
+      </button>
+
+      <button
+        onclick={resetPositions}
+        class="h-7 flex items-center gap-1.5 px-2.5 rounded-md border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors shadow-sm cursor-pointer"
+        title={$t('graph.resetPositions')}
+      >
+        <RotateCcw size={13} />
+        <span>{$t('graph.resetPositions')}</span>
+      </button>
+    </div>
   </header>
 
-  <div class="flex-1 flex min-h-0 overflow-hidden">
+  <div class="flex-1 flex min-h-0 overflow-hidden relative">
     <div class="graph-area relative flex-1 min-w-0 overflow-hidden">
-      <div class="absolute top-4 left-4 z-10 w-60 max-w-[calc(100%-2rem)]">
-        <input
-          bind:value={searchQuery}
-          aria-label={$t('graph.search')}
-          placeholder={$t('graph.search')}
-          class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-md px-3 py-2 text-xs text-[var(--text-main)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent)] shadow-sm"
-        />
+      <!-- Search Input in Graph -->
+      <div class="absolute top-4 left-4 z-10 w-64 max-w-[calc(100%-2rem)]">
+        <div class="relative">
+          <Search size={13} class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none" />
+          <input
+            bind:value={searchQuery}
+            aria-label={$t('graph.search')}
+            placeholder={$t('graph.search')}
+            class="w-full bg-[var(--bg-card)]/90 backdrop-blur-xl border border-[var(--border)] rounded-xl pl-8 pr-3 py-2 text-xs text-[var(--text-main)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent)] shadow-lg transition-all"
+          />
+        </div>
         {#if searchResults.length > 0}
-          <div class="mt-1 rounded-md border border-[var(--border)] bg-[var(--bg-card)] shadow-lg max-h-64 overflow-y-auto">
+          <div class="mt-1.5 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)]/95 backdrop-blur-xl shadow-2xl max-h-60 overflow-y-auto p-1 animate-in fade-in zoom-in-95 duration-150">
             {#each searchResults as result (result.path)}
-              <button onclick={() => focusNote(result.path)} class="w-full text-left px-3 py-2 text-xs truncate hover:bg-[var(--bg-hover)] text-[var(--text-main)]">{result.title || result.name}</button>
+              <button
+                onclick={() => focusNote(result.path)}
+                class="w-full text-left px-3 py-1.5 text-xs truncate rounded-xl hover:bg-[var(--bg-hover)] text-[var(--text-main)] transition cursor-pointer"
+              >
+                {result.title || result.name}
+              </button>
             {/each}
           </div>
         {/if}
       </div>
 
       {#if linkMode}
-        <div class="absolute top-4 left-1/2 -translate-x-1/2 z-10 px-3 py-1.5 rounded-full bg-[var(--bg-card)] border border-[var(--accent)] text-xs text-[var(--accent-light)] shadow">
+        <div class="absolute top-4 left-1/2 -translate-x-1/2 z-10 px-4 py-1.5 rounded-full bg-[var(--bg-card)]/95 backdrop-blur-xl border border-[var(--accent)] text-xs font-semibold text-[var(--accent)] shadow-xl animate-bounce">
           {linkSource ? $t('graph.linkMode') : $t('graph.chooseSource')}
         </div>
       {/if}
 
       {#if graph.nodes.length === 0}
-        <div class="absolute inset-0 flex items-center justify-center p-8 text-sm text-[var(--text-dim)] text-center">{$t('graph.empty')}</div>
+        <div class="absolute inset-0 flex items-center justify-center p-8 text-sm text-[var(--text-dim)] text-center font-medium">{$t('graph.empty')}</div>
       {:else}
         <svg
           bind:this={svg}
@@ -362,33 +400,60 @@
         </svg>
       {/if}
 
-      <div class="absolute bottom-4 right-4 z-10 flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-1 shadow">
-        <button class="graph-button" onclick={() => zoomAt(1.25, { x: 50, y: 50 })} title={$t('graph.zoomIn')} aria-label={$t('graph.zoomIn')}>+</button>
-        <span class="text-[11px] text-[var(--text-muted)] tabular-nums min-w-10 text-center">{Math.round(viewport.scale * 100)}%</span>
-        <button class="graph-button" onclick={() => zoomAt(0.8, { x: 50, y: 50 })} title={$t('graph.zoomOut')} aria-label={$t('graph.zoomOut')}>−</button>
-        <button class="graph-button" onclick={resetView} title={$t('graph.resetView')} aria-label={$t('graph.resetView')}>◎</button>
+      <!-- Floating Zoom Controls Dock -->
+      <div class="absolute bottom-5 right-5 z-10 flex items-center gap-1 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)]/90 backdrop-blur-xl p-1.5 shadow-2xl">
+        <button class="p-1.5 rounded-xl hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer" onclick={() => zoomAt(1.25, { x: 50, y: 50 })} title={$t('graph.zoomIn')} aria-label={$t('graph.zoomIn')}>
+          <Plus size={14} />
+        </button>
+        <span class="text-xs font-mono font-bold text-[var(--text-main)] min-w-11 text-center select-none">{Math.round(viewport.scale * 100)}%</span>
+        <button class="p-1.5 rounded-xl hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer" onclick={() => zoomAt(0.8, { x: 50, y: 50 })} title={$t('graph.zoomOut')} aria-label={$t('graph.zoomOut')}>
+          <Minus size={14} />
+        </button>
+        <div class="w-[1px] h-4 bg-[var(--border)] mx-0.5"></div>
+        <button class="p-1.5 rounded-xl hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer" onclick={resetView} title={$t('graph.resetView')} aria-label={$t('graph.resetView')}>
+          <Maximize2 size={13} />
+        </button>
       </div>
-      <p class="absolute bottom-4 left-4 z-10 max-w-[55%] text-[11px] text-[var(--text-dim)] pointer-events-none">{$t('graph.hint')}</p>
+      <p class="absolute bottom-5 left-5 z-10 max-w-[55%] text-[11px] text-[var(--text-dim)] pointer-events-none font-medium">{$t('graph.hint')}</p>
     </div>
 
+    <!-- Selected Node Details Drawer -->
     {#if selected}
-      <aside class="w-64 shrink-0 border-l border-[var(--border)] bg-[var(--bg-sidebar)] flex flex-col overflow-y-auto p-4 gap-4">
+      <aside class="w-72 shrink-0 border-l border-[var(--border)] bg-[var(--bg-sidebar)]/95 backdrop-blur-xl flex flex-col overflow-y-auto p-5 gap-4 shadow-2xl">
         <div>
-          <h3 class="text-sm font-semibold text-[var(--text-main)] break-words">{selected.title || selected.name}</h3>
-          <p class="text-xs text-[var(--text-dim)] break-all mt-1">{selected.path}</p>
+          <span class="text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Nota Selecionada</span>
+          <h3 class="text-sm font-bold text-[var(--text-main)] break-words mt-1 leading-tight">{selected.title || selected.name}</h3>
+          <p class="text-[11px] font-mono text-[var(--text-dim)] break-all mt-1">{selected.path}</p>
         </div>
-        <button onclick={() => onOpenNote(selected.path)} class="px-3 py-1.5 text-xs rounded-md border border-[var(--accent)] bg-[var(--bg-active)] text-[var(--accent-light)] font-medium self-start">{$t('graph.open')}</button>
-        <div class="flex flex-col gap-2">
-          <p class="text-xs font-medium text-[var(--text-muted)]">{$t('graph.linksOf', { note: selected.title || selected.name })}</p>
+
+        <button
+          onclick={() => onOpenNote(selected.path)}
+          class="flex items-center justify-center gap-1.5 w-full py-2 text-xs rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] font-bold shadow-md hover:opacity-90 transition cursor-pointer"
+        >
+          <FileText size={13} />
+          <span>{$t('graph.open')}</span>
+        </button>
+
+        <div class="flex flex-col gap-2.5 pt-2 border-t border-[var(--border)]">
+          <p class="text-xs font-bold text-[var(--text-muted)]">{$t('graph.linksOf', { note: selected.title || selected.name })}</p>
           {#if selectedLinks.length === 0}
-            <p class="text-xs text-[var(--text-dim)]">{$t('graph.noLinksNote')}</p>
+            <p class="text-xs text-[var(--text-dim)] font-medium">{$t('graph.noLinksNote')}</p>
           {:else}
-            {#each selectedLinks as link (link.source + '→' + link.target + '→' + link.origin)}
-              <div class="flex items-center justify-between gap-2 px-2 py-1.5 rounded-md bg-[var(--bg-card)] border border-[var(--border)]">
-                <span class="text-xs text-[var(--text-main)] truncate">{titleFor(link.source === selectedPath ? link.target : link.source)}</span>
-                <button onclick={() => void removeLink(link.source, link.target)} class="text-[10px] text-[var(--text-dim)] hover:text-[var(--danger)]" title={$t('graph.unlink')} aria-label={$t('graph.unlink')}>×</button>
-              </div>
-            {/each}
+            <div class="flex flex-col gap-1.5">
+              {#each selectedLinks as link (link.source + '→' + link.target + '→' + link.origin)}
+                <div class="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] shadow-sm">
+                  <span class="text-xs font-semibold text-[var(--text-main)] truncate">{titleFor(link.source === selectedPath ? link.target : link.source)}</span>
+                  <button
+                    onclick={() => void removeLink(link.source, link.target)}
+                    class="p-1 rounded-lg text-[var(--text-dim)] hover:text-[var(--danger)] hover:bg-[var(--danger)]/10 transition cursor-pointer"
+                    title={$t('graph.unlink')}
+                    aria-label={$t('graph.unlink')}
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              {/each}
+            </div>
           {/if}
         </div>
       </aside>
@@ -398,9 +463,6 @@
 
 <style>
   .graph-area { background-color: var(--bg-main); background-image: radial-gradient(var(--border) 0.6px, transparent 0.6px); background-size: 20px 20px; }
-  .graph-button { min-width: 28px; min-height: 28px; padding: 0 7px; border-radius: 5px; color: var(--text-muted); }
-  .graph-button:hover, .graph-button:focus-visible { background: var(--bg-hover); color: var(--text-main); outline: none; }
-  .graph-button-active { background: var(--bg-active); color: var(--accent-light); }
   .edge-line { stroke: var(--text-dim); stroke-opacity: 0.58; stroke-width: 0.16; }
   .node-hit { fill: transparent; }
   .node-circle { fill: var(--accent); stroke: var(--accent-light); stroke-width: 0.12; transition: fill 120ms ease; }

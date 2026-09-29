@@ -3,6 +3,8 @@
   import { EditorView, basicSetup } from 'codemirror';
   import { markdown } from '@codemirror/lang-markdown';
   import { Compartment, EditorState } from '@codemirror/state';
+  import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
+  import { tags } from '@lezer/highlight';
   import * as Y from 'yjs';
   import { yCollab } from 'y-codemirror.next';
   import mermaid from 'mermaid';
@@ -12,6 +14,25 @@
   import DocumentActions from './DocumentActions.svelte';
   import type { AppTheme, ViewMode } from '../types';
   import { t, ts } from '$lib/i18n';
+  import {
+    Bold,
+    Italic,
+    Strikethrough,
+    Heading1,
+    Heading2,
+    List,
+    ListTodo,
+    Code,
+    Quote,
+    Network,
+    Sparkles,
+    CheckCircle2,
+    Loader2,
+    AlertCircle,
+    Eye,
+    Columns,
+    Edit3
+  } from 'lucide-svelte';
   import {
     Awareness,
     applyAwarenessUpdate,
@@ -82,10 +103,39 @@
   const editorTheme = new Compartment();
 
   function codeMirrorTheme() {
-    return EditorView.theme({
+    const isDark = theme === 'dark';
+    const linkColor = isDark ? '#7dd3fc' : '#0284c7';
+    const linkHover = isDark ? '#bae6fd' : '#0369a1';
+
+    const highlight = syntaxHighlighting(
+      HighlightStyle.define([
+        { tag: tags.link, color: linkColor, textDecoration: 'underline' },
+        { tag: tags.url, color: linkColor, textDecoration: 'underline' },
+        { tag: [tags.atom, tags.bool, tags.labelName], color: isDark ? '#f7c65d' : '#d97706' },
+        { tag: tags.keyword, color: isDark ? '#f472b6' : '#be185d' },
+        { tag: [tags.definition(tags.variableName), tags.local(tags.variableName)], color: isDark ? '#93c5fd' : '#1d4ed8' },
+        { tag: tags.definition(tags.propertyName), color: isDark ? '#7dd3fc' : '#0284c7' },
+        { tag: tags.comment, color: isDark ? '#ae9293' : '#6b586b', fontStyle: 'italic' },
+        { tag: tags.string, color: isDark ? '#b9c978' : '#4d7c0f' },
+      ])
+    );
+
+    const baseTheme = EditorView.theme({
       '&': { height: '100%', outline: 'none' },
       '.cm-scroller': { overflow: 'auto' },
-    }, { dark: theme === 'dark' });
+      '.cm-link, .cm-url': {
+        color: `${linkColor} !important`,
+        textDecoration: 'underline',
+      },
+      '.cm-link:hover, .cm-url:hover': {
+        color: `${linkHover} !important`,
+      },
+      '&.cm-editor a': {
+        color: `${linkColor} !important`,
+      },
+    }, { dark: isDark });
+
+    return [baseTheme, highlight];
   }
 
   async function renderMermaidBlocks(activeTheme: AppTheme) {
@@ -394,143 +444,162 @@
 </script>
 
 <div class="flex flex-col h-full w-full bg-[var(--bg-main)]">
-  <!-- Top Editor Toolbar -->
-  <header class="app-topbar flex items-center gap-3 overflow-x-auto whitespace-nowrap px-4 border-b border-[var(--border)] bg-[var(--bg-sidebar)] select-none">
-    <div class="flex shrink-0 items-center gap-1">
-      <button
-        onclick={() => applyFormatting('**', '**')}
-        class="px-2 py-1 text-xs font-bold rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
-        title={$t('editor.bold')}
-      >
-        B
-      </button>
-      <button
-        onclick={() => applyFormatting('*', '*')}
-        class="px-2 py-1 text-xs italic rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
-        title={$t('editor.italic')}
-      >
-        I
-      </button>
-      <button
-        onclick={() => applyFormatting('~~', '~~')}
-        class="px-2 py-1 text-xs line-through rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
-        title={$t('editor.strikethrough')}
-      >
-        S
-      </button>
-      <span class="w-[1px] h-4 bg-[var(--border)] mx-1"></span>
-      <button
-        onclick={() => applyFormatting('# ')}
-        class="px-2 py-1 text-xs font-semibold rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
-        title={$t('editor.heading1')}
-      >
-        H1
-      </button>
-      <button
-        onclick={() => applyFormatting('## ')}
-        class="px-2 py-1 text-xs font-semibold rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
-        title={$t('editor.heading2')}
-      >
-        H2
-      </button>
-      <button
-        onclick={() => applyFormatting('- ')}
-        class="px-2 py-1 text-xs rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
-        title={$t('editor.list')}
-      >
-        • {$t('editor.list')}
-      </button>
-      <button
-        onclick={() => applyFormatting('- [ ] ')}
-        class="px-2 py-1 text-xs rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
-        title={$t('editor.checklist')}
-      >
-        ☑ {$t('editor.task')}
-      </button>
-      <button
-        onclick={() => applyFormatting('`', '`')}
-        class="px-2 py-1 text-xs font-mono rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
-        title={$t('editor.code')}
-      >
-        &lt;/&gt;
-      </button>
-      <button
-        onclick={() => applyFormatting('> ')}
-        class="px-2 py-1 text-xs rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
-        title={$t('editor.quote')}
-      >
-        ” {$t('editor.quote')}
-      </button>
-      <span class="w-[1px] h-4 bg-[var(--border)] mx-1"></span>
+  <!-- Top Editor Toolbar (Glassmorphic Bar) -->
+  <header class="h-11 flex items-center justify-between gap-2 px-3 border-b border-[var(--border)] bg-[var(--bg-sidebar)]/80 backdrop-blur-xl select-none shrink-0">
+    <!-- Left Formatting Actions -->
+    <div class="flex items-center gap-1.5 overflow-x-auto py-0.5">
+      <div class="h-7 flex items-center gap-0.5 p-0.5 rounded-md bg-[var(--bg-card)]/70 border border-[var(--border)] shadow-sm">
+        <button
+          onclick={() => applyFormatting('**', '**')}
+          class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
+          title={$t('editor.bold')}
+        >
+          <Bold size={13} />
+        </button>
+        <button
+          onclick={() => applyFormatting('*', '*')}
+          class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
+          title={$t('editor.italic')}
+        >
+          <Italic size={13} />
+        </button>
+        <button
+          onclick={() => applyFormatting('~~', '~~')}
+          class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
+          title={$t('editor.strikethrough')}
+        >
+          <Strikethrough size={13} />
+        </button>
+      </div>
+
+      <div class="h-7 flex items-center gap-0.5 p-0.5 rounded-md bg-[var(--bg-card)]/70 border border-[var(--border)] shadow-sm">
+        <button
+          onclick={() => applyFormatting('# ')}
+          class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
+          title={$t('editor.heading1')}
+        >
+          <Heading1 size={13} />
+        </button>
+        <button
+          onclick={() => applyFormatting('## ')}
+          class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
+          title={$t('editor.heading2')}
+        >
+          <Heading2 size={13} />
+        </button>
+      </div>
+
+      <div class="h-7 flex items-center gap-0.5 p-0.5 rounded-md bg-[var(--bg-card)]/70 border border-[var(--border)] shadow-sm">
+        <button
+          onclick={() => applyFormatting('- ')}
+          class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
+          title={$t('editor.list')}
+        >
+          <List size={13} />
+        </button>
+        <button
+          onclick={() => applyFormatting('- [ ] ')}
+          class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
+          title={$t('editor.checklist')}
+        >
+          <ListTodo size={13} />
+        </button>
+        <button
+          onclick={() => applyFormatting('`', '`')}
+          class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
+          title={$t('editor.code')}
+        >
+          <Code size={13} />
+        </button>
+        <button
+          onclick={() => applyFormatting('> ')}
+          class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
+          title={$t('editor.quote')}
+        >
+          <Quote size={13} />
+        </button>
+      </div>
+
       <button
         onclick={() => onOpenGraph?.()}
-        class="px-2 py-1 text-xs rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition inline-flex items-center gap-1.5"
+        class="h-7 flex items-center gap-1.5 px-2.5 rounded-md border border-[var(--border)] bg-[var(--bg-card)]/70 hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition shadow-sm cursor-pointer"
         title={$t('graph.toolbarTitle')}
       >
-        <span aria-hidden="true">🕸</span><span>{$t('graph.button')}</span>
+        <Network size={13} class="text-[var(--accent)]" />
+        <span>{$t('graph.button')}</span>
       </button>
     </div>
 
-    <!-- Mode Selector & Status -->
-    <div class="flex shrink-0 items-center gap-3 ml-auto">
+    <!-- Right Controls: Save Status, View Mode, Export, AI Chat -->
+    <div class="flex shrink-0 items-center gap-1.5 ml-auto">
+      <!-- Presence Avatars -->
       {#if remoteUsers.length > 0}
         <div
-          class="flex items-center -space-x-1.5"
+          class="flex items-center -space-x-1.5 mr-1"
           title={remoteUsers.map((u) => u.name).join(', ')}
         >
           {#each remoteUsers as user (user.deviceId)}
             <span
-              class="w-5 h-5 rounded-full border-2 border-[var(--bg-sidebar)] flex items-center justify-center text-[9px] font-bold text-black select-none"
-              style="background: {user.color}"
+              class="w-5 h-5 rounded-full border border-[var(--bg-sidebar)] flex items-center justify-center text-[9px] font-extrabold text-black select-none shadow-sm"
+              style="background: {user.color}; box-shadow: 0 0 6px {user.color}88"
             >
               {user.name.slice(0, 1).toUpperCase()}
             </span>
           {/each}
         </div>
       {/if}
-      <div class="flex items-center gap-1.5 text-xs text-[var(--text-dim)]">
+
+      <!-- Save Status Pill -->
+      <div class="h-7 flex items-center gap-1.5 px-2 rounded-md bg-[var(--bg-card)]/70 border border-[var(--border)] text-xs font-medium text-[var(--text-muted)] shadow-sm">
         {#if saveStatus === 'error'}
+          <AlertCircle size={12} class="text-[var(--danger)]" />
           <span class="text-[var(--danger)]">{$t('editor.saveError')}</span>
         {:else if saveStatus === 'saving'}
-          <span class="inline-block w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse"></span>
-          <span>{$t('editor.saving')}</span>
+          <Loader2 size={12} class="text-[var(--accent)] animate-spin" />
+          <span class="text-[var(--accent)]">{$t('editor.saving')}</span>
         {:else}
-          <span class="inline-block w-2 h-2 rounded-full bg-[var(--success)]"></span>
+          <span class="w-1.5 h-1.5 rounded-full bg-[var(--success)] shadow-[0_0_5px_var(--success)]"></span>
           <span>{$t('editor.saved')}</span>
         {/if}
       </div>
 
-      <div class="flex items-center bg-[var(--bg-card)] p-0.5 rounded-md border border-[var(--border)]">
+      <!-- Segmented View Mode Switcher -->
+      <div class="h-7 flex items-center p-0.5 rounded-md bg-[var(--bg-card)]/70 border border-[var(--border)] shadow-sm">
         <button
           onclick={() => onViewModeChange('edit')}
-          class="px-2.5 py-1 text-xs rounded transition {viewMode === 'edit' ? 'bg-[var(--bg-active)] text-[var(--accent-light)] font-medium shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
+          class="h-6 px-2 text-xs font-medium rounded transition-all duration-150 cursor-pointer {viewMode === 'edit' ? 'bg-[var(--bg-active)] text-[var(--text-main)] font-semibold shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
+          title={$t('editor.modeEdit')}
         >
           {$t('editor.modeEdit')}
         </button>
         <button
           onclick={() => onViewModeChange('split')}
-          class="px-2.5 py-1 text-xs rounded transition {viewMode === 'split' ? 'bg-[var(--bg-active)] text-[var(--accent-light)] font-medium shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
+          class="h-6 px-2 text-xs font-medium rounded transition-all duration-150 cursor-pointer {viewMode === 'split' ? 'bg-[var(--bg-active)] text-[var(--text-main)] font-semibold shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
+          title={$t('editor.modeSplit')}
         >
           {$t('editor.modeSplit')}
         </button>
         <button
           onclick={() => onViewModeChange('preview')}
-          class="px-2.5 py-1 text-xs rounded transition {viewMode === 'preview' ? 'bg-[var(--bg-active)] text-[var(--accent-light)] font-medium shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
+          class="h-6 px-2 text-xs font-medium rounded transition-all duration-150 cursor-pointer {viewMode === 'preview' ? 'bg-[var(--bg-active)] text-[var(--text-main)] font-semibold shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
+          title={$t('editor.modePreview')}
         >
           {$t('editor.modePreview')}
         </button>
       </div>
 
+      <!-- Document Word / PDF Exports -->
       <DocumentActions content={currentContent} path={notePath} />
 
+      <!-- AI Assistant Toggle Button -->
       {#if onToggleAiChat}
         <button
           onclick={onToggleAiChat}
-          class="px-2.5 py-1 text-xs rounded transition flex items-center gap-1.5 border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-light)] {isAiChatOpen ? 'border-[var(--accent)] text-[var(--accent-light)] font-medium shadow-sm bg-[var(--bg-active)]' : ''}"
+          class="h-7 flex items-center gap-1.5 px-2.5 rounded-md border text-xs font-medium transition-all duration-150 shadow-sm cursor-pointer {isAiChatOpen ? 'border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--accent)] font-semibold shadow-[0_0_10px_var(--accent-glow)]' : 'border-[var(--border)] bg-[var(--bg-card)]/70 hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
           title={$t('editor.openAiAssistant')}
         >
-          <span>💬</span>
-          <span class="font-medium">{$t('editor.assistant')}</span>
+          <Sparkles size={13} class={isAiChatOpen ? 'text-[var(--accent)] animate-pulse' : 'text-[var(--accent)]'} />
+          <span>{$t('editor.assistant')}</span>
         </button>
       {/if}
     </div>
@@ -541,7 +610,7 @@
     <!-- CodeMirror Container -->
     <div
       bind:this={editorContainer}
-      class="h-full overflow-hidden transition-all duration-150 {viewMode === 'edit' ? 'w-full' : viewMode === 'split' ? 'w-1/2 border-r border-[var(--border)]' : 'hidden'}"
+      class="h-full overflow-hidden transition-all duration-200 {viewMode === 'edit' ? 'w-full' : viewMode === 'split' ? 'w-1/2 border-r border-[var(--border)]' : 'hidden'}"
     ></div>
 
     <!-- Rendered Markdown Container -->
@@ -551,7 +620,7 @@
         bind:this={previewContainer}
         role="presentation"
         onclick={handlePreviewClick}
-        class="h-full overflow-y-auto px-8 py-6 select-text {viewMode === 'preview' ? 'w-full max-w-4xl mx-auto' : 'w-1/2'}"
+        class="h-full overflow-y-auto px-10 py-8 select-text {viewMode === 'preview' ? 'w-full max-w-4xl mx-auto' : 'w-1/2'}"
       >
         <article class="prose max-w-none text-[var(--text-main)]">
           {@html renderMarkdown(currentContent)}
@@ -561,14 +630,19 @@
   </main>
 
   <!-- Status Bar Footer -->
-  <footer class="flex items-center justify-between px-4 py-1.5 border-t border-[var(--border)] bg-[var(--bg-sidebar)] text-xs text-[var(--text-dim)] select-none">
-    <div class="flex items-center gap-3">
-      <span>{notePath}</span>
+  <footer class="flex items-center justify-between px-5 py-2 border-t border-[var(--border)] bg-[var(--bg-sidebar)]/80 backdrop-blur-md text-xs text-[var(--text-dim)] select-none">
+    <div class="flex items-center gap-2">
+      <span class="font-mono text-[11px] text-[var(--text-muted)] truncate max-w-md">{notePath}</span>
     </div>
-    <div class="flex items-center gap-4">
+    <div class="flex items-center gap-4 text-[11.5px]">
       <span>{$t('editor.words', { count: wordCount })}</span>
+      <span>•</span>
       <span>{$t('editor.chars', { count: charCount })}</span>
-      <span class="text-[var(--accent-light)] font-mono">{$t('editor.p2pRealtime')}</span>
+      <span>•</span>
+      <span class="inline-flex items-center gap-1.5 text-[var(--accent)] font-semibold font-mono text-[11px]">
+        <span class="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse"></span>
+        <span>{$t('editor.p2pRealtime')}</span>
+      </span>
     </div>
   </footer>
 

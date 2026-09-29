@@ -5,6 +5,9 @@
   import { onDestroy, onMount } from 'svelte';
   import { t, trError, ts } from '$lib/i18n';
   import { dismissibleModal } from '$lib/modal-dismiss';
+  import { Share2, Link, Laptop, Copy, Check, Trash2, X, RefreshCw } from 'lucide-svelte';
+  import BorderBeam from './ui/BorderBeam.svelte';
+
   let {
     isOpen = $bindable(false),
     pairCode = $bindable(''),
@@ -53,6 +56,7 @@
       fetchPairInfo();
     }
   });
+
   function copyCode() {
     if (!pairCode) return;
     navigator.clipboard.writeText(pairCode);
@@ -98,11 +102,13 @@
   }
 
   let unlistenError: UnlistenFn | null = null;
-
   onMount(async () => {
     unlistenError = await listen<NetworkEventPayload>('p2p:error', (event) => {
       if (event.payload.type === 'Error') {
-        statusMessage = { type: 'error', text: trError(event.payload.message) };
+        statusMessage = {
+          type: 'error',
+          text: trError(event.payload.message),
+        };
       }
     });
   });
@@ -116,49 +122,59 @@
   <!-- Backdrop -->
   <div
     use:dismissibleModal={() => (isOpen = false)}
-    class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 select-none animate-fadeIn"
+    class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 select-none animate-in fade-in zoom-in-95 duration-200"
     role="presentation"
   >
     <!-- Modal Dialog -->
     <div
-      class="bg-[var(--bg-card)] border border-[var(--border)] rounded-xl w-full max-w-lg shadow-2xl flex flex-col overflow-hidden"
+      class="relative bg-[var(--bg-card)]/95 backdrop-blur-xl border border-[var(--border)] rounded-3xl w-full max-w-lg shadow-2xl flex flex-col overflow-hidden"
       role="dialog"
       aria-modal="true"
       tabindex="-1"
     >
+      <BorderBeam size={220} duration={12} borderWidth={1.5} colorFrom="var(--accent)" colorTo="var(--accent-light)" />
+
       <!-- Header -->
-      <div class="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-[var(--bg-sidebar)]">
-        <div>
-          <h2 class="text-base font-semibold text-[var(--text-main)]">{$t('pair.title')}</h2>
-          <p class="text-xs text-[var(--text-dim)]">{$t('pair.currentVault')} <span class="text-[var(--text-muted)] font-medium">{vaultName}</span></p>
+      <div class="flex items-center justify-between px-6 py-4.5 border-b border-[var(--border)] bg-[var(--bg-sidebar)]/80 backdrop-blur-md">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 rounded-xl bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/30 flex items-center justify-center shadow-sm">
+            <Share2 size={16} />
+          </div>
+          <div>
+            <h2 class="text-sm font-bold text-[var(--text-main)]">{$t('pair.title')}</h2>
+            <p class="text-[11px] text-[var(--text-dim)]">{$t('pair.currentVault')} <span class="text-[var(--accent)] font-semibold">{vaultName}</span></p>
+          </div>
         </div>
         <button
           onclick={() => (isOpen = false)}
-          class="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-dim)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition"
+          class="p-1.5 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition cursor-pointer"
         >
-          ✕
+          <X size={16} />
         </button>
       </div>
 
       <!-- Tabs Navigation -->
-      <div class="flex border-b border-[var(--border)] bg-[var(--bg-sidebar)] px-6">
+      <div class="flex border-b border-[var(--border)] bg-[var(--bg-sidebar)]/40 px-6 gap-2 pt-2">
         <button
           onclick={() => { activeTab = 'share'; statusMessage = null; }}
-          class="py-2.5 px-3 text-xs font-medium border-b-2 transition {activeTab === 'share' ? 'border-[var(--accent)] text-[var(--accent-light)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
+          class="flex items-center gap-1.5 py-2.5 px-3.5 text-xs font-semibold border-b-2 transition-all cursor-pointer {activeTab === 'share' ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
         >
-          {$t('pair.tabShare')}
+          <Share2 size={13} />
+          <span>{$t('pair.tabShare')}</span>
         </button>
         <button
           onclick={() => { activeTab = 'join'; statusMessage = null; }}
-          class="py-2.5 px-3 text-xs font-medium border-b-2 transition {activeTab === 'join' ? 'border-[var(--accent)] text-[var(--accent-light)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
+          class="flex items-center gap-1.5 py-2.5 px-3.5 text-xs font-semibold border-b-2 transition-all cursor-pointer {activeTab === 'join' ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
         >
-          {$t('pair.tabJoin')}
+          <Link size={13} />
+          <span>{$t('pair.tabJoin')}</span>
         </button>
         <button
           onclick={() => { activeTab = 'devices'; statusMessage = null; }}
-          class="py-2.5 px-3 text-xs font-medium border-b-2 transition {activeTab === 'devices' ? 'border-[var(--accent)] text-[var(--accent-light)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
+          class="flex items-center gap-1.5 py-2.5 px-3.5 text-xs font-semibold border-b-2 transition-all cursor-pointer {activeTab === 'devices' ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
         >
-          {$t('pair.tabDevices', { count: peers.length })}
+          <Laptop size={13} />
+          <span>{$t('pair.tabDevices', { count: peers.length })}</span>
         </button>
       </div>
 
@@ -171,24 +187,24 @@
             </p>
 
             <div class="flex flex-col gap-1.5">
-              <label for="p2p-code-display" class="text-xs font-medium text-[var(--text-dim)]">{$t('pair.inviteLabel')}</label>
+              <label for="p2p-code-display" class="text-xs font-semibold text-[var(--text-dim)]">{$t('pair.inviteLabel')}</label>
               <div class="relative">
                 <textarea
                   id="p2p-code-display"
                   readonly
                   value={pairCode || $t('pair.generating')}
                   rows="3"
-                  class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-lg p-3 text-xs font-mono text-[var(--text-main)] resize-none select-all focus:outline-none focus:border-[var(--accent)]"
+                  class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-2xl p-3 text-xs font-mono text-[var(--text-main)] resize-none select-all focus:outline-none focus:border-[var(--accent)] shadow-inner"
                 ></textarea>
               </div>
             </div>
 
             {#if loadError}
-              <div class="p-3 rounded-lg text-xs leading-relaxed bg-red-950/40 border border-red-800/60 text-red-300 flex items-center justify-between">
+              <div class="p-3 rounded-xl text-xs leading-relaxed bg-[var(--danger)]/15 border border-[var(--danger)]/40 text-[var(--danger)] flex items-center justify-between">
                 <span>{loadError}</span>
                 <button
                   onclick={fetchPairInfo}
-                  class="px-2.5 py-1 bg-red-900/60 hover:bg-red-800/80 rounded text-xs font-medium text-white transition"
+                  class="px-3 py-1 bg-[var(--danger)]/20 hover:bg-[var(--danger)]/30 rounded-lg text-xs font-semibold text-[var(--danger)] transition"
                 >
                   {$t('pair.retry')}
                 </button>
@@ -196,15 +212,21 @@
             {/if}
 
             <div class="flex justify-between items-center pt-2">
-              <span class="text-[11px] text-[var(--text-dim)] font-mono truncate max-w-[280px]">
+              <span class="text-[11px] text-[var(--text-dim)] font-mono truncate max-w-[260px]">
                 {$t('pair.idLabel')} {endpointId ? (endpointId.length > 16 ? endpointId.slice(0, 16) + '...' : endpointId) : '...'}
               </span>
               <button
                 onclick={copyCode}
                 disabled={!pairCode}
-                class="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-light)] disabled:opacity-40 disabled:cursor-not-allowed text-black text-xs font-semibold rounded-lg transition shadow-md flex items-center gap-1.5"
+                class="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--accent-contrast)] text-xs font-bold rounded-xl transition-all shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95"
               >
-                {copied ? '✓ ' + $t('pair.copied') : $t('pair.copy')}
+                {#if copied}
+                  <Check size={14} />
+                  <span>{$t('pair.copied')}</span>
+                {:else}
+                  <Copy size={14} />
+                  <span>{$t('pair.copy')}</span>
+                {/if}
               </button>
             </div>
           </div>
@@ -215,19 +237,19 @@
             </p>
 
             <div class="flex flex-col gap-1.5">
-              <label for="p2p-code-input" class="text-xs font-medium text-[var(--text-dim)]">{$t('pair.joinLabel')}</label>
+              <label for="p2p-code-input" class="text-xs font-semibold text-[var(--text-dim)]">{$t('pair.joinLabel')}</label>
               <textarea
                 id="p2p-code-input"
                 bind:value={inputCode}
                 placeholder={$t('pair.joinPlaceholder')}
                 rows="3"
-                class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-lg p-3 text-xs font-mono text-[var(--text-main)] resize-none focus:outline-none focus:border-[var(--accent)]"
+                class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-2xl p-3 text-xs font-mono text-[var(--text-main)] resize-none focus:outline-none focus:border-[var(--accent)] shadow-inner"
               ></textarea>
             </div>
 
             {#if statusMessage}
               <div
-                class="p-3 rounded-lg text-xs leading-relaxed {statusMessage.type === 'error' ? 'bg-red-950/40 border border-red-800/60 text-red-300' : statusMessage.type === 'success' ? 'bg-emerald-950/40 border border-emerald-800/60 text-emerald-300' : 'bg-amber-950/40 border border-amber-800/60 text-amber-300'}"
+                class="p-3 rounded-xl text-xs leading-relaxed {statusMessage.type === 'error' ? 'bg-[var(--danger)]/15 border border-[var(--danger)]/30 text-[var(--danger)]' : statusMessage.type === 'success' ? 'bg-[var(--success)]/15 border border-[var(--success)]/30 text-[var(--success)]' : 'bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)]'}"
               >
                 {statusMessage.text}
               </div>
@@ -237,7 +259,7 @@
               <button
                 onclick={handleRequestPair}
                 disabled={isConnecting || !inputCode.trim()}
-                class="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-light)] disabled:opacity-50 text-black text-xs font-semibold rounded-lg transition shadow-md"
+                class="px-5 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-[var(--accent-contrast)] text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer active:scale-95"
               >
                 {isConnecting ? $t('pair.connectingButton') : $t('pair.requestPair')}
               </button>
@@ -246,11 +268,12 @@
         {:else if activeTab === 'devices'}
           <div class="flex flex-col gap-3">
             {#if peers.length === 0}
-              <div class="text-center py-8">
-                <p class="text-xs text-[var(--text-dim)]">{$t('pair.noDevices')}</p>
+              <div class="text-center py-10 flex flex-col items-center">
+                <Laptop size={28} class="text-[var(--text-dim)] mb-2 opacity-50" />
+                <p class="text-xs text-[var(--text-dim)] font-medium">{$t('pair.noDevices')}</p>
                 <button
                   onclick={() => (activeTab = 'share')}
-                  class="mt-2 text-xs text-[var(--accent-light)] hover:underline"
+                  class="mt-2 text-xs font-semibold text-[var(--accent)] hover:underline"
                 >
                   {$t('pair.shareToStart')}
                 </button>
@@ -258,16 +281,22 @@
             {:else}
               <div class="flex flex-col gap-2">
                 {#each peers as peer}
-                  <div class="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-main)] border border-[var(--border)]">
-                    <div class="flex flex-col">
-                      <span class="text-xs font-medium text-[var(--text-main)]">{peer.name}</span>
-                      <span class="text-[11px] font-mono text-[var(--text-dim)]">ID: {peer.endpoint_id.slice(0, 20)}...</span>
+                  <div class="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--bg-main)] border border-[var(--border)] shadow-sm">
+                    <div class="flex items-center gap-3">
+                      <div class="w-8 h-8 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center text-[var(--accent)]">
+                        <Laptop size={16} />
+                      </div>
+                      <div class="flex flex-col">
+                        <span class="text-xs font-bold text-[var(--text-main)]">{peer.name}</span>
+                        <span class="text-[10px] font-mono text-[var(--text-dim)]">ID: {peer.endpoint_id.slice(0, 18)}...</span>
+                      </div>
                     </div>
                     <button
                       onclick={() => handleRemove(peer.endpoint_id)}
-                      class="px-2.5 py-1 text-xs text-red-400 hover:text-red-300 hover:bg-red-950/30 rounded border border-transparent hover:border-red-900/50 transition"
+                      class="flex items-center gap-1 px-3 py-1.5 text-xs text-[var(--danger)] hover:bg-[var(--danger)]/10 rounded-xl border border-transparent hover:border-[var(--danger)]/30 transition cursor-pointer"
                     >
-                      {$t('pair.remove')}
+                      <Trash2 size={12} />
+                      <span>{$t('pair.remove')}</span>
                     </button>
                   </div>
                 {/each}
@@ -279,13 +308,3 @@
     </div>
   </div>
 {/if}
-
-<style>
-  @keyframes fadeIn {
-    from { opacity: 0; transform: scale(0.98); }
-    to { opacity: 1; transform: scale(1); }
-  }
-  .animate-fadeIn {
-    animation: fadeIn 0.15s ease-out;
-  }
-</style>

@@ -4,6 +4,8 @@
   import type { DownloadEvent, Update } from '@tauri-apps/plugin-updater';
   import { t } from '$lib/i18n';
   import { dismissibleModal } from '$lib/modal-dismiss';
+  import { Loader2, AlertCircle } from 'lucide-svelte';
+  import BorderBeam from './ui/BorderBeam.svelte';
 
   let {
     isOpen = $bindable(false),
@@ -82,83 +84,94 @@
 {#if isOpen && update}
   <div
     use:dismissibleModal={() => { if (phase !== 'downloading' && phase !== 'installing') isOpen = false; }}
-    class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 select-none animate-fadeIn"
+    class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 select-none animate-in fade-in zoom-in-95 duration-200"
     role="presentation"
   >
     <div
-      class="bg-[var(--bg-card)] border border-[var(--border)] rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col"
+      class="relative bg-[var(--bg-card)]/95 backdrop-blur-2xl border border-[var(--border)] rounded-2xl w-full max-w-[560px] shadow-2xl overflow-hidden flex flex-col"
       role="dialog"
       aria-modal="true"
       tabindex="-1"
     >
-      <div class="px-6 pt-6 pb-4 border-b border-[var(--border)]">
-        <h2 class="text-base font-bold text-[var(--text-main)] mb-1">{$t('update.title')}</h2>
-        <p class="text-xs text-[var(--text-muted)]">{$t('update.body', { version: update.version })}</p>
+      <BorderBeam size={200} duration={10} borderWidth={1.5} colorFrom="var(--accent)" colorTo="var(--accent-light)" />
+
+      <!-- Modal Header -->
+      <div class="px-6 pt-5 pb-4 border-b border-[var(--border)] bg-[var(--bg-sidebar)]/60">
+        <div>
+          <h2 class="text-sm font-bold text-[var(--text-main)] tracking-tight">{$t('update.title')}</h2>
+          <p class="text-xs text-[var(--text-muted)] mt-0.5">{$t('update.body', { version: update.version })}</p>
+        </div>
       </div>
 
-      <div class="px-6 py-4 max-h-64 overflow-y-auto bg-[var(--bg-main)]">
-        <div class="text-[11px] text-[var(--text-muted)] leading-relaxed whitespace-pre-wrap">{update.body}</div>
+      <!-- Release Notes Body -->
+      <div class="px-6 py-4 max-h-60 overflow-y-auto bg-[var(--bg-main)]/60">
+        <div class="text-xs text-[var(--text-muted)] leading-relaxed whitespace-pre-wrap">{update.body}</div>
       </div>
 
       {#if phase === 'downloading' || phase === 'installing' || phase === 'error'}
-        <div class="px-6 py-3 border-t border-[var(--border)] flex flex-col gap-2">
+        <div class="px-6 py-3 border-t border-[var(--border)] flex flex-col gap-2 bg-[var(--bg-card)]">
           {#if phase === 'error'}
-            <p class="text-[11px] text-red-300 leading-relaxed">
-              {$t('update.installFailed')} {errorMessage}
-            </p>
+            <div class="flex items-center gap-2 text-xs text-[var(--danger)]">
+              <AlertCircle size={14} class="shrink-0" />
+              <span>{$t('update.installFailed')} {errorMessage}</span>
+            </div>
           {:else if phase === 'downloading'}
-            <div class="flex items-center gap-2">
-              <div class="flex-1 h-1.5 rounded bg-[var(--bg-hover)] overflow-hidden">
-                <div class="h-full bg-[var(--accent)] transition-all" style="width: {percent}%"></div>
+            <div class="flex items-center gap-3">
+              <div class="flex-1 h-2 rounded-full bg-[var(--bg-hover)] overflow-hidden p-0.5">
+                <div class="h-full bg-[var(--accent)] rounded-full transition-all duration-200" style="width: {percent}%"></div>
               </div>
-              <span class="text-[10px] text-[var(--text-dim)] font-mono w-24 text-right">
-                {$t('update.downloading', { percent })}
+              <span class="text-xs text-[var(--accent)] font-mono font-bold w-14 text-right">
+                {percent}%
               </span>
             </div>
           {:else}
-            <p class="text-[11px] text-[var(--accent-light)] animate-pulse">{$t('update.installing')}</p>
+            <div class="flex items-center gap-2 text-xs text-[var(--accent)] font-semibold animate-pulse">
+              <Loader2 size={13} class="animate-spin" />
+              <span>{$t('update.installing')}</span>
+            </div>
           {/if}
         </div>
       {/if}
 
-      <div class="px-6 py-4 border-t border-[var(--border)] bg-[var(--bg-sidebar)] flex flex-col gap-3">
-        <label class="flex items-center gap-2 text-[11px] text-[var(--text-muted)] cursor-pointer select-none">
+      <!-- Footer Actions -->
+      <div class="px-6 py-4 border-t border-[var(--border)] bg-[var(--bg-sidebar)]/80 flex flex-col gap-3">
+        <label class="flex items-center gap-2 text-xs text-[var(--text-muted)] cursor-pointer select-none">
           <input
             type="checkbox"
             checked={autoCheck}
             onchange={handleAutoCheckChange}
-            class="accent-[var(--accent)] w-3.5 h-3.5"
+            class="accent-[var(--accent)] w-3.5 h-3.5 rounded"
           />
-          {$t('update.autoCheck')}
+          <span>{$t('update.autoCheck')}</span>
         </label>
 
-        <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center justify-between gap-3">
           <button
             onclick={handleSkip}
             disabled={phase === 'downloading' || phase === 'installing'}
-            class="text-[11px] text-[var(--text-dim)] hover:text-[var(--text-main)] transition disabled:opacity-40"
+            class="text-xs text-[var(--text-dim)] hover:text-[var(--text-main)] transition disabled:opacity-40 cursor-pointer whitespace-nowrap"
           >
             {$t('update.skip')}
           </button>
 
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 shrink-0">
             <button
               onclick={() => (isOpen = false)}
               disabled={phase === 'downloading' || phase === 'installing'}
-              class="px-3 py-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border)] rounded-lg transition disabled:opacity-40"
+              class="h-8 px-3 text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border)] hover:bg-[var(--bg-hover)] rounded-md transition disabled:opacity-40 cursor-pointer whitespace-nowrap"
             >
               {$t('update.later')}
             </button>
             <button
               onclick={handleOpenRelease}
-              class="px-3 py-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border)] rounded-lg transition"
+              class="h-8 px-3 text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] border border-[var(--border)] hover:bg-[var(--bg-hover)] rounded-md transition cursor-pointer whitespace-nowrap"
             >
               {$t('update.openRelease')}
             </button>
             <button
               onclick={handleInstallNow}
               disabled={phase === 'downloading' || phase === 'installing'}
-              class="px-4 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-light)] disabled:opacity-50 text-black text-xs font-semibold rounded-lg shadow-md transition"
+              class="h-8 px-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-[var(--accent-contrast)] text-xs font-semibold rounded-md shadow-sm transition cursor-pointer whitespace-nowrap"
             >
               {$t('update.installNow')}
             </button>
@@ -168,13 +181,3 @@
     </div>
   </div>
 {/if}
-
-<style>
-  @keyframes fadeIn {
-    from { opacity: 0; transform: scale(0.97); }
-    to { opacity: 1; transform: scale(1); }
-  }
-  .animate-fadeIn {
-    animation: fadeIn 0.15s ease-out;
-  }
-</style>

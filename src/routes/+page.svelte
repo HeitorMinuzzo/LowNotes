@@ -21,6 +21,10 @@
     networkGetPairInfo,
     saveUpdatePrefs,
     undoLastDelete,
+    createNote,
+    createFolder,
+    networkSyncNow,
+    saveTheme,
   } from '$lib/api';
   import { locale, resolveLocale, t, trError } from '$lib/i18n';
   import { resolveNoteLink } from '$lib/note-links';
@@ -42,10 +46,15 @@
   import WelcomeModal from '$lib/components/WelcomeModal.svelte';
   import UpdateModal from '$lib/components/UpdateModal.svelte';
   import SettingsView from '$lib/components/SettingsView.svelte';
+  import CommandPalette from '$lib/components/CommandPalette.svelte';
+  import BorderBeam from '$lib/components/ui/BorderBeam.svelte';
+  import ShimmerButton from '$lib/components/ui/ShimmerButton.svelte';
+  import AmbientGlow from '$lib/components/ui/AmbientGlow.svelte';
   let settings = $state<AppSettings | null>(null);
   let theme = $state<AppTheme>('dark');
   let viewMode = $state<ViewMode>('split');
   let isGraphOpen = $state(false);
+  let isCommandPaletteOpen = $state(false);
   let activeVault = $state<VaultConfig | null>(null);
   let vaults = $state<VaultConfig[]>([]);
   let items = $state<VaultItem[]>([]);
@@ -79,6 +88,94 @@
   let presencePruneTimer: ReturnType<typeof setInterval> | undefined;
   let undoPending = false;
   let lastUndoableAction: 'delete' | 'text' = 'text';
+  function handleGlobalShortcuts(event: KeyboardEvent) {
+    if (event.defaultPrevented || event.repeat) return;
+    const isCtrlOrMeta = event.ctrlKey || event.metaKey;
+    const target = event.target instanceof Element ? event.target : null;
+
+    // Ctrl+K / Cmd+K -> Toggle Command Palette
+    if (isCtrlOrMeta && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      event.stopPropagation();
+      isCommandPaletteOpen = !isCommandPaletteOpen;
+      return;
+    }
+
+    // Skip other shortcuts if inside an input or editor
+    if (target?.closest('input, textarea, select, .cm-editor, [contenteditable="true"]')) return;
+
+    // Ctrl+J / Cmd+J -> Toggle AI Copilot
+    if (isCtrlOrMeta && event.key.toLowerCase() === 'j') {
+      event.preventDefault();
+      event.stopPropagation();
+      isAiChatOpen = !isAiChatOpen;
+      return;
+    }
+
+    // Ctrl+G / Cmd+G -> Toggle Graph
+    if (isCtrlOrMeta && event.key.toLowerCase() === 'g') {
+      event.preventDefault();
+      event.stopPropagation();
+      isGraphOpen = !isGraphOpen;
+      return;
+    }
+
+    // Ctrl+, -> Open Settings
+    if (isCtrlOrMeta && event.key === ',') {
+      event.preventDefault();
+      event.stopPropagation();
+      openSettings('general');
+      return;
+    }
+  }
+
+  async function handleQuickNewNote() {
+    const name = prompt($t('sidebar.noteNamePlaceholder') || 'Nome da nova nota:');
+    if (!name || !name.trim()) return;
+    try {
+      const trimmed = name.trim();
+      const path = await createNote(trimmed, trimmed.split('/').at(-1) || trimmed);
+      await refreshItems();
+      await openNote(path);
+    } catch (e: any) {
+      alert(trError(typeof e === 'string' ? e : e.message || 'sidebar.errorCreateNote'));
+    }
+  }
+
+  async function handleQuickNewFolder() {
+    const name = prompt($t('sidebar.folderNamePlaceholder') || 'Nome da nova pasta:');
+    if (!name || !name.trim()) return;
+    try {
+      await createFolder(name.trim());
+      await refreshItems();
+    } catch (e: any) {
+      alert(trError(typeof e === 'string' ? e : e.message || 'sidebar.errorCreateFolder'));
+    }
+  }
+
+  async function handleQuickSync() {
+    syncStatus = 'syncing';
+    try {
+      await networkSyncNow();
+      await refreshItems();
+      syncStatus = 'synced';
+      setTimeout(() => {
+        syncStatus = 'idle';
+      }, 2500);
+    } catch {
+      syncStatus = 'error';
+    }
+  }
+
+  async function handleThemeChange(nextTheme: AppTheme) {
+    theme = nextTheme;
+    try {
+      await saveTheme(nextTheme);
+      if (settings) settings.theme = nextTheme;
+    } catch (err) {
+      console.error('Failed to save theme:', err);
+    }
+  }
 
   async function handleUndoDeletedItem(event: KeyboardEvent) {
     if (event.key.toLowerCase() !== 'z' || !(event.ctrlKey || event.metaKey)
@@ -272,6 +369,7 @@
   });
 
   onMount(async () => {
+    window.addEventListener('keydown', handleGlobalShortcuts, true);
     window.addEventListener('keydown', handleUndoDeletedItem, true);
     // Setup P2P event listeners first so no events are lost
     const u1 = await listen<NetworkEventPayload>('p2p:ready', (event) => {
@@ -378,6 +476,7 @@
   });
 
   onDestroy(() => {
+    window.removeEventListener('keydown', handleGlobalShortcuts, true);
     window.removeEventListener('keydown', handleUndoDeletedItem, true);
     unlisteners.forEach((u) => u());
     if (updateTimer) clearInterval(updateTimer);
@@ -399,28 +498,80 @@
   {#if isSettingsOpen && settings}
     <SettingsView {settings} initialTab={settingsTab} onClose={() => void closeSettings()} onChange={handleSettingsChange} />
   {:else if !activeVault}
-    <!-- Welcome screen when no vault is configured -->
-    <main class="flex-1 flex flex-col items-center justify-center p-8 text-center select-none">
-      <button class="absolute top-5 right-6 text-sm text-[var(--text-muted)] hover:text-[var(--accent-light)]" onclick={() => openSettings()}>{$t('settings.title')}</button>
-      <div class="w-16 h-16 rounded-2xl bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center text-3xl mb-6 shadow-xl">
-        ✦
+    <!-- Welcome screen when no vault is configured (Magic UI Bento Showcase) -->
+    <main class="relative flex-1 flex flex-col items-center justify-center p-6 md:p-12 text-center select-none overflow-y-auto">
+      <AmbientGlow color="var(--accent)" size="600px" opacity={0.12} class="top-[-100px] left-1/2 -translate-x-1/2" />
+      <AmbientGlow color="var(--danger)" size="450px" opacity={0.08} class="bottom-[-150px] right-[-100px]" />
+
+      <!-- Topbar actions -->
+      <div class="absolute top-6 right-8 flex items-center gap-3">
+        <button
+          onclick={() => openSettings()}
+          class="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-card)]/80 hover:bg-[var(--bg-hover)] text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all shadow-sm backdrop-blur-md"
+        >
+          <span>⚙️</span>
+          <span>{$t('settings.title')}</span>
+        </button>
       </div>
-      <h1 class="text-2xl font-bold mb-2">{$t('app.welcomeTitle')}</h1>
-      <p class="text-sm text-[var(--text-muted)] max-w-md mb-8 leading-relaxed">
-        {$t('app.welcomeSubtitle')}
-      </p>
 
-      <button
-        onclick={handleOpenVaultFolder}
-        class="px-6 py-3 bg-[var(--accent)] hover:bg-[var(--accent-light)] text-black font-semibold text-sm rounded-xl transition shadow-lg flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
-      >
-        <span>📁</span>
-        <span>{$t('app.chooseVaultFolder')}</span>
-      </button>
+      <!-- Hero Header -->
+      <div class="relative z-10 max-w-2xl flex flex-col items-center">
+        <!-- Floating badge -->
+        <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-[var(--border)] bg-[var(--bg-card)]/90 backdrop-blur-md text-xs font-medium text-[var(--accent)] mb-6 shadow-sm">
+          <span class="w-2 h-2 rounded-full bg-[var(--accent)] animate-[pulse-subtle_2s_infinite]"></span>
+          <span>LowNotes v0.2.1 • P2P & Markdown Local</span>
+        </div>
 
-      <p class="text-xs text-[var(--text-dim)] mt-6">
-        {$t('app.filesReadable')}
-      </p>
+        <h1 class="text-3xl md:text-5xl font-extrabold tracking-tight mb-4 text-[var(--text-main)] leading-tight">
+          {$t('app.welcomeTitle')}
+        </h1>
+
+        <p class="text-sm md:text-base text-[var(--text-muted)] max-w-lg mb-8 leading-relaxed">
+          {$t('app.welcomeSubtitle')}
+        </p>
+
+        <!-- CTA Shimmer Button -->
+        <div class="relative mb-12">
+          <ShimmerButton onclick={handleOpenVaultFolder} class="px-7 py-3.5 text-sm font-bold shadow-xl">
+            <span class="text-base">📁</span>
+            <span>{$t('app.chooseVaultFolder')}</span>
+          </ShimmerButton>
+        </div>
+      </div>
+
+      <!-- Bento Grid features -->
+      <div class="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl w-full text-left">
+        <div class="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)]/70 backdrop-blur-md p-5 glow-card-hover group">
+          <div class="w-10 h-10 rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 flex items-center justify-center text-lg mb-3">
+            📄
+          </div>
+          <h3 class="text-sm font-bold text-[var(--text-main)] mb-1">Arquivos Markdown Reais</h3>
+          <p class="text-xs text-[var(--text-muted)] leading-relaxed">
+            {$t('app.filesReadable')} Suas notas permanecem legíveis em qualquer outro editor.
+          </p>
+        </div>
+
+        <div class="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)]/70 backdrop-blur-md p-5 glow-card-hover group">
+          <BorderBeam size={120} duration={8} borderWidth={1.5} colorFrom="var(--accent)" colorTo="var(--accent-light)" />
+          <div class="w-10 h-10 rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 flex items-center justify-center text-lg mb-3">
+            ⚡
+          </div>
+          <h3 class="text-sm font-bold text-[var(--text-main)] mb-1">P2P Criptografado</h3>
+          <p class="text-xs text-[var(--text-muted)] leading-relaxed">
+            Sincronização direta entre seus dispositivos via Iroh e CRDTs, sem nuvem proprietária.
+          </p>
+        </div>
+
+        <div class="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)]/70 backdrop-blur-md p-5 glow-card-hover group">
+          <div class="w-10 h-10 rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 flex items-center justify-center text-lg mb-3">
+            🧠
+          </div>
+          <h3 class="text-sm font-bold text-[var(--text-main)] mb-1">Assistente com RAG Local</h3>
+          <p class="text-xs text-[var(--text-muted)] leading-relaxed">
+            Consulte suas notas e faça buscas na web mantendo sua privacidade sob total controle.
+          </p>
+        </div>
+      </div>
     </main>
   {:else}
     <!-- Main App Layout -->
@@ -453,20 +604,21 @@
       onOpenPairModal={() => (isPairModalOpen = true)}
       onRefreshItems={refreshItems}
       onItemDeleted={() => (lastUndoableAction = 'delete')}
+      onOpenCommandPalette={() => (isCommandPaletteOpen = true)}
       presence={activeEditors}
     />
 
     <!-- Editor Surface -->
     <div class="flex-1 flex flex-col h-full overflow-hidden bg-[var(--bg-main)]">
       {#if conflictNotice}
-        <div role="alert" class="flex items-center gap-3 px-4 py-2 border-b border-[var(--danger)] bg-[var(--bg-card)] text-xs">
+        <div role="alert" class="flex items-center gap-3 px-5 py-2.5 border-b border-[var(--danger)]/50 bg-[var(--bg-card)]/95 backdrop-blur-md text-xs shadow-lg">
           <div class="flex-1 min-w-0">
-            <strong class="text-[var(--accent-light)]">{$t('app.conflictDetected')}</strong>
+            <strong class="text-[var(--danger)] font-bold">{$t('app.conflictDetected')}</strong>
             <span class="ml-2 text-[var(--text-muted)]">{$t('app.conflictExplanation')}</span>
-            <span class="block truncate mt-1 text-[var(--text-dim)]">{conflictNotice.note_path} → {conflictNotice.conflict_path}</span>
+            <span class="block truncate mt-0.5 text-[var(--text-dim)] font-mono text-[11px]">{conflictNotice.note_path} → {conflictNotice.conflict_path}</span>
           </div>
-          <button class="shrink-0 rounded px-3 py-1.5 bg-[var(--accent)] text-[var(--accent-contrast)] font-semibold" onclick={() => { if (conflictNotice) void openNote(conflictNotice.conflict_path); conflictNotice = null; }}>{$t('app.openConflict')}</button>
-          <button class="shrink-0 px-2 py-1 text-[var(--text-muted)] hover:text-[var(--text-main)]" aria-label={$t('app.dismissConflict')} title={$t('app.dismissConflict')} onclick={() => (conflictNotice = null)}>×</button>
+          <button class="shrink-0 rounded-lg px-3.5 py-1.5 bg-[var(--accent)] text-[var(--accent-contrast)] font-bold text-xs shadow hover:opacity-90 transition" onclick={() => { if (conflictNotice) void openNote(conflictNotice.conflict_path); conflictNotice = null; }}>{$t('app.openConflict')}</button>
+          <button class="shrink-0 p-1.5 text-[var(--text-muted)] hover:text-[var(--text-main)] rounded-md hover:bg-[var(--bg-hover)]" aria-label={$t('app.dismissConflict')} title={$t('app.dismissConflict')} onclick={() => (conflictNotice = null)}>✕</button>
         </div>
       {/if}
       {#if isGraphOpen}
@@ -497,23 +649,61 @@
         />
         {/key}
       {:else}
-        <div class="flex-1 flex flex-col min-h-0 select-none text-[var(--text-dim)]">
-          <header class="app-topbar flex items-center justify-between gap-2 px-4 border-b border-[var(--border)] bg-[var(--bg-sidebar)]">
-            <button
-              onclick={() => (isGraphOpen = true)}
-              class="px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-xs text-[var(--text-muted)] hover:text-[var(--accent-light)] transition"
-            >🕸 {$t('graph.button')}</button>
-            <button
-              onclick={() => (isAiChatOpen = !isAiChatOpen)}
-              class="px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-xs text-[var(--text-muted)] hover:text-[var(--accent-light)] flex items-center gap-1.5 transition shadow"
-            >
-              <span>💬</span>
-              <span>{$t('app.openAiChat')}</span>
-            </button>
+        <!-- Modern Empty Dashboard state when vault is open but no note is active -->
+        <div class="relative flex-1 flex flex-col min-h-0 select-none bg-[var(--bg-main)]">
+          <AmbientGlow color="var(--accent)" size="500px" opacity={0.08} class="top-10 right-20" />
+
+          <header class="h-11 flex items-center justify-between gap-3 px-3 border-b border-[var(--border)] bg-[var(--bg-sidebar)]/80 backdrop-blur-xl shrink-0">
+            <div class="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+              <span class="font-semibold text-[var(--text-main)]">{activeVault.name}</span>
+              <span>/</span>
+              <span class="text-[var(--text-dim)]">{$t('app.emptyState')}</span>
+            </div>
+
+            <div class="flex items-center gap-1.5">
+              <button
+                onclick={() => (isGraphOpen = true)}
+                class="h-7 flex items-center px-2.5 rounded-md border border-[var(--border)] bg-[var(--bg-card)]/70 hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition shadow-sm cursor-pointer"
+              >
+                <span>{$t('graph.button')}</span>
+              </button>
+              <button
+                onclick={() => (isAiChatOpen = !isAiChatOpen)}
+                class="h-7 flex items-center px-2.5 rounded-md border border-[var(--border)] bg-[var(--bg-card)]/70 hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--accent)] transition shadow-sm cursor-pointer"
+              >
+                <span>{$t('app.openAiChat')}</span>
+              </button>
+            </div>
           </header>
+
           <div class="flex-1 flex flex-col items-center justify-center text-center p-8">
-            <span class="text-4xl mb-3 opacity-60">📄</span>
-            <p class="text-sm">{$t('app.emptyState')}</p>
+            <div class="relative p-8 rounded-3xl border border-[var(--border)] bg-[var(--bg-card)]/60 backdrop-blur-xl shadow-2xl max-w-md w-full flex flex-col items-center glow-card-hover">
+              <BorderBeam size={180} duration={10} borderWidth={1.5} colorFrom="var(--accent)" colorTo="var(--accent-light)" />
+              <div class="w-16 h-16 rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 flex items-center justify-center text-3xl mb-4 shadow-inner">
+                📝
+              </div>
+              <h2 class="text-lg font-bold text-[var(--text-main)] mb-1">
+                {$t('app.emptyState')}
+              </h2>
+              <p class="text-xs text-[var(--text-muted)] max-w-xs leading-relaxed mb-6">
+                Selecione uma nota no menu lateral ou abra o assistente de inteligência artificial.
+              </p>
+
+              <div class="flex items-center gap-3">
+                <button
+                  onclick={() => (isGraphOpen = true)}
+                  class="px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-xs font-semibold text-[var(--text-main)] transition"
+                >
+                  🕸 Mapa de Grafos
+                </button>
+                <button
+                  onclick={() => (isAiChatOpen = true)}
+                  class="px-4 py-2 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] hover:opacity-90 text-xs font-bold transition shadow-md"
+                >
+                  💬 Assistente IA
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       {/if}
@@ -581,5 +771,23 @@
       }
       isUpdateOpen = false;
     }}
+  />
+
+  <CommandPalette
+    isOpen={isCommandPaletteOpen}
+    {items}
+    {viewMode}
+    {theme}
+    onClose={() => (isCommandPaletteOpen = false)}
+    onOpenNote={(path) => void openNote(path)}
+    onCreateNote={() => void handleQuickNewNote()}
+    onCreateFolder={() => void handleQuickNewFolder()}
+    onToggleAi={() => (isAiChatOpen = !isAiChatOpen)}
+    onToggleGraph={() => (isGraphOpen = !isGraphOpen)}
+    onOpenSettings={(tab) => void openSettings(tab || 'general')}
+    onOpenPair={() => (isPairModalOpen = true)}
+    onSync={() => void handleQuickSync()}
+    onChangeTheme={(next) => void handleThemeChange(next)}
+    onChangeViewMode={(mode) => void handleViewModeChange(mode)}
   />
 </div>

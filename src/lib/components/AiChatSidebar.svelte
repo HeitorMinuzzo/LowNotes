@@ -22,6 +22,24 @@
     saveAiSettings,
   } from '../api';
   import { locale, t, trError, ts } from '$lib/i18n';
+  import {
+    Plus,
+    Clock,
+    Brain,
+    Settings,
+    X,
+    FileText,
+    Globe,
+    Link2,
+    Check,
+    Bot,
+    User,
+    ChevronDown,
+    Search,
+    Edit2,
+    Trash2
+  } from 'lucide-svelte';
+  import BorderBeam from './ui/BorderBeam.svelte';
 
   let {
     isOpen = $bindable(false),
@@ -318,40 +336,54 @@
 
 {#if isOpen}
   <aside
-    class="w-96 h-full flex flex-col border-l border-[var(--border)] bg-[var(--bg-sidebar)] z-30 select-none shadow-2xl relative transition-all"
+    class="w-100 h-full flex flex-col border-l border-[var(--border)] bg-[var(--bg-sidebar)] z-30 select-none shadow-2xl relative transition-all"
   >
     <!-- Top Header -->
-    <header class="app-topbar flex items-center justify-between gap-2 px-4 border-b border-[var(--border)] bg-[var(--bg-card)] min-w-0">
-      <div class="flex items-center gap-2 min-w-0">
-        <span class="text-[var(--accent-light)] font-bold text-sm shrink-0">✦</span>
-        <h3 class="text-xs font-bold text-[var(--text-main)] truncate">{$t('ai.title')}</h3>
+    <header class="app-topbar h-11 shrink-0 flex items-center justify-between gap-2 px-4 border-b border-[var(--border)] bg-[var(--bg-card)]/90 backdrop-blur-xl min-w-0">
+      <div class="flex flex-col min-w-0">
+        <h3 class="text-xs font-bold text-[var(--text-main)] truncate tracking-tight">{$t('ai.title')}</h3>
+        <span class="text-[10px] text-[var(--text-dim)] truncate">Local RAG & Assistente</span>
       </div>
-      <div class="flex items-center gap-0.5 shrink-0">
+
+      <!-- Action Icons Toolbar -->
+      <div class="flex items-center gap-1 shrink-0">
         <button onclick={newChat} disabled={!historyReady}
-          class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--accent-light)] disabled:opacity-40"
-          title={$t('ai.newChat')} aria-label={$t('ai.newChat')}>＋</button>
+          class="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-main)] disabled:opacity-40 transition cursor-pointer"
+          title={$t('ai.newChat')} aria-label={$t('ai.newChat')}>
+          <Plus size={14} />
+        </button>
         <button onclick={() => (pane = pane === 'history' ? 'chat' : 'history')} disabled={!historyReady}
-          class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--accent-light)] disabled:opacity-40"
-          title={$t('ai.history')} aria-label={$t('ai.history')}>◷</button>
+          class="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] {pane === 'history' ? 'bg-[var(--bg-hover)] text-[var(--accent)]' : 'text-[var(--text-dim)] hover:text-[var(--text-main)]'} disabled:opacity-40 transition cursor-pointer"
+          title={$t('ai.history')} aria-label={$t('ai.history')}>
+          <Clock size={14} />
+        </button>
         <button onclick={() => { memoryDraft = archive.memory; pane = pane === 'memory' ? 'chat' : 'memory'; }} disabled={!historyReady}
-          class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-hover)] {archive.memory ? 'text-[var(--accent-light)]' : 'text-[var(--text-dim)]'} hover:text-[var(--accent-light)] disabled:opacity-40"
-          title={$t('ai.memory')} aria-label={$t('ai.memory')}>🧠</button>
+          class="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] {archive.memory || pane === 'memory' ? 'bg-[var(--bg-hover)] text-[var(--accent)]' : 'text-[var(--text-dim)] hover:text-[var(--text-main)]'} disabled:opacity-40 transition cursor-pointer"
+          title={$t('ai.memory')} aria-label={$t('ai.memory')}>
+          <Brain size={14} />
+        </button>
         <button
           onclick={() => onOpenSettings(skill === 'research' ? 'web' : 'ai')}
-          class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--accent-light)] transition"
+          class="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-main)] transition cursor-pointer"
           title={$t('ai.settings')} aria-label={$t('ai.settings')}
-        >⚙️</button>
+        >
+          <Settings size={14} />
+        </button>
         <button
           onclick={() => (isOpen = false)}
-          class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-main)] transition"
+          class="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-main)] transition cursor-pointer"
           title={$t('ai.close')} aria-label={$t('ai.close')}
-        >✕</button>
+        >
+          <X size={14} />
+        </button>
       </div>
     </header>
 
-    <div class="px-4 py-2 border-b border-[var(--border)] bg-[var(--bg-sidebar)] min-w-0">
-      <label class="flex items-center gap-2 min-w-0 text-[11px] text-[var(--text-dim)]">
-        <span class="shrink-0">{$t('ai.quickProviderSwitch')}</span>
+    <!-- Provider and Scope Bar -->
+    <div class="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-sidebar)]/90 backdrop-blur-md flex flex-col gap-2 min-w-0">
+      <!-- Provider Selector -->
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-[11px] font-semibold text-[var(--text-dim)]">Modelo / Provedor:</span>
         <select
           value={aiSettings.active_provider_id}
           onchange={async (e) => {
@@ -360,7 +392,7 @@
             aiSettings.active_provider_id = newId;
             try { await saveAiSettings(aiSettings); } catch (reason) { aiSettings.active_provider_id = previous; errorMessage = trError(String(reason)); }
           }}
-          class="min-w-0 flex-1 bg-[var(--bg-main)] border border-[var(--border)] rounded px-2 py-1 text-[11px] font-medium text-[var(--accent-light)] focus:outline-none focus:border-[var(--accent)] cursor-pointer hover:border-[var(--accent)] transition"
+          class="h-7 bg-[var(--bg-card)] border border-[var(--border)] rounded-md px-2 text-xs font-semibold text-[var(--accent)] focus:outline-none focus:border-[var(--accent)] cursor-pointer hover:border-[var(--accent)]/50 transition shadow-sm max-w-[190px] truncate"
         >
           {#each aiSettings.providers as prov}
             <option value={prov.id} selected={aiSettings.active_provider_id === prov.id}>
@@ -368,90 +400,93 @@
             </option>
           {/each}
         </select>
-      </label>
-    </div>
+      </div>
 
-    {#if errorMessage}
-      <p role="alert" class="px-4 py-1.5 text-xs text-red-500 border-b border-[var(--border)]">{errorMessage}</p>
-    {/if}
+      <!-- Scope & Skill Selector -->
+      <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-[var(--border)]/50">
+        <!-- Scope Switcher -->
+        <div class="h-7 flex items-center p-0.5 rounded-md bg-[var(--bg-card)] border border-[var(--border)] shadow-sm shrink-0">
+          <button
+            onclick={() => (scope = 'vault')}
+            class="h-6 px-2.5 rounded text-[11px] font-medium whitespace-nowrap transition-all cursor-pointer {scope === 'vault' ? 'bg-[var(--bg-active)] text-[var(--text-main)] font-semibold shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
+          >
+            {$t('ai.scopeVault')}
+          </button>
+          <button
+            onclick={() => (scope = 'note')}
+            disabled={!currentNotePath}
+            class="h-6 px-2.5 rounded text-[11px] font-medium whitespace-nowrap transition-all disabled:opacity-40 cursor-pointer {scope === 'note' ? 'bg-[var(--bg-active)] text-[var(--text-main)] font-semibold shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
+            title={currentNotePath ? currentNotePath : $t('ai.scopeNoteHint')}
+          >
+            {$t('ai.scopeNote')}
+          </button>
+        </div>
 
-    <!-- Scope Selector Bar -->
-    <div class="flex items-center justify-between px-4 py-2 bg-[var(--bg-main)] border-b border-[var(--border)] text-xs">
-      <span class="text-[11px] text-[var(--text-dim)]">{$t('ai.scope')}</span>
-      <div class="flex bg-[var(--bg-card)] p-0.5 rounded-lg border border-[var(--border)]">
-        <button
-          onclick={() => (scope = 'vault')}
-          class="px-2.5 py-0.5 rounded-md text-[11px] transition {scope === 'vault' ? 'bg-[var(--accent)] text-black font-semibold shadow' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
-        >
-          {$t('ai.scopeVault')}
-        </button>
-        <button
-          onclick={() => (scope = 'note')}
-          disabled={!currentNotePath}
-          class="px-2.5 py-0.5 rounded-md text-[11px] transition disabled:opacity-40 {scope === 'note' ? 'bg-[var(--accent)] text-black font-semibold shadow' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
-          title={currentNotePath ? currentNotePath : $t('ai.scopeNoteHint')}
-        >
-          {$t('ai.scopeNote')}
-        </button>
+        <!-- Skill Select -->
+        <select bind:value={skill} disabled={isLoading}
+          class="h-7 rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-2 text-[11px] font-medium text-[var(--text-main)] focus:outline-none shadow-sm cursor-pointer truncate max-w-[170px]">
+          <option value="auto">{$t('ai.skillAuto')}</option>
+          <option value="notes">{$t('ai.skillNotes')}</option>
+          <option value="write">{$t('ai.skillWrite')}</option>
+          <option value="research">{$t('ai.skillResearch')}</option>
+        </select>
       </div>
     </div>
 
-    <div class="px-4 py-2 border-b border-[var(--border)] flex flex-col gap-1.5">
-      <label for="assistant-skill" class="text-[11px] text-[var(--text-dim)]">{$t('ai.skill')}</label>
-      <select id="assistant-skill" bind:value={skill} disabled={isLoading}
-        class="w-full rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-2 py-1.5 text-xs text-[var(--text-main)]">
-        <option value="auto">{$t('ai.skillAuto')}</option>
-        <option value="notes">{$t('ai.skillNotes')}</option>
-        <option value="write">{$t('ai.skillWrite')}</option>
-        <option value="research">{$t('ai.skillResearch')}</option>
-      </select>
-      <p class="text-[10px] text-[var(--text-dim)] leading-relaxed">
-        {skill === 'research' ? $t('ai.researchHint') : $t('ai.skillsHint')}
-      </p>
-    </div>
-
+    {#if errorMessage}
+      <div role="alert" class="px-4 py-2 text-xs text-[var(--danger)] bg-[var(--danger)]/10 border-b border-[var(--danger)]/30 font-medium">{errorMessage}</div>
+    {/if}
 
     {#if pane === 'history'}
-      <div class="flex-1 min-h-0 flex flex-col p-3 gap-3">
+      <div class="flex-1 min-h-0 flex flex-col p-4 gap-3">
         <div class="flex items-center justify-between">
-          <h4 class="text-sm font-semibold">{$t('ai.history')}</h4>
-          <button onclick={() => (pane = 'chat')} class="text-xs text-[var(--accent-light)]">{$t('ai.backToChat')}</button>
+          <h4 class="text-sm font-bold text-[var(--text-main)]">{$t('ai.history')}</h4>
+          <button onclick={() => (pane = 'chat')} class="text-xs text-[var(--accent)] font-semibold hover:underline">{$t('ai.backToChat')}</button>
         </div>
-        <p class="text-[10px] text-[var(--text-dim)]">{$t('ai.historyLocalHint')}</p>
-        <input bind:value={historySearch} placeholder={$t('ai.searchHistory')}
-          class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-md px-2.5 py-1.5 text-xs" />
-        <div class="flex-1 overflow-y-auto flex flex-col gap-1.5">
+        <p class="text-[11px] text-[var(--text-dim)]">{$t('ai.historyLocalHint')}</p>
+        <div class="relative">
+          <Search size={13} class="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+          <input bind:value={historySearch} placeholder={$t('ai.searchHistory')}
+            class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl pl-8 pr-3 py-1.5 text-xs text-[var(--text-main)] placeholder-[var(--text-dim)] focus:outline-none focus:border-[var(--accent)]" />
+        </div>
+        <div class="flex-1 overflow-y-auto flex flex-col gap-2">
           {#each sortedChats.filter((chat) => {
             const query = historySearch.trim().toLocaleLowerCase();
             return !query || chat.title.toLocaleLowerCase().includes(query)
               || chat.messages.some((message) => message.content.toLocaleLowerCase().includes(query));
           }) as chat (chat.id)}
-            <div class="flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--bg-card)]">
+            {@const isActiveChat = archive.activeConversationId === chat.id}
+            <div class="flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] hover:border-[var(--accent)]/40 transition-all shadow-sm">
               <button onclick={() => openChat(chat.id)}
-                class="flex-1 min-w-0 px-2.5 py-2 text-left hover:bg-[var(--bg-hover)]">
-                <span class="block text-xs font-medium truncate {archive.activeConversationId === chat.id ? 'text-[var(--accent-light)]' : 'text-[var(--text-main)]'}">{chat.title}</span>
-                <span class="block text-[10px] text-[var(--text-dim)]">{new Date(chat.updatedAt).toLocaleDateString($locale)} · {chat.messages.length} {$t('ai.messages')}</span>
+                class="flex-1 min-w-0 px-3 py-2 text-left">
+                <span class="block text-xs font-semibold truncate {isActiveChat ? 'text-[var(--accent)]' : 'text-[var(--text-main)]'}">{chat.title}</span>
+                <span class="block text-[10px] text-[var(--text-dim)] mt-0.5">{new Date(chat.updatedAt).toLocaleDateString($locale)} · {chat.messages.length} {$t('ai.messages')}</span>
               </button>
               <button onclick={() => renameChat(chat.id)} title={$t('ai.renameChat')} aria-label={$t('ai.renameChat')}
-                class="w-7 h-7 rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-main)]">✎</button>
+                class="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-main)]">
+                <Edit2 size={12} />
+              </button>
               <button onclick={() => deleteChat(chat.id)} title={$t('ai.deleteChat')} aria-label={$t('ai.deleteChat')}
-                class="w-7 h-7 mr-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-red-400">✕</button>
+                class="p-1.5 mr-1 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--danger)]">
+                <Trash2 size={12} />
+              </button>
             </div>
           {:else}
-            <p class="text-xs text-[var(--text-dim)] text-center py-8">{$t('ai.noHistory')}</p>
+            <p class="text-xs text-[var(--text-dim)] text-center py-12">{$t('ai.noHistory')}</p>
           {/each}
         </div>
       </div>
     {:else if pane === 'memory'}
       <div class="flex-1 min-h-0 flex flex-col p-4 gap-3">
         <div class="flex items-center justify-between">
-          <h4 class="text-sm font-semibold">{$t('ai.memory')}</h4>
-          <button onclick={() => (pane = 'chat')} class="text-xs text-[var(--accent-light)]">{$t('ai.backToChat')}</button>
+          <h4 class="text-sm font-bold text-[var(--text-main)]">{$t('ai.memory')}</h4>
+          <button onclick={() => (pane = 'chat')} class="text-xs text-[var(--accent)] font-semibold hover:underline">{$t('ai.backToChat')}</button>
         </div>
         <p class="text-xs leading-relaxed text-[var(--text-muted)]">{$t('ai.memoryHelp')}</p>
         <textarea bind:value={memoryDraft} maxlength="8000"
-          class="flex-1 min-h-40 w-full resize-none rounded-md border border-[var(--border)] bg-[var(--bg-main)] p-2.5 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent)]"></textarea>
-        <button onclick={saveMemory} class="self-end px-3 py-1.5 rounded-md bg-[var(--accent)] text-black text-xs font-semibold">{$t('ai.saveMemory')}</button>
+          placeholder="Ex: Prefiro notas em formato de tópicos sucintos..."
+          class="flex-1 min-h-40 w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--bg-main)] p-3 text-xs text-[var(--text-main)] focus:outline-none focus:border-[var(--accent)] shadow-inner"></textarea>
+        <button onclick={saveMemory} class="self-end px-4 py-2 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] text-xs font-bold shadow-md hover:opacity-90 transition">{$t('ai.saveMemory')}</button>
       </div>
     {:else}
     <!-- Chat Messages Container -->
@@ -463,34 +498,31 @@
       {#if !historyReady}
         <div class="my-auto text-center text-xs text-[var(--text-dim)]">
           <p>{$t('ai.historyLoading')}</p>
-          {#if errorMessage}<button onclick={loadHistory} class="mt-2 text-[var(--accent-light)]">{$t('ai.retryHistory')}</button>{/if}
+          {#if errorMessage}<button onclick={loadHistory} class="mt-2 text-[var(--accent)] underline">{$t('ai.retryHistory')}</button>{/if}
         </div>
       {:else if messages.length === 0}
         <div class="flex flex-col items-center justify-center my-auto py-8 text-center text-[var(--text-dim)] select-none">
-          <div class="w-12 h-12 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center text-xl mb-3">
-            ✦
-          </div>
-          <h4 class="text-xs font-bold text-[var(--text-main)] mb-1">{$t('ai.emptyTitle')}</h4>
-          <p class="text-[11px] text-[var(--text-muted)] max-w-[240px] leading-relaxed mb-4">
+          <h4 class="text-sm font-bold text-[var(--text-main)] mb-1">{$t('ai.emptyTitle')}</h4>
+          <p class="text-xs text-[var(--text-muted)] max-w-[280px] leading-relaxed mb-5">
             {$t('ai.emptySubtitle')}
           </p>
 
-          <div class="flex flex-col gap-1.5 w-full max-w-[260px]">
+          <div class="flex flex-col gap-2 w-full max-w-[320px]">
             <button
               onclick={() => sendMessage(ts('ai.suggestionCreate'), 'write')}
-              class="px-3 py-2 text-[11px] text-left rounded-lg bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
+              class="p-2.5 text-xs text-left rounded-md bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all shadow-sm cursor-pointer"
             >
               {$t('ai.suggestionCreate')}
             </button>
             <button
               onclick={() => sendMessage(ts('ai.suggestionSummary'))}
-              class="px-3 py-2 text-[11px] text-left rounded-lg bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
+              class="p-2.5 text-xs text-left rounded-md bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all shadow-sm cursor-pointer"
             >
               {$t('ai.suggestionSummary')}
             </button>
             <button
               onclick={() => sendMessage(ts('ai.suggestionResearch'), 'research')}
-              class="px-3 py-2 text-[11px] text-left rounded-lg bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
+              class="p-2.5 text-xs text-left rounded-md bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all shadow-sm cursor-pointer"
             >
               {$t('ai.suggestionResearch')}
             </button>
@@ -498,36 +530,36 @@
         </div>
       {:else}
         {#each messages as msg}
-          <div class="flex flex-col gap-1 {msg.role === 'user' ? 'items-end' : 'items-start'}">
+          <div class="flex flex-col gap-1.5 {msg.role === 'user' ? 'items-end' : 'items-start'}">
             <div class="flex items-center gap-1.5 text-[10px] text-[var(--text-dim)] px-1 select-none">
-              <span>{msg.role === 'user' ? $t('ai.you') : $t('ai.assistantRole')}</span>
+              <span class="font-semibold">{msg.role === 'user' ? $t('ai.you') : $t('ai.assistantRole')}</span>
               <span>•</span>
               <span>{msg.timestamp}</span>
               {#if msg.role === 'user'}
                 <button onclick={() => rememberMessage(msg)} title={$t('ai.rememberMessage')}
-                  aria-label={$t('ai.rememberMessage')} class="ml-1 hover:text-[var(--accent-light)]">🧠</button>
+                  aria-label={$t('ai.rememberMessage')} class="ml-1 hover:text-[var(--accent)] text-[10px] font-medium text-[var(--text-dim)] cursor-pointer">Lembrar</button>
               {/if}
             </div>
 
             <div
-              class="max-w-[92%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed {msg.role === 'user' ? 'bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--text-main)]' : 'bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-main)] shadow-sm'}"
+              class="max-w-[92%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed {msg.role === 'user' ? 'bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--text-main)] shadow-sm' : 'bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-main)] shadow-md'}"
             >
               {#if msg.role === 'assistant'}
                 <div class="prose max-w-none text-xs leading-relaxed">
                   {@html renderChatMarkdown(trError(msg.content))}
                 </div>
                 {#if msg.isError}
-                  <button class="mt-3 text-xs font-semibold text-[var(--accent-light)] hover:underline" onclick={() => onOpenSettings(msg.errorSettingsTab || 'providers')}>{msg.errorSettingsTab === 'web' ? $t('settings.webSearch') : $t('settings.providers')}</button>
+                  <button class="mt-3 text-xs font-bold text-[var(--danger)] hover:underline block" onclick={() => onOpenSettings(msg.errorSettingsTab || 'providers')}>{msg.errorSettingsTab === 'web' ? $t('settings.webSearch') : $t('settings.providers')}</button>
                 {/if}
 
                 {#each msg.warnings || [] as warning}
-                  <p role="status" class="mt-2 text-xs text-[var(--accent-light)]">{trError(warning)}</p>
+                  <p role="status" class="mt-2 text-xs text-[var(--accent)] font-medium">{trError(warning)}</p>
                 {/each}
 
                 {#if !msg.drafts?.length && !msg.isError && msg.content.trim()}
-                  <div class="mt-3 flex flex-wrap items-center gap-2">
+                  <div class="mt-3 pt-2 border-t border-[var(--border)]/60 flex flex-wrap items-center gap-2">
                     <button onclick={() => { msg.drafts = [{ path: `${ts('ai.responseDocumentName')}.md`, content: msg.content }]; void persistHistory(); }}
-                      class="px-2 py-1 rounded border border-[var(--border)] text-[11px] text-[var(--accent-light)] hover:bg-[var(--bg-hover)]">
+                      class="h-7 px-2.5 rounded-md border border-[var(--border)] bg-[var(--bg-main)] text-xs font-medium text-[var(--accent)] hover:bg-[var(--bg-hover)] shadow-sm cursor-pointer">
                       {$t('ai.responseToNote')}
                     </button>
                     <DocumentActions content={msg.content} path={`${ts('ai.responseDocumentName')}.md`} />
@@ -537,69 +569,79 @@
                 {#if msg.drafts?.length}
                   <div class="mt-3 flex flex-col gap-3">
                     <div class="flex items-center justify-between gap-2">
-                      <span class="text-[11px] font-semibold">{$t('ai.drafts', { count: msg.drafts.length })}</span>
+                      <span class="text-[11px] font-bold text-[var(--text-main)]">{$t('ai.drafts', { count: msg.drafts.length })}</span>
                       {#if msg.drafts.length > 1 && msg.drafts.some((d) => !d.savedPath)}
                         <button onclick={() => saveAllDrafts(msg)} disabled={msg.drafts.some((d) => d.saving)}
-                          class="text-[11px] text-[var(--accent-light)] disabled:opacity-40">{$t('ai.saveAll')}</button>
+                          class="text-[11px] font-semibold text-[var(--accent)] hover:underline disabled:opacity-40">{$t('ai.saveAll')}</button>
                       {/if}
                     </div>
                     {#each msg.drafts as draft}
-                      <div class="rounded-lg border border-[var(--border)] bg-[var(--bg-main)] p-2.5 flex flex-col gap-2">
+                      <div class="rounded-xl border border-[var(--border)] bg-[var(--bg-main)] p-3 flex flex-col gap-2 shadow-sm">
                         <input aria-label={$t('ai.draftPath')} bind:value={draft.path} oninput={schedulePersist} onchange={() => void persistHistory()} disabled={!!draft.savedPath || draft.saving}
-                          class="w-full bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border)] rounded px-2 py-1 text-[11px] disabled:opacity-70" />
-                        <details>
-                          <summary class="cursor-pointer text-[11px] text-[var(--text-muted)]">{$t('ai.previewDraft')}</summary>
+                          class="w-full bg-[var(--bg-card)] text-[var(--text-main)] border border-[var(--border)] rounded-lg px-2.5 py-1 text-xs font-mono disabled:opacity-70 focus:outline-none focus:border-[var(--accent)]" />
+                        <details class="group">
+                          <summary class="cursor-pointer text-[11px] text-[var(--text-muted)] font-medium hover:text-[var(--text-main)]">{$t('ai.previewDraft')}</summary>
                           <div class="prose text-xs max-h-72 overflow-auto py-2">{@html renderChatMarkdown(draft.content)}</div>
                           <textarea aria-label={$t('ai.editDraft')} bind:value={draft.content} oninput={schedulePersist} onchange={() => void persistHistory()} rows="8" disabled={!!draft.savedPath || draft.saving}
-                            class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded p-2 font-mono text-[11px] disabled:opacity-60"></textarea>
+                            class="w-full bg-[var(--bg-card)] border border-[var(--border)] rounded-lg p-2 font-mono text-[11px] disabled:opacity-60 focus:outline-none"></textarea>
                         </details>
                         <div class="flex flex-wrap items-center gap-2">
                           {#if draft.savedPath}
                             <button onclick={() => onNavigateToSource(draft.savedPath!, 1)}
-                              class="text-[11px] text-[var(--accent-light)] hover:underline">✓ {$t('ai.openSavedNote')}</button>
+                              class="text-[11px] text-[var(--success)] font-semibold hover:underline">✓ {$t('ai.openSavedNote')}</button>
                           {:else}
                             <button onclick={() => saveDraft(msg, draft)} disabled={draft.saving || !draft.content.trim()}
-                              class="px-2 py-1 rounded bg-[var(--accent)] text-black text-[11px] disabled:opacity-40">
+                              class="px-3 py-1 rounded-lg bg-[var(--accent)] text-[var(--accent-contrast)] font-bold text-[11px] shadow-sm disabled:opacity-40">
                               {draft.saving ? $t('editor.saving') : $t('ai.saveDraft')}
                             </button>
                           {/if}
                           <DocumentActions content={draft.content} path={draft.path} />
                         </div>
-                        {#if draft.error}<p role="alert" class="text-[11px] text-red-500">{draft.error}</p>{/if}
+                        {#if draft.error}<p role="alert" class="text-[11px] text-[var(--danger)]">{draft.error}</p>{/if}
                       </div>
                     {/each}
                   </div>
                 {/if}
 
                 {#if msg.webSources?.length}
-                  <div class="mt-3 pt-2 border-t border-[var(--border)] flex flex-col gap-1">
-                    <span class="text-[10px] text-[var(--text-dim)]">{$t('ai.webSources')}</span>
-                    {#each msg.webSources as source}
-                      <a href={source.url} title={source.description} class="text-[11px] text-[var(--accent-light)] hover:underline break-words">{source.title}</a>
-                    {/each}
+                  <div class="mt-3 pt-2.5 border-t border-[var(--border)] flex flex-col gap-1.5">
+                    <span class="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider flex items-center gap-1">
+                      <Globe size={11} />
+                      {$t('ai.webSources')}
+                    </span>
+                    <div class="flex flex-col gap-1">
+                      {#each msg.webSources as source}
+                        <a href={source.url} title={source.description} class="text-[11px] text-[var(--accent)] hover:underline truncate block">
+                          {source.title}
+                        </a>
+                      {/each}
+                    </div>
                   </div>
                 {/if}
 
                 {#if msg.appliedLinks && msg.appliedLinks > 0}
-                  <div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--bg-main)] border border-[var(--border)] text-[10px] text-[var(--accent-light)] select-none">
-                    🔗 {$t('ai.linksApplied', { count: msg.appliedLinks })}
+                  <div class="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[var(--bg-main)] border border-[var(--border)] text-[11px] text-[var(--accent)] font-semibold select-none">
+                    <Link2 size={12} />
+                    <span>{$t('ai.linksApplied', { count: msg.appliedLinks })}</span>
                   </div>
                 {/if}
 
                 <!-- Sources Chips -->
                 {#if msg.sources && msg.sources.length > 0}
-                  <div class="mt-3 pt-2 border-t border-[var(--border)] flex flex-col gap-1.5 select-none">
-                    <span class="text-[10px] text-[var(--text-dim)] font-medium">{$t('ai.sources')}</span>
-                    <div class="flex flex-wrap gap-1">
+                  <div class="mt-3 pt-2.5 border-t border-[var(--border)] flex flex-col gap-1.5 select-none">
+                    <span class="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider flex items-center gap-1">
+                      <FileText size={11} />
+                      {$t('ai.sources')}
+                    </span>
+                    <div class="flex flex-wrap gap-1.5">
                       {#each msg.sources as src}
                         <button
                           onclick={() => onNavigateToSource(src.note_path, src.line_number)}
-                          class="px-2 py-0.5 rounded bg-[var(--bg-main)] hover:bg-[var(--bg-active)] border border-[var(--border)] text-[10px] text-[var(--accent-light)] flex items-center gap-1 transition"
+                          class="px-2.5 py-1 rounded-lg bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[11px] text-[var(--accent)] font-medium flex items-center gap-1.5 transition shadow-sm"
                           title="{src.content.slice(0, 100)}..."
                         >
-                          <span>📄</span>
-                          <span class="truncate max-w-[140px]">{src.note_title}</span>
-                          <span class="text-[var(--text-dim)]">:L{src.line_number}</span>
+                          <span class="truncate max-w-[130px]">{src.note_title}</span>
+                          <span class="text-[10px] font-mono text-[var(--text-dim)]">:L{src.line_number}</span>
                         </button>
                       {/each}
                     </div>
@@ -613,16 +655,16 @@
         {/each}
 
         {#if isLoading && loadingConversationId === currentChat?.id}
-          <div class="flex items-center gap-2 text-xs text-[var(--text-dim)] px-2 animate-pulse">
-            <span class="inline-block w-2 h-2 rounded-full bg-[var(--accent)]"></span>
-            <span>{$t('ai.thinking')}</span>
+          <div class="flex items-center gap-2.5 text-xs text-[var(--text-dim)] px-2 py-1">
+            <span class="w-2 h-2 rounded-full bg-[var(--accent)] animate-ping"></span>
+            <span class="font-medium text-[var(--text-muted)] animate-pulse">{$t('ai.thinking')}</span>
           </div>
         {/if}
       {/if}
     </div>
 
     <!-- Chat Input Footer -->
-    <footer class="p-3 border-t border-[var(--border)] bg-[var(--bg-card)]">
+    <footer class="p-3 border-t border-[var(--border)] bg-[var(--bg-card)]/90 backdrop-blur-xl">
       <form
         onsubmit={(e) => { e.preventDefault(); sendMessage(); }}
         class="flex flex-col gap-2"
@@ -638,7 +680,7 @@
             }}
             placeholder={$t('ai.inputPlaceholder')}
             rows="2"
-            class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-lg p-2.5 text-xs text-[var(--text-main)] placeholder-[var(--text-dim)] resize-none focus:outline-none focus:border-[var(--accent)] select-text"
+            class="w-full bg-[var(--bg-main)] border border-[var(--border)] rounded-xl p-3 text-xs text-[var(--text-main)] placeholder-[var(--text-dim)] resize-none focus:outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent-glow)] select-text shadow-inner transition-all"
           ></textarea>
         </div>
 
@@ -647,10 +689,9 @@
           <button
             type="submit"
             disabled={isLoading || !historyReady || !inputPrompt.trim()}
-            class="px-3 py-1 bg-[var(--accent)] hover:bg-[var(--accent-light)] disabled:opacity-40 text-black text-xs font-semibold rounded-md transition shadow flex items-center gap-1"
+            class="h-7 px-3.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-[var(--accent-contrast)] text-xs font-semibold rounded-md transition shadow-sm flex items-center justify-center cursor-pointer"
           >
-            <span>{$t('ai.send')}</span>
-            <span>➤</span>
+            {$t('ai.send')}
           </button>
         </div>
       </form>
