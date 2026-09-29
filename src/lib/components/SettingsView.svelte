@@ -48,7 +48,16 @@
   const allPalettes = $derived([...BUILTIN_PALETTES, ...palettes.custom_palettes]);
   const appMode = $derived<AppTheme>(settings.theme);
 
-  onMount(() => { getVersion().then((value) => version = value).catch(() => {}); });
+  onMount(() => {
+    getVersion().then((value) => version = value).catch(() => {});
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || document.querySelector('[data-modal-backdrop]')) return;
+      event.preventDefault();
+      onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  });
 
   async function persist(action: Promise<void>, next: AppSettings) {
     error = '';

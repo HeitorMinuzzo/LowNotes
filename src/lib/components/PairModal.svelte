@@ -4,6 +4,7 @@
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { onDestroy, onMount } from 'svelte';
   import { t, trError, ts } from '$lib/i18n';
+  import { dismissibleModal } from '$lib/modal-dismiss';
   let {
     isOpen = $bindable(false),
     pairCode = $bindable(''),
@@ -114,6 +115,7 @@
 {#if isOpen}
   <!-- Backdrop -->
   <div
+    use:dismissibleModal={() => (isOpen = false)}
     class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 select-none animate-fadeIn"
     role="presentation"
   >

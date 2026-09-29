@@ -2,6 +2,7 @@
   import type { PeerConfig } from '../types';
   import { networkAnswerPair } from '../api';
   import { t } from '$lib/i18n';
+  import { dismissibleModal } from '$lib/modal-dismiss';
 
   let {
     request = null,
@@ -11,13 +12,16 @@
     onAnswer: () => void;
   }>();
 
+  let answering = false;
   async function handleDecision(accept: boolean) {
-    if (!request) return;
+    if (!request || answering) return;
+    answering = true;
     try {
       await networkAnswerPair(request.request_id, accept);
     } catch (e) {
       console.error('Failed to answer pairing request:', e);
     } finally {
+      answering = false;
       onAnswer();
     }
   }
@@ -25,6 +29,7 @@
 
 {#if request}
   <div
+    use:dismissibleModal={() => void handleDecision(false)}
     class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 select-none animate-fadeIn"
     role="presentation"
   >

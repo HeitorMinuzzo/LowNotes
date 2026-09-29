@@ -2,6 +2,7 @@
   import { markWelcomeSeen, saveLanguage } from '../api';
   import { t, locale, LOCALE_LABELS, SUPPORTED_LOCALES } from '$lib/i18n';
   import logoUrl from '../../../assets/brand/lownotes_logo.png';
+  import { dismissibleModal } from '$lib/modal-dismiss';
 
   let {
     isOpen = $bindable(false),
@@ -26,6 +27,7 @@
 
 {#if isOpen}
   <div
+    use:dismissibleModal={() => void handleDismiss(false)}
     class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 select-none animate-fadeIn"
     role="presentation"
   >

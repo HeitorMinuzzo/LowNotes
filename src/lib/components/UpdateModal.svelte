@@ -3,6 +3,7 @@
   import { relaunch } from '@tauri-apps/plugin-process';
   import type { DownloadEvent, Update } from '@tauri-apps/plugin-updater';
   import { t } from '$lib/i18n';
+  import { dismissibleModal } from '$lib/modal-dismiss';
 
   let {
     isOpen = $bindable(false),
@@ -80,6 +81,7 @@
 
 {#if isOpen && update}
   <div
+    use:dismissibleModal={() => { if (phase !== 'downloading' && phase !== 'installing') isOpen = false; }}
     class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 select-none animate-fadeIn"
     role="presentation"
   >
