@@ -232,11 +232,11 @@ jobs:
               chown -R builder:builder /workspace && \
               su builder -c 'makepkg -f --nodeps'
             "
-            arch_pkg=\$(find "$arch_build" -name "*.pkg.tar.zst" | head -n 1 || true)
-            if [[ -n "\$arch_pkg" && -f "\$arch_pkg" ]]; then
-              dest_arch="LowNotes-\${VERSION}-linux-x86_64.pkg.tar.zst"
-              cp "\$arch_pkg" "dist/\$dest_arch"
-              (cd dist && sha256sum "\$dest_arch" > "\$dest_arch.sha256")
+            arch_pkg=$(find "$arch_build" -name "*.pkg.tar.zst" | head -n 1 || true)
+            if [[ -n "$arch_pkg" && -f "$arch_pkg" ]]; then
+              dest_arch="LowNotes-${VERSION}-linux-x86_64.pkg.tar.zst"
+              cp "$arch_pkg" "dist/$dest_arch"
+              (cd dist && sha256sum "$dest_arch" > "$dest_arch.sha256")
             fi
             rm -rf "$arch_build"
           fi
