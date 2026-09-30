@@ -10,6 +10,8 @@ depends=('webkit2gtk-4.1' 'gtk3' 'libappindicator-gtk3')
 provides=('lownotes')
 conflicts=('lownotes')
 options=('!strip')
+source=('lownotes' 'lownotes.desktop' 'lownotes.png')
+sha256sums=('SKIP' 'SKIP' 'SKIP')
 
 package() {
     install -Dm755 "${srcdir}/lownotes" "${pkgdir}/usr/bin/lownotes"
