@@ -202,7 +202,7 @@
               <button
                 onclick={copyCode}
                 disabled={!pairCode}
-                class="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-light)] disabled:opacity-40 disabled:cursor-not-allowed text-black text-xs font-semibold rounded-lg transition shadow-md flex items-center gap-1.5"
+                class="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed text-black text-xs font-semibold rounded-lg transition shadow-md flex items-center gap-1.5"
               >
                 {copied ? '✓ ' + $t('pair.copied') : $t('pair.copy')}
               </button>
@@ -237,7 +237,7 @@
               <button
                 onclick={handleRequestPair}
                 disabled={isConnecting || !inputCode.trim()}
-                class="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-light)] disabled:opacity-50 text-black text-xs font-semibold rounded-lg transition shadow-md"
+                class="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-black text-xs font-semibold rounded-lg transition shadow-md"
               >
                 {isConnecting ? $t('pair.connectingButton') : $t('pair.requestPair')}
               </button>

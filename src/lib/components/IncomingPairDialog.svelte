@@ -65,7 +65,7 @@
         </button>
         <button
           onclick={() => handleDecision(true)}
-          class="px-4 py-2 text-xs font-semibold bg-[var(--accent)] hover:bg-[var(--accent-light)] text-black rounded-lg transition shadow-md"
+          class="px-4 py-2 text-xs font-semibold bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-black rounded-lg transition shadow-md"
         >
           {$t('incoming.accept')}
         </button>

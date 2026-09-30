@@ -158,7 +158,7 @@
             <button
               onclick={handleInstallNow}
               disabled={phase === 'downloading' || phase === 'installing'}
-              class="px-4 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-light)] disabled:opacity-50 text-black text-xs font-semibold rounded-lg shadow-md transition"
+              class="px-4 py-1.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-black text-xs font-semibold rounded-lg shadow-md transition"
             >
               {$t('update.installNow')}
             </button>

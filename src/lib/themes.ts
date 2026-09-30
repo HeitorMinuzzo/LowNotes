@@ -6,12 +6,31 @@ import type { AppTheme, ThemeColors, ThemePalette } from './types';
  * src-tauri/src/config.rs) so new defaults can be added in any release.
  * Only user-created palettes are persisted in appdata settings.
  *
- * Megumin's colors mirror the static `:root` / `:root[data-theme="light"]`
+ * LowBloat's colors mirror the static `:root` / `:root[data-theme="dark"]`
  * blocks in app.css, which act as the pre-JS fallback and as the exact
- * rendering path while Megumin is active.
+ * rendering path while LowBloat is active.
  */
 
-export const DEFAULT_PALETTE_ID = 'megumin';
+export const DEFAULT_PALETTE_ID = 'lowbloat';
+
+const LOWBLOAT_PALETTE: ThemePalette = {
+  id: 'lowbloat',
+  name: 'LowBloat',
+  light: {
+    bg_main: '#f1f3ee', bg_sidebar: '#e8ebe3', bg_card: '#fbfcf8',
+    bg_hover: '#e8ebe3', bg_active: '#e2edcc', border: '#d4d9d0',
+    text_main: '#171a17', text_muted: '#4f584f', text_dim: '#606b60',
+    accent: '#b8f238', accent_light: '#4d7100', accent_contrast: '#1a2700',
+    success: '#247a48', danger: '#b42318',
+  },
+  dark: {
+    bg_main: '#171a17', bg_sidebar: '#111510', bg_card: '#222821',
+    bg_hover: '#2c332a', bg_active: '#34402a', border: '#41473e',
+    text_main: '#fbfcf8', text_muted: '#b8c0b0', text_dim: '#a9b1a5',
+    accent: '#b8f238', accent_light: '#d4fc8a', accent_contrast: '#1a2700',
+    success: '#7ac394', danger: '#f28f84',
+  },
+};
 
 const MEGUMIN_PALETTE: ThemePalette = {
   id: 'megumin',
@@ -51,7 +70,7 @@ const RIMURU_PALETTE: ThemePalette = {
   },
 };
 
-export const BUILTIN_PALETTES: ThemePalette[] = [MEGUMIN_PALETTE, RIMURU_PALETTE];
+export const BUILTIN_PALETTES: ThemePalette[] = [LOWBLOAT_PALETTE, MEGUMIN_PALETTE, RIMURU_PALETTE];
 
 export type ThemeToken = keyof ThemeColors;
 
@@ -143,7 +162,7 @@ export function themeVarsStyle(colors: ThemeColors, mode: AppTheme): string {
   }
   parts.push(`--accent-glow: ${withAlpha(colors.accent, 0.17)}`);
   parts.push(`--accent-hover: ${lighten(colors.accent, 0.25)}`);
-  parts.push(`--selection: ${mode === 'dark' ? withAlpha(colors.accent, 0.3) : withAlpha(colors.danger, 0.2)}`);
+  parts.push(`--selection: ${withAlpha(colors.accent, 0.3)}`);
   parts.push(`--line-highlight: ${mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.045)'}`);
   return parts.map((part) => `${part};`).join(' ');
 }
@@ -151,7 +170,7 @@ export function themeVarsStyle(colors: ThemeColors, mode: AppTheme): string {
 export function resolvePalette(id: string, customs: ThemePalette[]): ThemePalette {
   return BUILTIN_PALETTES.find((palette) => palette.id === id)
     ?? customs.find((palette) => palette.id === id)
-    ?? MEGUMIN_PALETTE;
+    ?? LOWBLOAT_PALETTE;
 }
 
 function clearThemeOverrides(): void {
@@ -167,12 +186,12 @@ function applyThemeColors(colors: ThemeColors, mode: AppTheme): void {
   }
   root.style.setProperty('--accent-glow', withAlpha(colors.accent, 0.17));
   root.style.setProperty('--accent-hover', lighten(colors.accent, 0.25));
-  root.style.setProperty('--selection', mode === 'dark' ? withAlpha(colors.accent, 0.3) : withAlpha(colors.danger, 0.2));
+  root.style.setProperty('--selection', withAlpha(colors.accent, 0.3));
   root.style.setProperty('--line-highlight', mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.045)');
 }
 
 /**
- * Applies mode + palette to the document. Megumin renders through the static
+ * Applies mode + palette to the document. LowBloat renders through the static
  * stylesheet (pixel-exact fallback); other palettes are applied as inline
  * custom properties that override it.
  */

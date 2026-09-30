@@ -647,7 +647,7 @@
           <button
             type="submit"
             disabled={isLoading || !historyReady || !inputPrompt.trim()}
-            class="px-3 py-1 bg-[var(--accent)] hover:bg-[var(--accent-light)] disabled:opacity-40 text-black text-xs font-semibold rounded-md transition shadow flex items-center gap-1"
+            class="px-3 py-1 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-black text-xs font-semibold rounded-md transition shadow flex items-center gap-1"
           >
             <span>{$t('ai.send')}</span>
             <span>➤</span>

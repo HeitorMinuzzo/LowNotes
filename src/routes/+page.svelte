@@ -43,7 +43,7 @@
   import UpdateModal from '$lib/components/UpdateModal.svelte';
   import SettingsView from '$lib/components/SettingsView.svelte';
   let settings = $state<AppSettings | null>(null);
-  let theme = $state<AppTheme>('dark');
+  let theme = $state<AppTheme>('light');
   let viewMode = $state<ViewMode>('split');
   let isGraphOpen = $state(false);
   let activeVault = $state<VaultConfig | null>(null);
@@ -412,7 +412,7 @@
 
       <button
         onclick={handleOpenVaultFolder}
-        class="px-6 py-3 bg-[var(--accent)] hover:bg-[var(--accent-light)] text-black font-semibold text-sm rounded-xl transition shadow-lg flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
+        class="px-6 py-3 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-black font-semibold text-sm rounded-xl transition shadow-lg flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
       >
         <span>📁</span>
         <span>{$t('app.chooseVaultFolder')}</span>

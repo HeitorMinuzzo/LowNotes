@@ -116,7 +116,7 @@
           </button>
           <button
             onclick={() => handleDismiss(true)}
-            class="px-5 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-light)] text-black text-xs font-semibold rounded-xl shadow-lg transition flex items-center gap-1.5"
+            class="px-5 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-black text-xs font-semibold rounded-xl shadow-lg transition flex items-center gap-1.5"
           >
             <span>{$t('welcome.tryAi')}</span>
             <span>💬</span>
