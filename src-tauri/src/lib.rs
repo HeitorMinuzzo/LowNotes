@@ -22,6 +22,13 @@ use undo::UndoHistory;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "linux")]
+    {
+        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        }
+    }
+
     let settings = Arc::new(RwLock::new(AppSettings::load()));
     let crdt = CrdtManager::new();
     let network = Arc::new(RwLock::new(None::<NetworkService>));
