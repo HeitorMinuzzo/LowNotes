@@ -242,7 +242,7 @@ jobs:
               cp "$arch_pkg" "dist/$dest_arch"
               (cd dist && sha256sum "$dest_arch" > "$dest_arch.sha256")
             fi
-            rm -rf "$arch_build"
+            sudo rm -rf "$arch_build"
           fi
 
       - name: Guardar artefatos
