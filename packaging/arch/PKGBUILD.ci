@@ -1,0 +1,20 @@
+# Maintainer: LowBloat <contato@fabioharaujo.com.br>
+pkgname=lownotes-bin
+pkgver=__VERSION__
+pkgrel=1
+pkgdesc="Local-first Markdown notes with serverless P2P sync and real-time collaboration"
+arch=('x86_64')
+url="https://github.com/LowBloat/LowNotes"
+license=('AGPL-3.0-only')
+depends=('webkit2gtk-4.1' 'gtk3' 'libappindicator-gtk3')
+provides=('lownotes')
+conflicts=('lownotes')
+options=('!strip')
+source=('lownotes' 'lownotes.desktop' 'lownotes.png')
+sha256sums=('SKIP' 'SKIP' 'SKIP')
+
+package() {
+    install -Dm755 "${srcdir}/lownotes" "${pkgdir}/usr/bin/lownotes"
+    install -Dm644 "${srcdir}/lownotes.desktop" "${pkgdir}/usr/share/applications/lownotes.desktop"
+    install -Dm644 "${srcdir}/lownotes.png" "${pkgdir}/usr/share/icons/hicolor/128x128/apps/lownotes.png"
+}

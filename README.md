@@ -1,130 +1,133 @@
 <p align="center">
-  <img src="assets/brand/lownotes_logo.png" alt="Logo do LowNotes: um grimório em pixel art" width="144">
+  <img src="assets/brand/lownotes_logo.png" alt="LowNotes logo: a pixel-art grimoire" width="144">
 </p>
 
 <h1 align="center">LowNotes</h1>
 
 <p align="center">
-  Suas notas em Markdown, no seu computador.<br>
-  Edição colaborativa P2P quando você quiser.
+  Your Markdown notes, on your computer.<br>
+  P2P collaborative editing whenever you want.
 </p>
 
 <p align="center">
-  <a href="https://github.com/LowBloat/LowNotes/releases/latest">Baixar o aplicativo</a>
-  · <a href="#comece-aqui">Comece aqui</a>
-  · <a href="#como-funciona">Como funciona</a>
-  · <a href="#desenvolvimento">Desenvolvimento</a>
+  <a href="https://github.com/LowBloat/LowNotes/releases/latest">Download the app</a>
+  · <a href="#get-started">Get started</a>
+  · <a href="#how-it-works">How it works</a>
+  · <a href="#development">Development</a>
 </p>
 
 ---
 
-O LowNotes é um editor desktop para quem quer **arquivos Markdown legíveis**, uma interface confortável e colaboração entre dispositivos sem hospedar um servidor de notas. Você pode trabalhar só com arquivos locais; pareamento P2P e assistente de IA são opcionais.
+LowNotes is a desktop editor for people who want **readable Markdown files**, a comfortable interface, and collaboration between devices without hosting a notes server. You can work with local files only; P2P pairing and the AI assistant are optional.
 
-| No dia a dia | Quando você precisa de mais |
+| Day to day | When you need more |
 | --- | --- |
-| Editor e prévia Markdown lado a lado, com diagramas Mermaid | Edição em tempo real com CodeMirror, Yjs e Yrs |
-| Pastas, links entre notas e mapa de conexões | Sincronização P2P criptografada com Iroh |
-| Temas Megumin e Rimuru Tempest, além de paletas personalizadas | Assistente com busca no vault, pesquisa web e exportação Word/PDF |
-| Notas em `.md` que abrem em outros editores | Cópias de conflito para revisar edições offline divergentes |
+| Side-by-side Markdown editor and preview, with Mermaid diagrams | Real-time editing with CodeMirror, Yjs and Yrs |
+| Folders, links between notes and a connection map | Encrypted P2P sync with Iroh |
+| Megumin and Rimuru Tempest themes, plus custom palettes | Assistant with vault search, web search and Word/PDF export |
+| `.md` notes that open in other editors | Conflict copies to review divergent offline edits |
 
-## Comece aqui
+## Get started
 
-1. Baixe a versão para Windows, Linux ou macOS em [Releases](https://github.com/LowBloat/LowNotes/releases/latest).
-2. Abra o LowNotes e escolha uma pasta para o **vault**. Você pode usar uma pasta que já contém arquivos `.md`.
-3. Crie uma nota ou abra uma existente. Alterne entre **Editor**, **Dividido** e **Visualizar**; o modo dividido é o padrão.
-4. Se quiser sincronizar outro computador, abra **Gerenciar Conexões** na barra lateral e siga o [pareamento P2P](#pareamento-p2p).
-5. Se quiser usar IA, escolha um modelo em **Configurações → Providers**. Ollama e LM Studio funcionam localmente quando o serviço e o modelo estão instalados; provedores remotos precisam das credenciais correspondentes.
+1. Download the Windows, Linux or macOS build from [Releases](https://github.com/LowBloat/LowNotes/releases/latest).
+2. Open LowNotes and pick a folder for your **vault**. You can use a folder that already contains `.md` files.
+3. Create a note or open an existing one. Switch between **Editor**, **Split** and **Preview**; split mode is the default.
+4. To sync another computer, open **Manage Connections** in the sidebar and follow [P2P pairing](#p2p-pairing).
+5. To use AI, pick a model under **Settings → Providers**. Ollama and LM Studio work locally when the service and model are installed; remote providers need their credentials.
 
-Ao fechar a janela, o aplicativo permanece na bandeja do sistema por padrão. Esse comportamento pode ser alterado em **Configurações → Geral**; o menu da bandeja também permite sair completamente.
+When you close the window, the app stays in the system tray by default. You can change this in **Settings → General**; the tray menu also lets you quit completely.
 
-## O que o aplicativo oferece
+## What the app offers
 
-### Notas e organização
+### Notes and organization
 
-- Markdown editável com prévia, tarefas, tabelas, notas de rodapé, extensões de sintaxe e diagramas Mermaid.
-- Pastas, busca de notas, links `[[entre notas]]` e links Markdown locais. O mapa de links combina relações escritas nas notas com relações adicionadas manualmente ou pelo assistente.
-- Exportação de notas e rascunhos para Word (`.docx`) e PDF. Títulos, listas, tarefas, tabelas, código e links externos são preservados; diagramas Mermaid saem como código e imagens como texto alternativo e endereço.
-- Configurações reunidas em uma tela: preferências gerais, temas, IA, providers, fontes de busca web e informações do aplicativo.
+- Editable Markdown with preview, tasks, tables, footnotes, syntax extensions and Mermaid diagrams.
+- Interface zoom with **Ctrl + +**, **Ctrl + -** or **Ctrl + mouse wheel**; **Ctrl + 0** resets to 100%. The chosen level is saved on the device.
+- **Ctrl + Z** undoes only your local note edits, preserving text from other devices; **Ctrl + Y** or **Ctrl + Shift + Z** redoes your edits.
+- Immediate autosave with a stable **Saved** indicator while typing and a warning if saving fails.
+- Folders, note search, `[[links between notes]]` and local Markdown links. The link map combines relations written in notes with relations added manually or by the assistant.
+- Export notes and drafts to Word (`.docx`) and PDF using the same Markdown dialect as the preview. Rich text, lists, tasks, aligned tables, links and footnotes are preserved; Mermaid diagrams and images are embedded as visuals. PDF text remains selectable and Word text remains editable. Images can come from the vault, HTTP(S) addresses or data URLs.
+- Settings gathered on one screen: general preferences, themes, AI, providers, web search sources and app information.
 
-### Assistente opcional
+### Optional assistant
 
-O assistente pode conversar, consultar notas, criar documentos e planos ou pesquisar na web. Os rascunhos ficam disponíveis para revisão antes de **Salvar no vault**; uma nota existente não é sobrescrita por essa ação. Conversas, rascunhos e memória são salvos **localmente por vault**, mesmo depois de fechar o aplicativo.
+The assistant can chat, query notes, create documents and plans, or search the web. Drafts are available for review before **Save to vault**; this action never overwrites an existing note. Conversations, drafts and memory are stored **locally per vault**, even after you close the app.
 
-A busca no vault seleciona trechos por palavras, frases e cabeçalhos **no próprio computador**; não usa banco vetorial nem serviço de indexação externo. Ao chamar um modelo remoto, o pedido e os trechos selecionados são enviados ao provider escolhido. Na pesquisa web, somente os termos da consulta vão para a fonte de busca; o modelo selecionado continua responsável pela resposta.
+Vault search selects snippets by words, phrases and headings **on your own computer**; it uses no vector database or external indexing service. When calling a remote model, the request and the selected snippets are sent to the chosen provider. In web search, only the query terms go to the search source; the selected model remains responsible for the answer.
 
-Em **Configurações → Busca web**, Firecrawl, Keenable, Exa, DuckDuckGo e uma instância pública do SearXNG vêm habilitados sem chave. O aplicativo alterna a fonte inicial e tenta a próxima em caso de falha. Brave e Parallel podem ser ativados com uma chave própria; Firecrawl, Keenable e Exa também aceitam chave opcional. Serviços públicos podem impor limites ou mudar de disponibilidade.
+Under **Settings → Web search**, Firecrawl, Keenable, Exa, DuckDuckGo and a public SearXNG instance come enabled without a key. The app rotates the initial source and tries the next one on failure. Brave and Parallel can be enabled with your own key; Firecrawl, Keenable and Exa also accept an optional key. Public services may enforce limits or change availability.
 
-## Como funciona
+## How it works
 
 ```mermaid
 flowchart LR
-    subgraph App["LowNotes em cada computador"]
-        UI["Svelte 5<br/>CodeMirror + Yjs"] <-->|"atualizações via IPC"| Core["Tauri v2 + Rust<br/>Yrs"]
+    subgraph App["LowNotes on each computer"]
+        UI["Svelte 5<br/>CodeMirror + Yjs"] <-->|"updates via IPC"| Core["Tauri v2 + Rust<br/>Yrs"]
         Core <--> Vault["Vault<br/>.md + .lownotes/"]
-        Core <--> Net["Iroh<br/>QUIC criptografado"]
-        UI --> Chat["Assistente"]
+        Core <--> Net["Iroh<br/>encrypted QUIC"]
+        UI --> Chat["Assistant"]
         Chat --> Core
     end
-    Net <-->|"sincronização e presença"| Peer["Outro LowNotes"]
-    Core -.->|"consulta opcional"| Web["Buscadores web"]
-    Core -.->|"pedido + contexto opcional"| AI["Provider de IA"]
+    Net <-->|"sync and presence"| Peer["Another LowNotes"]
+    Core -.->|"optional query"| Web["Web search engines"]
+    Core -.->|"request + optional context"| AI["AI provider"]
 ```
 
-| Camada | Responsabilidade | Código |
+| Layer | Responsibility | Code |
 | --- | --- | --- |
-| Interface | Editor, prévia, sidebar, configurações e assistente | `src/lib/components/`, `src/routes/` |
-| Ponte desktop | Comandos entre a interface e o processo local | `src/lib/api.ts`, `src-tauri/src/commands.rs` |
-| Dados locais | Leitura do vault, links e preferências | `src-tauri/src/vault.rs`, `links.rs`, `config.rs` |
-| Colaboração | Histórico CRDT, mensagens P2P e reconciliação | `src-tauri/src/crdt.rs`, `network.rs` |
-| Assistente | Skills, seleção de trechos, busca web e histórico | `src-tauri/src/assistant.rs`, `rag.rs`, `web_search.rs`, `chat_history.rs` |
+| Interface | Editor, preview, sidebar, settings and assistant | `src/lib/components/`, `src/routes/` |
+| Desktop bridge | Commands between the interface and the local process | `src/lib/api.ts`, `src-tauri/src/commands.rs` |
+| Local data | Vault reading, links and preferences | `src-tauri/src/vault.rs`, `links.rs`, `config.rs` |
+| Collaboration | CRDT history, P2P messages and reconciliation | `src-tauri/src/crdt.rs`, `network.rs` |
+| Assistant | Skills, snippet selection, web search and history | `src-tauri/src/assistant.rs`, `rag.rs`, `web_search.rs`, `chat_history.rs` |
 
-### Decisões sobre dados e sincronização
+### Data and sync decisions
 
-**Markdown continua sendo um arquivo real.** As notas ficam na pasta escolhida e podem ser abertas em outros editores. O histórico necessário à colaboração fica em `.lownotes/crdt/`; os links adicionados fora do texto ficam em `.lownotes/links.json`. Ao fazer backup ou mover um vault entre computadores, leve a pasta `.lownotes/` junto com os arquivos `.md`.
+**Markdown stays a real file.** Notes live in the folder you chose and can be opened in other editors. The history needed for collaboration lives in `.lownotes/crdt/`; links added outside the text live in `.lownotes/links.json`. When backing up or moving a vault between computers, take the `.lownotes/` folder along with the `.md` files.
 
-**Edições ao vivo e offline seguem caminhos diferentes.** Com dois aplicativos conectados, alterações do editor são enviadas como atualizações CRDT e aparecem no outro dispositivo. Com peers pareados, ocorre uma reconciliação completa ao abrir o aplicativo; outra rodada periódica recupera mensagens perdidas ou períodos desconectados.
+**Live and offline edits follow different paths.** With two connected apps, editor changes are sent as CRDT updates and appear on the other device. With paired peers, a full reconciliation happens when the app opens; another periodic round recovers lost messages or disconnected periods.
 
-**Uma divergência offline preserva as duas versões.** Se os dois lados alteraram a mesma nota sem ver a alteração do outro, a reconciliação mantém uma versão inteira na nota original e cria `nome (conflict <hash>).md` com a outra. O dispositivo que detecta o conflito mostra um aviso com atalho para a cópia. A escolha da versão principal é determinística, **não uma decisão sobre qual texto é mais recente ou melhor**; revise as duas e una o conteúdo que desejar. A cópia também é sincronizada com o outro computador.
+**An offline divergence preserves both versions.** If both sides changed the same note without seeing the other's change, reconciliation keeps one full version in the original note and creates `name (conflict <hash>).md` with the other. The device that detects the conflict shows a notice with a shortcut to the copy. The choice of the main version is deterministic, **not a decision about which text is newer or better**; review both and merge whatever content you want. The copy is also synced to the other computer.
 
-**P2P não significa ausência de infraestrutura de conexão.** As notas não ficam em um servidor central do LowNotes. O Iroh usa conexões diretas quando possível e pode recorrer à infraestrutura de descoberta/relay para estabelecer ou encaminhar a conexão criptografada.
+**P2P does not mean no connection infrastructure.** Notes do not live on a central LowNotes server. Iroh uses direct connections when possible and may fall back to discovery/relay infrastructure to establish or forward the encrypted connection.
 
-**Dados opcionais ficam separados.** Preferências e chaves de API ficam no `settings.json` local do aplicativo; o histórico de conversas fica no diretório local de dados, separado por vault. Esses arquivos não fazem parte do vault nem da sincronização P2P. As chaves em `settings.json` não são criptografadas pelo LowNotes.
+**Optional data stays separate.** Preferences and API keys live in the app's local `settings.json`; conversation history lives in the local data directory, separated per vault. These files are not part of the vault or the P2P sync. Keys in `settings.json` are not encrypted by LowNotes.
 
-**Padrões evoluem sem substituir escolhas pessoais.** Paletas, providers de IA e fontes de busca integrados são definidos pelo aplicativo e mesclados com as configurações salvas. Assim, novos padrões podem chegar em uma atualização sem apagar chaves, modelos e entradas personalizadas.
+**Defaults evolve without replacing personal choices.** Built-in palettes, AI providers and search sources are defined by the app and merged with saved settings. This way, new defaults can arrive in an update without erasing keys, models and custom entries.
 
-**Exportação entra quando é usada.** As bibliotecas de Word e PDF são carregadas sob demanda, sem fazer parte do caminho inicial de edição.
+**Export loads when used.** The Word and PDF libraries are loaded on demand, not part of the initial editing path.
 
-## Pareamento P2P
+## P2P pairing
 
-Use a mesma versão atualizada nos dois computadores para contar com a resolução de conflitos offline. O protocolo de sincronização atual é `lownotes/sync/2`.
+Use the same up-to-date version on both computers to get offline conflict resolution. The current sync protocol is `lownotes/sync/2`.
 
-1. Abra o LowNotes nos dois computadores e selecione um vault em cada um.
-2. No primeiro, abra **Gerenciar Conexões → Compartilhar Código** e copie o código `LOWNOTES2_...`.
-3. No segundo, abra **Conectar Dispositivo**, cole o código e solicite o pareamento.
-4. Aceite a solicitação no primeiro computador.
+1. Open LowNotes on both computers and select a vault on each.
+2. On the first one, open **Manage Connections → Share Code** and copy the `LOWNOTES2_...` code.
+3. On the second one, open **Connect Device**, paste the code and request pairing.
+4. Accept the request on the first computer.
 
-Depois disso, edições de notas abertas podem chegar em tempo real. Alterações feitas enquanto um dispositivo estava desconectado são reconciliadas quando a conexão volta; também é possível usar **Sincronizar agora** na barra lateral.
+After that, edits to open notes can arrive in real time. Changes made while a device was disconnected are reconciled when the connection returns; you can also use **Sync now** in the sidebar.
 
-## Desenvolvimento
+## Development
 
-### Requisitos
+### Requirements
 
-- [Rust](https://rustup.rs/) com toolchain estável
+- [Rust](https://rustup.rs/) with the stable toolchain
 - [Bun](https://bun.sh/)
-- Dependências de sistema exigidas pelo Tauri na sua plataforma; no Linux, veja as bibliotecas instaladas em [`.github/workflows/release.yml`](.github/workflows/release.yml)
+- System dependencies required by Tauri on your platform; on Linux, see the libraries installed in [`.github/workflows/release.yml`](.github/workflows/release.yml)
 
 ```bash
 bun install
 bun run tauri dev
 ```
 
-Para compilar o aplicativo:
+To build the app:
 
 ```bash
 bun run tauri build
 ```
 
-Para verificar mudanças:
+To verify changes:
 
 ```bash
 bun run check
@@ -133,8 +136,8 @@ cargo test --lib --manifest-path src-tauri/Cargo.toml
 bun run build
 ```
 
-O frontend usa **Svelte 5, TypeScript, Tailwind CSS v4, CodeMirror 6 e Yjs**. O backend usa **Tauri v2, Rust, Yrs e Iroh**. O renderizador Markdown é baseado em `markdown-it` com extensões e Mermaid. A publicação multiplataforma é feita pelo [workflow de release](.github/workflows/release.yml), que gera instaladores, assinaturas e o `latest.json` do atualizador.
+The frontend uses **Svelte 5, TypeScript, Tailwind CSS v4, CodeMirror 6 and Yjs**. The backend uses **Tauri v2, Rust, Yrs and Iroh**. The Markdown renderer is based on `markdown-it` with extensions and Mermaid. Multi-platform publishing is done by the [release workflow](.github/workflows/release.yml), which generates installers, signatures and the updater's `latest.json`.
 
-## Licença
+## License
 
-LowNotes é distribuído sob a **GNU Affero General Public License v3.0 (AGPL-3.0-only)**. Consulte [LICENSE](LICENSE).
+LowNotes is distributed under the **GNU Affero General Public License v3.0 (AGPL-3.0-only)**. See [LICENSE](LICENSE).

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=LowNotes
+Comment=Local-first Markdown notes with serverless P2P sync and real-time collaboration
+Exec=lownotes %U
+Icon=lownotes
+Terminal=false
+Type=Application
+Categories=Office;Utility;TextEditor;
+StartupWMClass=LowNotes
+MimeType=x-scheme-handler/lownotes;

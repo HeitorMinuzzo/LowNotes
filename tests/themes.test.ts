@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { readFileSync } from 'node:fs';
 import {
   BUILTIN_PALETTES,
   DEFAULT_PALETTE_ID,
@@ -37,13 +38,14 @@ test('resolvePalette finds builtin, custom, then falls back to default', () => {
   const custom: ThemePalette = { id: 'custom_x', name: 'X', dark: {} as ThemeColors, light: {} as ThemeColors };
   expect(resolvePalette('megumin', []).id).toBe('megumin');
   expect(resolvePalette('rimuru', []).id).toBe('rimuru');
+  expect(resolvePalette('lowbloat', []).id).toBe('lowbloat');
   expect(resolvePalette('custom_x', [custom]).id).toBe('custom_x');
   expect(resolvePalette('does-not-exist', []).id).toBe(DEFAULT_PALETTE_ID);
 });
 
 test('builtin palettes are complete, valid hex, and correctly identified', () => {
-  expect(BUILTIN_PALETTES.map((p) => p.id)).toEqual(['megumin', 'rimuru', 'apple']);
-  expect(DEFAULT_PALETTE_ID).toBe('megumin');
+  expect(BUILTIN_PALETTES.map((p) => p.id)).toEqual(['lowbloat', 'megumin', 'rimuru', 'apple']);
+  expect(DEFAULT_PALETTE_ID).toBe('lowbloat');
   for (const palette of BUILTIN_PALETTES) {
     expect(palette.name.length).toBeGreaterThan(0);
     for (const mode of ['dark', 'light'] as const) {
@@ -54,7 +56,35 @@ test('builtin palettes are complete, valid hex, and correctly identified', () =>
   }
 });
 
-test('Megumin mirrors the shipped default palette', () => {
+test('LowBloat uses the site and helpdesk colors in both modes', () => {
+  const lowbloat = resolvePalette('lowbloat', []);
+  expect(lowbloat.name).toBe('LowBloat');
+  expect(lowbloat.light.bg_main).toBe('#f1f3ee');
+  expect(lowbloat.light.bg_card).toBe('#fbfcf8');
+  expect(lowbloat.light.text_main).toBe('#171a17');
+  expect(lowbloat.light.accent).toBe('#b8f238');
+  expect(lowbloat.light.accent_contrast).toBe('#1a2700');
+  expect(lowbloat.dark.bg_main).toBe('#171a17');
+  expect(lowbloat.dark.accent).toBe('#b8f238');
+});
+
+test('static pre-JS colors mirror the default palette', () => {
+  const css = readFileSync(new URL('../src/app.css', import.meta.url), 'utf8');
+  const light = css.match(/:root\s*\{([^}]+)\}/)?.[1];
+  const dark = css.match(/:root\[data-theme="dark"\]\s*\{([^}]+)\}/)?.[1];
+  const palette = resolvePalette(DEFAULT_PALETTE_ID, []);
+  expect(light).toBeDefined();
+  expect(dark).toBeDefined();
+  for (const mode of ['light', 'dark'] as const) {
+    const block = mode === 'light' ? light : dark;
+    expect(block).toContain(`color-scheme: ${mode}`);
+    for (const token of TOKENS) {
+      expect(block).toContain(`--${token.replaceAll('_', '-')}: ${palette[mode][token]}`);
+    }
+  }
+});
+
+test('Megumin keeps its original colors', () => {
   const megumin = resolvePalette('megumin', []);
   expect(megumin.name).toBe('Megumin');
   expect(megumin.dark.bg_main).toBe('#241d24');
@@ -93,10 +123,10 @@ test('themeVarsStyle emits base and derived tokens plus color-scheme', () => {
   expect(style).toContain(`--accent-hover: ${lighten(colors.accent, 0.25)}`);
   expect(style).toContain(`--selection: ${withAlpha(colors.accent, 0.3)}`);
   expect(style).toContain('--line-highlight: rgba(255,255,255,0.02)');
-  // Light mode derives selection from danger, not accent.
+  // Light and dark modes both use the palette accent for selection.
   const lightStyle = themeVarsStyle(resolvePalette('rimuru', []).light, 'light');
   expect(lightStyle).toContain('color-scheme: light');
-  expect(lightStyle).toContain(`--selection: ${withAlpha(resolvePalette('rimuru', []).light.danger, 0.2)}`);
+  expect(lightStyle).toContain(`--selection: ${withAlpha(resolvePalette('rimuru', []).light.accent, 0.3)}`);
 });
 
 test('every picker token is covered by a group exactly once', () => {

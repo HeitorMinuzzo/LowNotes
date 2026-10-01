@@ -9,6 +9,7 @@ pub mod assistant;
 pub mod web_search;
 pub mod chat_history;
 pub mod undo;
+pub mod export_images;
 
 use std::sync::Arc;
 use parking_lot::{Mutex, RwLock};
@@ -22,6 +23,13 @@ use undo::UndoHistory;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(target_os = "linux")]
+    {
+        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        }
+    }
+
     let settings = Arc::new(RwLock::new(AppSettings::load()));
     let crdt = CrdtManager::new();
     let network = Arc::new(RwLock::new(None::<NetworkService>));
@@ -139,6 +147,7 @@ pub fn run() {
             commands::ai_chat_query,
             commands::ai_save_draft,
             commands::export_document,
+            commands::load_export_image,
             commands::mark_welcome_seen,
             commands::links_get,
             commands::links_apply,

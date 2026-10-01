@@ -195,6 +195,8 @@ const enUS = {
     saved: 'File exported',
     invalidFile: 'Invalid export file or larger than 32 MB.',
     fontFailed: 'Could not load the local PDF fonts.',
+    imageFailed: 'Could not load an image for export. Check its address and try again.',
+    diagramFailed: 'Could not render a Mermaid diagram. Check its syntax and try again.',
   },
   pair: {
     title: 'P2P Sync & Devices',

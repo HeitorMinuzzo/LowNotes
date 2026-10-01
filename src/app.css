@@ -25,54 +25,52 @@
 }
 
 :root {
-  color-scheme: dark;
-  --app-toolbar-height: 54px;
-  --bg-main: #110e14;
-  --bg-sidebar: #0b090e;
-  --bg-card: #18141d;
-  --bg-hover: #221c28;
-  --bg-active: #32283b;
-  --border: rgba(255, 255, 255, 0.08);
-  --border-focus: rgba(247, 198, 93, 0.45);
-  --text-main: #fcf9f5;
-  --text-muted: #b9adbe;
-  --text-dim: #7d7283;
-  --accent: #f7c65d;
-  --accent-light: #ffe09a;
-  --accent-contrast: #181204;
-  --accent-hover: #ffe4a6;
-  --accent-glow: rgba(247, 198, 93, 0.25);
-  --success: #6ee7b7;
-  --danger: #f87171;
-  --line-highlight: rgba(255, 255, 255, 0.025);
-  --selection: rgba(247, 198, 93, 0.28);
-  --editor-link: #7dd3fc;
-  --editor-link-hover: #bae6fd;
-}
-
-:root[data-theme="light"] {
   color-scheme: light;
-  --bg-main: #f8fafc;
-  --bg-sidebar: #f1f5f9;
-  --bg-card: #ffffff;
-  --bg-hover: #e2e8f0;
-  --bg-active: #cbd5e1;
-  --border: rgba(0, 0, 0, 0.08);
-  --border-focus: rgba(217, 119, 6, 0.45);
-  --text-main: #0f172a;
-  --text-muted: #475569;
-  --text-dim: #94a3b8;
-  --accent: #d97706;
-  --accent-light: #b45309;
-  --accent-contrast: #ffffff;
-  --accent-hover: #f59e0b;
-  --accent-glow: rgba(217, 119, 6, 0.2);
-  --success: #059669;
-  --danger: #dc2626;
-  --line-highlight: rgba(15, 23, 42, 0.035);
-  --selection: rgba(217, 119, 6, 0.2);
+  --app-toolbar-height: 58px;
+  --bg-main: #f1f3ee;
+  --bg-sidebar: #e8ebe3;
+  --bg-card: #fbfcf8;
+  --bg-hover: #e8ebe3;
+  --bg-active: #e2edcc;
+  --border: #d4d9d0;
+  --text-main: #171a17;
+  --text-muted: #4f584f;
+  --text-dim: #606b60;
+  --accent: #b8f238;
+  --accent-light: #4d7100;
+  --accent-contrast: #1a2700;
+  --accent-hover: #caf56a;
+  --accent-glow: rgba(184, 242, 56, 0.17);
+  --success: #247a48;
+  --danger: #b42318;
+  --line-highlight: rgba(0, 0, 0, 0.045);
+  --selection: rgba(184, 242, 56, 0.3);
   --editor-link: #0284c7;
   --editor-link-hover: #0369a1;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-main: #171a17;
+  --bg-sidebar: #111510;
+  --bg-card: #222821;
+  --bg-hover: #2c332a;
+  --bg-active: #34402a;
+  --border: #41473e;
+  --text-main: #fbfcf8;
+  --text-muted: #b8c0b0;
+  --text-dim: #a9b1a5;
+  --accent: #b8f238;
+  --accent-light: #d4fc8a;
+  --accent-contrast: #1a2700;
+  --accent-hover: #caf56a;
+  --accent-glow: rgba(184, 242, 56, 0.17);
+  --success: #7ac394;
+  --danger: #f28f84;
+  --line-highlight: rgba(255, 255, 255, 0.02);
+  --selection: rgba(184, 242, 56, 0.3);
+  --editor-link: #7dd3fc;
+  --editor-link-hover: #bae6fd;
 }
 
 * {
@@ -94,9 +92,9 @@ body {
 }
 
 button, input, select, textarea { font: inherit; }
-button { cursor: pointer; }
-button:disabled { cursor: not-allowed; opacity: .5; }
+button:disabled { cursor: not-allowed; opacity: .55; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.app-topbar { height: var(--app-toolbar-height); min-height: var(--app-toolbar-height); }
 
 /* Magic UI & 21st.dev Core Keyframes */
 @keyframes border-beam {

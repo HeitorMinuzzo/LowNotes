@@ -63,7 +63,7 @@
   } from 'lucide-svelte';
 
   let settings = $state<AppSettings | null>(null);
-  let theme = $state<AppTheme>('dark');
+  let theme = $state<AppTheme>('light');
   let viewMode = $state<ViewMode>('split');
   let activePaletteId = $derived(settings?.theme_palettes?.active_palette_id ?? DEFAULT_PALETTE_ID);
   let isAppleTheme = $derived(activePaletteId === 'apple');

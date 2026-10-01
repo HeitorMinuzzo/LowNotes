@@ -245,7 +245,7 @@ impl WebSearchSettings {
 /// Palettes shipped with the app. They live in code (and in the frontend
 /// `themes.ts` mirror) so new defaults can be added in any version without
 /// touching user data; only `custom_palettes` below is persisted.
-pub const BUILTIN_PALETTE_IDS: [&str; 3] = ["megumin", "rimuru", "apple"];
+pub const BUILTIN_PALETTE_IDS: [&str; 4] = ["lowbloat", "megumin", "rimuru", "apple"];
 
 /// One color per UI token, stored as `#rrggbb`. Derived tokens
 /// (glow/selection/highlight) are computed by the frontend.
@@ -337,7 +337,7 @@ fn is_hex_color(value: &str) -> bool {
 }
 
 fn default_palette_id() -> String {
-    "megumin".to_string()
+    "lowbloat".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -393,7 +393,7 @@ impl Default for AppSettings {
 }
 
 fn default_theme() -> String {
-    "dark".to_string()
+    "light".to_string()
 }
 
 fn default_view_mode() -> String {
@@ -500,7 +500,7 @@ mod tests {
 
         let restored: AppSettings = serde_json::from_value(saved).unwrap();
         assert_eq!(restored.view_mode, "split");
-        assert_eq!(restored.theme, "dark");
+        assert_eq!(restored.theme, "light");
     }
 
     #[test]
@@ -552,9 +552,9 @@ mod tests {
     }
 
     #[test]
-    fn theme_palettes_default_to_megumin() {
+    fn theme_palettes_default_to_lowbloat() {
         let settings = ThemePalettesSettings::default();
-        assert_eq!(settings.active_palette_id, "megumin");
+        assert_eq!(settings.active_palette_id, "lowbloat");
         assert!(settings.custom_palettes.is_empty());
     }
 
@@ -587,22 +587,32 @@ mod tests {
     }
 
     #[test]
-    fn normalize_falls_back_to_megumin_for_unknown_active() {
+    fn normalize_falls_back_to_lowbloat_for_unknown_active() {
         let mut settings = ThemePalettesSettings {
             active_palette_id: "custom_gone".into(),
             custom_palettes: vec![],
         };
         settings.normalize();
-        assert_eq!(settings.active_palette_id, "megumin");
+        assert_eq!(settings.active_palette_id, "lowbloat");
     }
 
     #[test]
-    fn existing_settings_without_theme_palettes_default_to_megumin() {
+    fn existing_settings_without_theme_palettes_default_to_lowbloat() {
         let mut saved = serde_json::to_value(AppSettings::default()).unwrap();
         saved.as_object_mut().unwrap().remove("theme_palettes");
         let restored = AppSettings::from_saved_value(saved).unwrap();
-        assert_eq!(restored.theme_palettes.active_palette_id, "megumin");
+        assert_eq!(restored.theme_palettes.active_palette_id, "lowbloat");
         assert!(restored.theme_palettes.custom_palettes.is_empty());
+    }
+
+    #[test]
+    fn saved_legacy_palette_and_mode_remain_selected() {
+        let mut saved = serde_json::to_value(AppSettings::default()).unwrap();
+        saved["theme"] = "dark".into();
+        saved["theme_palettes"]["active_palette_id"] = "megumin".into();
+        let restored = AppSettings::from_saved_value(saved).unwrap();
+        assert_eq!(restored.theme, "dark");
+        assert_eq!(restored.theme_palettes.active_palette_id, "megumin");
     }
 
     #[test]

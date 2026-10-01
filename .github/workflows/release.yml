@@ -10,6 +10,10 @@ on:
         description: "Tag para compilar (ex: v0.1.1)"
         required: true
         type: string
+      source_ref:
+        description: "Ref do código para compilar (opcional; usa a tag por padrão)"
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -32,7 +36,7 @@ jobs:
       - name: Baixar código
         uses: actions/checkout@v7
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ inputs.source_ref || env.RELEASE_TAG }}
 
       - name: Conferir versões do aplicativo
         id: version
@@ -78,7 +82,7 @@ jobs:
       - name: Baixar código
         uses: actions/checkout@v7
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ inputs.source_ref || env.RELEASE_TAG }}
 
       - name: Instalar Bun
         uses: oven-sh/setup-bun@v2
@@ -154,7 +158,7 @@ jobs:
       - name: Baixar código
         uses: actions/checkout@v7
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ inputs.source_ref || env.RELEASE_TAG }}
 
       - name: Instalar bibliotecas de sistema (WebKitGTK)
         run: |
@@ -219,11 +223,33 @@ jobs:
             (cd dist && sha256sum "LowNotes-${VERSION}-linux-x64-portable.tar.gz" > "LowNotes-${VERSION}-linux-x64-portable.tar.gz.sha256")
           fi
 
+          # Criar pacote nativo Arch Linux (.pkg.tar.zst)
+          if [[ -f "src-tauri/target/release/lownotes" ]]; then
+            arch_build="dist/arch-build"
+            mkdir -p "$arch_build"
+            cp "src-tauri/target/release/lownotes" "$arch_build/lownotes"
+            cp "src-tauri/icons/128x128.png" "$arch_build/lownotes.png"
+            cp "packaging/arch/lownotes.desktop" "$arch_build/lownotes.desktop"
+            sed "s/__VERSION__/${VERSION}/g" packaging/arch/PKGBUILD.ci > "$arch_build/PKGBUILD"
+            docker run --rm -v "$PWD/$arch_build":/workspace -w /workspace archlinux:base-devel bash -c "
+              useradd -m builder && \
+              chown -R builder:builder /workspace && \
+              su builder -c 'makepkg -f --nodeps'
+            "
+            arch_pkg=$(find "$arch_build" -name "*.pkg.tar.zst" | head -n 1 || true)
+            if [[ -n "$arch_pkg" && -f "$arch_pkg" ]]; then
+              dest_arch="LowNotes-${VERSION}-linux-x86_64.pkg.tar.zst"
+              cp "$arch_pkg" "dist/$dest_arch"
+              (cd dist && sha256sum "$dest_arch" > "$dest_arch.sha256")
+            fi
+            sudo rm -rf "$arch_build"
+          fi
+
       - name: Guardar artefatos
         uses: actions/upload-artifact@v7
         with:
           name: lownotes-linux
-          path: dist/*.*
+          path: dist/*
           if-no-files-found: error
   macos:
     name: macOS universal (Apple Silicon + Intel)
@@ -236,7 +262,7 @@ jobs:
       - name: Baixar código
         uses: actions/checkout@v7
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ inputs.source_ref || env.RELEASE_TAG }}
 
       - name: Instalar Bun
         uses: oven-sh/setup-bun@v2

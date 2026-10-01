@@ -6,8 +6,8 @@
   import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
   import { tags } from '@lezer/highlight';
   import * as Y from 'yjs';
-  import { yCollab } from 'y-codemirror.next';
-  import mermaid from 'mermaid';
+  import { createLocalCollaboration } from '$lib/editor-collaboration';
+  import { renderMermaidSvg } from '$lib/mermaid-renderer';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { crdtApplyClientUpdate, readNote, broadcastAwareness } from '../api';
   import { renderMarkdown } from '../markdown';
@@ -82,7 +82,7 @@
 
   let editorContainer: HTMLDivElement | null = $state(null);
   let previewContainer: HTMLDivElement | null = $state(null);
-  let saveStatus = $state<'saved' | 'saving' | 'error'>('saved');
+  let saveStatus = $state<'saved' | 'error'>('saved');
   let currentContent = $state('');
   let wordCount = $derived(
     currentContent.trim() ? currentContent.trim().split(/\s+/).length : 0
@@ -91,13 +91,13 @@
 
   let editorView: EditorView | null = null;
   let yDoc: Y.Doc | null = null;
+  let undoManager: Y.UndoManager | null = null;
   let unlistenCrdt: UnlistenFn | null = null;
   let awareness: Awareness | null = null;
   let remoteUsers = $state<PresenceUser[]>([]);
   let awarenessSendTimer: ReturnType<typeof setTimeout> | null = null;
   let stalePruneTimer: ReturnType<typeof setInterval> | undefined;
   let unlistenAwareness: UnlistenFn | null = null;
-  let pendingSaves = 0;
   let pendingRemoteUpdates: Uint8Array[] = [];
   let disposed = false;
   let mermaidCounter = 0;
@@ -151,9 +151,9 @@
     const blocks = previewContainer.querySelectorAll<HTMLDivElement>('.mermaid-block');
     if (blocks.length === 0) return;
 
-    mermaid.initialize({
+    const config = {
       startOnLoad: false,
-      theme: activeTheme === 'dark' ? 'dark' : 'default',
+      theme: activeTheme === 'dark' ? 'dark' as const : 'default' as const,
       ...(appleTheme ? {
         themeVariables: {
           darkMode: activeTheme === 'dark',
@@ -178,8 +178,8 @@
         },
       } : {}),
       fontFamily: 'inherit',
-      securityLevel: 'strict',
-    });
+      securityLevel: 'strict' as const,
+    };
 
     for (const block of blocks) {
       const raw = block.getAttribute('data-mermaid');
@@ -190,7 +190,7 @@
 
       const id = `mermaid-${Date.now()}-${mermaidCounter++}`;
       try {
-        const { svg } = await mermaid.render(id, code);
+        const svg = await renderMermaidSvg(id, code, config);
         svgTarget.innerHTML = svg;
       } catch {
         svgTarget.innerHTML = `<pre class="text-xs text-amber-400/90 font-mono text-left w-full p-2 bg-[var(--bg-main)] rounded border border-amber-900/40 overflow-x-auto whitespace-pre-wrap">${code}</pre>`;
@@ -226,6 +226,10 @@
     if (editorView) {
       editorView.destroy();
       editorView = null;
+    }
+    if (undoManager) {
+      undoManager.destroy();
+      undoManager = null;
     }
     if (yDoc) {
       yDoc.destroy();
@@ -286,20 +290,19 @@
       if (origin !== 'remote') {
         onLocalEdit?.();
         const base64 = uint8ArrayToBase64(update);
-        pendingSaves += 1;
-        saveStatus = 'saving';
         crdtApplyClientUpdate(notePath, base64)
-          .catch((error) => { console.error('Failed to persist CRDT update:', error); saveStatus = 'error'; })
-          .finally(() => { pendingSaves -= 1; if (pendingSaves === 0 && saveStatus !== 'error') saveStatus = 'saved'; });
+          .catch((error) => { console.error('Failed to persist CRDT update:', error); saveStatus = 'error'; });
       }
     });
 
+    const collaboration = createLocalCollaboration(yText, awareness);
+    undoManager = collaboration.undoManager;
     const state = EditorState.create({
       doc: yText.toString(),
       extensions: [
         basicSetup,
         markdown(),
-        yCollab(yText, awareness),
+        collaboration.extension,
         editorTheme.of(codeMirrorTheme()),
       ],
     });
@@ -435,6 +438,7 @@
   onDestroy(() => {
     disposed = true;
     if (editorView) editorView.destroy();
+    if (undoManager) undoManager.destroy();
     if (yDoc) yDoc.destroy();
     if (unlistenCrdt) unlistenCrdt();
     if (unlistenAwareness) unlistenAwareness();
@@ -574,9 +578,6 @@
         {#if saveStatus === 'error'}
           <AlertCircle size={12} class="text-[var(--danger)]" />
           <span class="text-[var(--danger)]">{$t('editor.saveError')}</span>
-        {:else if saveStatus === 'saving'}
-          <Loader2 size={12} class="text-[var(--accent)] animate-spin" />
-          <span class="text-[var(--accent)]">{$t('editor.saving')}</span>
         {:else}
           <span class="w-1.5 h-1.5 rounded-full bg-[var(--success)] shadow-[0_0_5px_var(--success)]"></span>
           <span>{$t('editor.saved')}</span>
