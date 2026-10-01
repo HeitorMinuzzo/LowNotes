@@ -51,7 +51,44 @@ const RIMURU_PALETTE: ThemePalette = {
   },
 };
 
-export const BUILTIN_PALETTES: ThemePalette[] = [MEGUMIN_PALETTE, RIMURU_PALETTE];
+const APPLE_PALETTE: ThemePalette = {
+  id: 'apple',
+  name: 'Apple macOS',
+  dark: {
+    bg_main: '#1d1d1f',      // Near-black ink canvas (apple.design.md)
+    bg_sidebar: '#161617',   // Frosted sub-surface sidebar
+    bg_card: '#272729',      // surface-tile-1
+    bg_hover: '#333336',     // surface-tile-2
+    bg_active: '#424245',    // active tile
+    border: '#38383a',       // hairline border
+    text_main: '#f5f5f7',    // canvas-parchment text
+    text_muted: '#a1a1a6',   // body-muted
+    text_dim: '#6e6e73',     // ink-muted-48
+    accent: '#2997ff',       // Sky Link Blue (Action Blue on dark)
+    accent_light: '#70baff', // focus ring / hover
+    accent_contrast: '#ffffff',
+    success: '#30d158',      // Apple system green
+    danger: '#ff453a',       // Apple system red
+  },
+  light: {
+    bg_main: '#ffffff',      // Pure white canvas
+    bg_sidebar: '#f5f5f7',   // Canvas parchment (signature Apple off-white)
+    bg_card: '#ffffff',      // Utility card canvas
+    bg_hover: '#e8e8ed',     // Soft hover
+    bg_active: '#d2d2d7',    // Translucent chip base
+    border: '#e0e0e0',       // Hairline border
+    text_main: '#1d1d1f',    // Near-black ink
+    text_muted: '#6e6e73',   // Ink muted 80
+    text_dim: '#86868b',     // Ink muted 48
+    accent: '#0066cc',       // Action Blue (#0066cc)
+    accent_light: '#0071e3', // Focus Blue (#0071e3)
+    accent_contrast: '#ffffff',
+    success: '#34c759',      // Apple system green
+    danger: '#ff3b30',       // Apple system red
+  },
+};
+
+export const BUILTIN_PALETTES: ThemePalette[] = [MEGUMIN_PALETTE, RIMURU_PALETTE, APPLE_PALETTE];
 
 export type ThemeToken = keyof ThemeColors;
 
@@ -162,17 +199,17 @@ function clearThemeOverrides(): void {
   for (const cssVar of DERIVED_VARS) root.style.removeProperty(cssVar);
 }
 
-function applyThemeColors(colors: ThemeColors, mode: AppTheme): void {
+function applyThemeColors(colors: ThemeColors, mode: AppTheme, paletteId: string): void {
   const root = document.documentElement;
   for (const [token, cssVar] of Object.entries(PALETTE_VARS)) {
     root.style.setProperty(cssVar, colors[token as ThemeToken]);
   }
   root.style.setProperty('--accent-glow', withAlpha(colors.accent, 0.17));
-  root.style.setProperty('--accent-hover', lighten(colors.accent, 0.25));
-  root.style.setProperty('--selection', mode === 'dark' ? withAlpha(colors.accent, 0.3) : withAlpha(colors.danger, 0.2));
+  root.style.setProperty('--accent-hover', paletteId === 'apple' ? '#0071e3' : lighten(colors.accent, 0.25));
+  root.style.setProperty('--selection', paletteId === 'apple' ? withAlpha(colors.accent, 0.18) : mode === 'dark' ? withAlpha(colors.accent, 0.3) : withAlpha(colors.danger, 0.2));
   root.style.setProperty('--line-highlight', mode === 'dark' ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.045)');
-  root.style.setProperty('--editor-link', mode === 'dark' ? '#7dd3fc' : '#0284c7');
-  root.style.setProperty('--editor-link-hover', mode === 'dark' ? '#bae6fd' : '#0369a1');
+  root.style.setProperty('--editor-link', paletteId === 'apple' ? (mode === 'dark' ? '#2997ff' : '#0066cc') : mode === 'dark' ? '#7dd3fc' : '#0284c7');
+  root.style.setProperty('--editor-link-hover', paletteId === 'apple' ? (mode === 'dark' ? '#70baff' : '#0071e3') : mode === 'dark' ? '#bae6fd' : '#0369a1');
 }
 
 /**
@@ -182,12 +219,13 @@ function applyThemeColors(colors: ThemeColors, mode: AppTheme): void {
  */
 export function applyTheme(paletteId: string, mode: AppTheme, customs: ThemePalette[]): void {
   document.documentElement.dataset.theme = mode;
+  document.documentElement.dataset.palette = paletteId;
   if (paletteId === DEFAULT_PALETTE_ID) {
     clearThemeOverrides();
     return;
   }
   const palette = resolvePalette(paletteId, customs);
-  applyThemeColors(palette[mode], mode);
+  applyThemeColors(palette[mode], mode, paletteId);
 }
 
 /** Starting point for a new user palette: a copy of `base` with a fresh id. */

@@ -42,7 +42,7 @@ test('resolvePalette finds builtin, custom, then falls back to default', () => {
 });
 
 test('builtin palettes are complete, valid hex, and correctly identified', () => {
-  expect(BUILTIN_PALETTES.map((p) => p.id)).toEqual(['megumin', 'rimuru']);
+  expect(BUILTIN_PALETTES.map((p) => p.id)).toEqual(['megumin', 'rimuru', 'apple']);
   expect(DEFAULT_PALETTE_ID).toBe('megumin');
   for (const palette of BUILTIN_PALETTES) {
     expect(palette.name.length).toBeGreaterThan(0);
@@ -70,6 +70,17 @@ test('Rimuru palette uses the requested blue family', () => {
   expect(rimuru.dark.text_main).toBe('#f7fcfc');
   expect(rimuru.light.bg_active).toBe('#cce9f6');
   expect(rimuru.light.text_muted).toBe('#3a71a4');
+});
+
+test('Apple palette matches Apple Design System tokens', () => {
+  const apple = resolvePalette('apple', []);
+  expect(apple.name).toBe('Apple macOS');
+  expect(apple.light.accent).toBe('#0066cc');
+  expect(apple.dark.accent).toBe('#2997ff');
+  expect(apple.light.bg_main).toBe('#ffffff');
+  expect(apple.dark.bg_main).toBe('#1d1d1f');
+  expect(apple.light.text_main).toBe('#1d1d1f');
+  expect(apple.dark.text_main).toBe('#f5f5f7');
 });
 
 test('themeVarsStyle emits base and derived tokens plus color-scheme', () => {

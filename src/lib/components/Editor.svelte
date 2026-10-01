@@ -49,6 +49,7 @@
     targetLine,
     theme,
     viewMode,
+    isAppleTheme = false,
     onViewModeChange,
     isAiChatOpen = false,
     onToggleAiChat,
@@ -66,6 +67,7 @@
     targetLine?: number;
     theme: AppTheme;
     viewMode: ViewMode;
+    isAppleTheme?: boolean;
     onViewModeChange: (mode: ViewMode) => void;
     isAiChatOpen?: boolean;
     onToggleAiChat?: () => void;
@@ -104,11 +106,17 @@
 
   function codeMirrorTheme() {
     const isDark = theme === 'dark';
-    const linkColor = isDark ? '#7dd3fc' : '#0284c7';
-    const linkHover = isDark ? '#bae6fd' : '#0369a1';
+    const linkColor = isAppleTheme ? (isDark ? '#2997ff' : '#0066cc') : isDark ? '#7dd3fc' : '#0284c7';
+    const linkHover = isAppleTheme ? (isDark ? '#70baff' : '#0071e3') : isDark ? '#bae6fd' : '#0369a1';
 
     const highlight = syntaxHighlighting(
-      HighlightStyle.define([
+      HighlightStyle.define(isAppleTheme ? [
+        { tag: [tags.link, tags.url], color: linkColor, textDecoration: 'underline' },
+        { tag: [tags.atom, tags.bool, tags.labelName, tags.keyword], color: linkColor },
+        { tag: [tags.definition(tags.variableName), tags.local(tags.variableName), tags.definition(tags.propertyName)], color: 'var(--text-main)' },
+        { tag: tags.comment, color: 'var(--text-dim)', fontStyle: 'italic' },
+        { tag: tags.string, color: 'var(--text-main)' },
+      ] : [
         { tag: tags.link, color: linkColor, textDecoration: 'underline' },
         { tag: tags.url, color: linkColor, textDecoration: 'underline' },
         { tag: [tags.atom, tags.bool, tags.labelName], color: isDark ? '#f7c65d' : '#d97706' },
@@ -138,7 +146,7 @@
     return [baseTheme, highlight];
   }
 
-  async function renderMermaidBlocks(activeTheme: AppTheme) {
+  async function renderMermaidBlocks(activeTheme: AppTheme, appleTheme: boolean) {
     if (!previewContainer) return;
     const blocks = previewContainer.querySelectorAll<HTMLDivElement>('.mermaid-block');
     if (blocks.length === 0) return;
@@ -146,7 +154,18 @@
     mermaid.initialize({
       startOnLoad: false,
       theme: activeTheme === 'dark' ? 'dark' : 'default',
-      ...(activeTheme === 'dark' ? {
+      ...(appleTheme ? {
+        themeVariables: {
+          darkMode: activeTheme === 'dark',
+          background: activeTheme === 'dark' ? '#272729' : '#f5f5f7',
+          primaryColor: activeTheme === 'dark' ? '#2997ff' : '#0066cc',
+          primaryTextColor: activeTheme === 'dark' ? '#f5f5f7' : '#1d1d1f',
+          primaryBorderColor: activeTheme === 'dark' ? '#38383a' : '#e0e0e0',
+          lineColor: activeTheme === 'dark' ? '#a1a1a6' : '#7a7a7a',
+          secondaryColor: activeTheme === 'dark' ? '#2a2a2c' : '#fafafc',
+          tertiaryColor: activeTheme === 'dark' ? '#252527' : '#ffffff',
+        },
+      } : activeTheme === 'dark' ? {
         themeVariables: {
           darkMode: true,
           background: '#151b26',
@@ -435,17 +454,18 @@
   $effect(() => {
     if ((viewMode === 'split' || viewMode === 'preview') && previewContainer && currentContent) {
       const activeTheme = theme;
+      const activePalette = isAppleTheme;
       if (mermaidDebounce) clearTimeout(mermaidDebounce);
       mermaidDebounce = setTimeout(() => {
-        renderMermaidBlocks(activeTheme);
+        renderMermaidBlocks(activeTheme, activePalette);
       }, 60);
     }
   });
 </script>
 
-<div class="flex flex-col h-full w-full bg-[var(--bg-main)]">
+<div class="apple-editor flex flex-col h-full w-full bg-[var(--bg-main)]">
   <!-- Top Editor Toolbar (Glassmorphic Bar) -->
-  <header class="h-11 flex items-center justify-between gap-2 px-3 border-b border-[var(--border)] bg-[var(--bg-sidebar)]/80 backdrop-blur-xl select-none shrink-0">
+  <header class="apple-editor-toolbar h-11 flex items-center justify-between gap-2 px-3 border-b border-[var(--border)] bg-[var(--bg-sidebar)]/80 backdrop-blur-xl select-none shrink-0">
     <!-- Left Formatting Actions -->
     <div class="flex items-center gap-1.5 overflow-x-auto py-0.5">
       <div class="h-7 flex items-center gap-0.5 p-0.5 rounded-md bg-[var(--bg-card)]/70 border border-[var(--border)] shadow-sm">
@@ -520,14 +540,14 @@
         </button>
       </div>
 
-      <button
+      {#if !isAppleTheme}<button
         onclick={() => onOpenGraph?.()}
         class="h-7 flex items-center gap-1.5 px-2.5 rounded-md border border-[var(--border)] bg-[var(--bg-card)]/70 hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition shadow-sm cursor-pointer"
         title={$t('graph.toolbarTitle')}
       >
         <Network size={13} class="text-[var(--accent)]" />
         <span>{$t('graph.button')}</span>
-      </button>
+      </button>{/if}
     </div>
 
     <!-- Right Controls: Save Status, View Mode, Export, AI Chat -->
@@ -564,7 +584,7 @@
       </div>
 
       <!-- Segmented View Mode Switcher -->
-      <div class="h-7 flex items-center p-0.5 rounded-md bg-[var(--bg-card)]/70 border border-[var(--border)] shadow-sm">
+      {#if !isAppleTheme}<div class="h-7 flex items-center p-0.5 rounded-md bg-[var(--bg-card)]/70 border border-[var(--border)] shadow-sm">
         <button
           onclick={() => onViewModeChange('edit')}
           class="h-6 px-2 text-xs font-medium rounded transition-all duration-150 cursor-pointer {viewMode === 'edit' ? 'bg-[var(--bg-active)] text-[var(--text-main)] font-semibold shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
@@ -586,13 +606,13 @@
         >
           {$t('editor.modePreview')}
         </button>
-      </div>
+      </div>{/if}
 
       <!-- Document Word / PDF Exports -->
       <DocumentActions content={currentContent} path={notePath} />
 
       <!-- AI Assistant Toggle Button -->
-      {#if onToggleAiChat}
+      {#if onToggleAiChat && !isAppleTheme}
         <button
           onclick={onToggleAiChat}
           class="h-7 flex items-center gap-1.5 px-2.5 rounded-md border text-xs font-medium transition-all duration-150 shadow-sm cursor-pointer {isAiChatOpen ? 'border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--accent)] font-semibold shadow-[0_0_10px_var(--accent-glow)]' : 'border-[var(--border)] bg-[var(--bg-card)]/70 hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
@@ -620,7 +640,7 @@
         bind:this={previewContainer}
         role="presentation"
         onclick={handlePreviewClick}
-        class="h-full overflow-y-auto px-10 py-8 select-text {viewMode === 'preview' ? 'w-full max-w-4xl mx-auto' : 'w-1/2'}"
+        class="apple-editor-preview h-full overflow-y-auto px-10 py-8 select-text {viewMode === 'preview' ? 'w-full max-w-4xl mx-auto' : 'w-1/2'}"
       >
         <article class="prose max-w-none text-[var(--text-main)]">
           {@html renderMarkdown(currentContent)}

@@ -245,7 +245,7 @@ impl WebSearchSettings {
 /// Palettes shipped with the app. They live in code (and in the frontend
 /// `themes.ts` mirror) so new defaults can be added in any version without
 /// touching user data; only `custom_palettes` below is persisted.
-pub const BUILTIN_PALETTE_IDS: [&str; 2] = ["megumin", "rimuru"];
+pub const BUILTIN_PALETTE_IDS: [&str; 3] = ["megumin", "rimuru", "apple"];
 
 /// One color per UI token, stored as `#rrggbb`. Derived tokens
 /// (glow/selection/highlight) are computed by the frontend.

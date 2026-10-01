@@ -281,7 +281,7 @@
   }
 </script>
 
-<section class="flex flex-col h-full min-h-0 w-full bg-[var(--bg-main)] select-none" aria-label={$t('graph.title')}>
+<section class="apple-graph flex flex-col h-full min-h-0 w-full bg-[var(--bg-main)] select-none" aria-label={$t('graph.title')}>
   <!-- Header Bar -->
   <header class="app-topbar h-11 flex items-center justify-between gap-3 px-3 border-b border-[var(--border)] bg-[var(--bg-sidebar)]/80 backdrop-blur-xl shrink-0">
     <div class="flex items-center gap-3">

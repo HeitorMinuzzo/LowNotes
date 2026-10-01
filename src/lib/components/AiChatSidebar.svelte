@@ -336,7 +336,7 @@
 
 {#if isOpen}
   <aside
-    class="w-100 h-full flex flex-col border-l border-[var(--border)] bg-[var(--bg-sidebar)] z-30 select-none shadow-2xl relative transition-all"
+    class="apple-ai-sidebar w-100 h-full flex flex-col border-l border-[var(--border)] bg-[var(--bg-sidebar)] z-30 select-none shadow-2xl relative transition-all"
   >
     <!-- Top Header -->
     <header class="app-topbar h-11 shrink-0 flex items-center justify-between gap-2 px-4 border-b border-[var(--border)] bg-[var(--bg-card)]/90 backdrop-blur-xl min-w-0">

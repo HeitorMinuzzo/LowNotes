@@ -48,11 +48,61 @@
   import SettingsView from '$lib/components/SettingsView.svelte';
   import CommandPalette from '$lib/components/CommandPalette.svelte';
   import BorderBeam from '$lib/components/ui/BorderBeam.svelte';
-  import ShimmerButton from '$lib/components/ui/ShimmerButton.svelte';
   import AmbientGlow from '$lib/components/ui/AmbientGlow.svelte';
+  import AppleDock from '$lib/components/ui/AppleDock.svelte';
+  import MacTrafficLights from '$lib/components/ui/MacTrafficLights.svelte';
+  import {
+    FolderOpen,
+    Settings2,
+    FileText,
+    ShieldCheck,
+    Sparkles,
+    Network,
+    Plus,
+    ArrowRight,
+  } from 'lucide-svelte';
+
   let settings = $state<AppSettings | null>(null);
   let theme = $state<AppTheme>('dark');
   let viewMode = $state<ViewMode>('split');
+  let activePaletteId = $derived(settings?.theme_palettes?.active_palette_id ?? DEFAULT_PALETTE_ID);
+  let isAppleTheme = $derived(activePaletteId === 'apple');
+  let appleNewNoteOpen = $state(false);
+  let appleNewNoteName = $state('');
+  let appleNewNoteError = $state('');
+  let appleNoteInput = $state<HTMLInputElement | null>(null);
+  let appleDialogElement = $state<HTMLDivElement | null>(null);
+
+  $effect(() => {
+    if (!appleNewNoteOpen) return;
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    queueMicrotask(() => appleNoteInput?.focus());
+    return () => previous?.focus();
+  });
+
+  function handleAppleDialogKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      appleNewNoteOpen = false;
+      return;
+    }
+    if (event.key !== 'Tab' || !appleDialogElement) return;
+    const controls = Array.from(appleDialogElement.querySelectorAll<HTMLElement>('input:not(:disabled), button:not(:disabled)'));
+    const first = controls[0];
+    const last = controls.at(-1);
+    if (event.shiftKey && document.activeElement === first && last) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last && first) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  async function toggleTheme() {
+    await handleThemeChange(theme === 'dark' ? 'light' : 'dark');
+  }
+
   let isGraphOpen = $state(false);
   let isCommandPaletteOpen = $state(false);
   let activeVault = $state<VaultConfig | null>(null);
@@ -130,6 +180,12 @@
   }
 
   async function handleQuickNewNote() {
+    if (isAppleTheme) {
+      appleNewNoteName = '';
+      appleNewNoteError = '';
+      appleNewNoteOpen = true;
+      return;
+    }
     const name = prompt($t('sidebar.noteNamePlaceholder') || 'Nome da nova nota:');
     if (!name || !name.trim()) return;
     try {
@@ -139,6 +195,19 @@
       await openNote(path);
     } catch (e: any) {
       alert(trError(typeof e === 'string' ? e : e.message || 'sidebar.errorCreateNote'));
+    }
+  }
+
+  async function submitAppleNewNote() {
+    const name = appleNewNoteName.trim();
+    if (!name) return;
+    try {
+      const path = await createNote(name, name.split('/').at(-1) || name);
+      appleNewNoteOpen = false;
+      await refreshItems();
+      await openNote(path);
+    } catch (e: any) {
+      appleNewNoteError = trError(typeof e === 'string' ? e : e.message || 'sidebar.errorCreateNote');
     }
   }
 
@@ -499,76 +568,89 @@
     <SettingsView {settings} initialTab={settingsTab} onClose={() => void closeSettings()} onChange={handleSettingsChange} />
   {:else if !activeVault}
     <!-- Welcome screen when no vault is configured (Magic UI Bento Showcase) -->
-    <main class="relative flex-1 flex flex-col items-center justify-center p-6 md:p-12 text-center select-none overflow-y-auto">
-      <AmbientGlow color="var(--accent)" size="600px" opacity={0.12} class="top-[-100px] left-1/2 -translate-x-1/2" />
-      <AmbientGlow color="var(--danger)" size="450px" opacity={0.08} class="bottom-[-150px] right-[-100px]" />
+    <main class="apple-welcome relative flex-1 flex flex-col items-center justify-center p-6 md:p-12 text-center select-none overflow-y-auto">
+      {#if isAppleTheme}
+        <!-- macOS Window Traffic Lights in Top-Left -->
+        <div class="absolute top-6 left-8 flex items-center z-20">
+          <MacTrafficLights />
+        </div>
+      {:else}
+        <AmbientGlow color="var(--accent)" size="600px" opacity={0.12} class="top-[-100px] left-1/2 -translate-x-1/2" />
+        <AmbientGlow color="var(--danger)" size="450px" opacity={0.08} class="bottom-[-150px] right-[-100px]" />
+      {/if}
 
       <!-- Topbar actions -->
-      <div class="absolute top-6 right-8 flex items-center gap-3">
+      <div class="absolute top-6 right-8 flex items-center gap-3 z-20">
         <button
           onclick={() => openSettings()}
-          class="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-card)]/80 hover:bg-[var(--bg-hover)] text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all shadow-sm backdrop-blur-md"
+          class="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-card)]/80 hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all duration-150 active:scale-95 shadow-sm backdrop-blur-md cursor-pointer"
         >
-          <span>⚙️</span>
+          <Settings2 size={13} class="text-[var(--text-muted)]" />
           <span>{$t('settings.title')}</span>
         </button>
       </div>
 
       <!-- Hero Header -->
-      <div class="relative z-10 max-w-2xl flex flex-col items-center">
+      <div class="relative z-10 max-w-2xl flex flex-col items-center mt-6">
         <!-- Floating badge -->
-        <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-[var(--border)] bg-[var(--bg-card)]/90 backdrop-blur-md text-xs font-medium text-[var(--accent)] mb-6 shadow-sm">
-          <span class="w-2 h-2 rounded-full bg-[var(--accent)] animate-[pulse-subtle_2s_infinite]"></span>
-          <span>LowNotes v0.2.1 • P2P & Markdown Local</span>
+        <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-[var(--border)] bg-[var(--bg-card)]/80 backdrop-blur-md text-xs font-medium text-[var(--accent)] mb-6 shadow-sm">
+          <span class="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-[pulse-subtle_2s_infinite]"></span>
+          <span>{isAppleTheme ? 'LowNotes · macOS Cupertino' : 'LowNotes · Local & P2P'}</span>
         </div>
 
-        <h1 class="text-3xl md:text-5xl font-extrabold tracking-tight mb-4 text-[var(--text-main)] leading-tight">
+        <h1 class="text-3xl md:text-5xl font-semibold tracking-[-0.03em] mb-4 text-[var(--text-main)] leading-tight">
           {$t('app.welcomeTitle')}
         </h1>
 
-        <p class="text-sm md:text-base text-[var(--text-muted)] max-w-lg mb-8 leading-relaxed">
+        <p class="text-sm md:text-base text-[var(--text-muted)] max-w-lg mb-8 leading-relaxed font-normal tracking-[-0.015em]">
           {$t('app.welcomeSubtitle')}
         </p>
 
-        <!-- CTA Shimmer Button -->
+        <!-- CTA Action Button (macOS Pill Button with subtle micro-scale) -->
         <div class="relative mb-12">
-          <ShimmerButton onclick={handleOpenVaultFolder} class="px-7 py-3.5 text-sm font-bold shadow-xl">
-            <span class="text-base">📁</span>
+          <button
+            onclick={handleOpenVaultFolder}
+            class="group relative inline-flex items-center gap-2.5 px-7 py-3 rounded-full bg-[var(--accent)] text-[var(--accent-contrast)] hover:opacity-95 active:scale-95 transition-all duration-150 font-semibold text-sm shadow-[0_4px_20px_-2px_var(--accent-glow)] cursor-pointer"
+          >
+            <FolderOpen size={16} strokeWidth={2.2} class="transition-transform duration-150 group-hover:scale-110" />
             <span>{$t('app.chooseVaultFolder')}</span>
-          </ShimmerButton>
+            <ArrowRight size={14} class="opacity-70 group-hover:translate-x-0.5 transition-transform" />
+          </button>
         </div>
       </div>
 
-      <!-- Bento Grid features -->
+      <!-- Bento Grid features with Lucide icons (No raw emojis) -->
       <div class="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl w-full text-left">
-        <div class="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)]/70 backdrop-blur-md p-5 glow-card-hover group">
-          <div class="w-10 h-10 rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 flex items-center justify-center text-lg mb-3">
-            📄
+        <div class="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)]/75 backdrop-blur-xl p-5 hover:border-[var(--accent)]/40 hover:bg-[var(--bg-hover)]/40 transition-all duration-200 group flex flex-col shadow-sm">
+          <div class="w-10 h-10 rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/15 flex items-center justify-center mb-3.5 shadow-inner">
+            <FileText size={18} strokeWidth={2} />
           </div>
-          <h3 class="text-sm font-bold text-[var(--text-main)] mb-1">Arquivos Markdown Reais</h3>
+          <h3 class="text-sm font-semibold text-[var(--text-main)] mb-1 tracking-tight">{$t('app.featureMarkdownTitle')}</h3>
           <p class="text-xs text-[var(--text-muted)] leading-relaxed">
-            {$t('app.filesReadable')} Suas notas permanecem legíveis em qualquer outro editor.
+            {$t('app.featureMarkdownDesc')}
           </p>
         </div>
 
-        <div class="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)]/70 backdrop-blur-md p-5 glow-card-hover group">
-          <BorderBeam size={120} duration={8} borderWidth={1.5} colorFrom="var(--accent)" colorTo="var(--accent-light)" />
-          <div class="w-10 h-10 rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 flex items-center justify-center text-lg mb-3">
-            ⚡
+        <div class="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)]/75 backdrop-blur-xl p-5 hover:border-[var(--accent)]/40 hover:bg-[var(--bg-hover)]/40 transition-all duration-200 group flex flex-col shadow-sm">
+          {#if !isAppleTheme}
+            <BorderBeam size={100} duration={8} borderWidth={1.5} colorFrom="var(--accent)" colorTo="var(--accent-light)" />
+          {/if}
+          <div class="w-10 h-10 rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/15 flex items-center justify-center mb-3.5 shadow-inner">
+            <ShieldCheck size={18} strokeWidth={2} />
           </div>
-          <h3 class="text-sm font-bold text-[var(--text-main)] mb-1">P2P Criptografado</h3>
+          <h3 class="text-sm font-semibold text-[var(--text-main)] mb-1 tracking-tight">{$t('app.featureP2PTitle')}</h3>
           <p class="text-xs text-[var(--text-muted)] leading-relaxed">
-            Sincronização direta entre seus dispositivos via Iroh e CRDTs, sem nuvem proprietária.
+            {$t('app.featureP2PDesc')}
           </p>
         </div>
 
-        <div class="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)]/70 backdrop-blur-md p-5 glow-card-hover group">
-          <div class="w-10 h-10 rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 flex items-center justify-center text-lg mb-3">
-            🧠
+        <div class="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)]/75 backdrop-blur-xl p-5 hover:border-[var(--accent)]/40 hover:bg-[var(--bg-hover)]/40 transition-all duration-200 group flex flex-col shadow-sm">
+          <div class="w-10 h-10 rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/15 flex items-center justify-center mb-3.5 shadow-inner">
+            <Sparkles size={18} strokeWidth={2} />
           </div>
-          <h3 class="text-sm font-bold text-[var(--text-main)] mb-1">Assistente com RAG Local</h3>
+          <h3 class="text-sm font-semibold text-[var(--text-main)] mb-1 tracking-tight">{$t('app.featureAiTitle')}</h3>
           <p class="text-xs text-[var(--text-muted)] leading-relaxed">
-            Consulte suas notas e faça buscas na web mantendo sua privacidade sob total controle.
+            {$t('app.featureAiDesc')}
           </p>
         </div>
       </div>
@@ -606,10 +688,11 @@
       onItemDeleted={() => (lastUndoableAction = 'delete')}
       onOpenCommandPalette={() => (isCommandPaletteOpen = true)}
       presence={activeEditors}
+      {isAppleTheme}
     />
 
     <!-- Editor Surface -->
-    <div class="flex-1 flex flex-col h-full overflow-hidden bg-[var(--bg-main)]">
+    <div class="flex-1 flex flex-col h-full overflow-hidden bg-[var(--bg-main)] relative">
       {#if conflictNotice}
         <div role="alert" class="flex items-center gap-3 px-5 py-2.5 border-b border-[var(--danger)]/50 bg-[var(--bg-card)]/95 backdrop-blur-md text-xs shadow-lg">
           <div class="flex-1 min-w-0">
@@ -637,6 +720,7 @@
           {targetLine}
           {theme}
           {viewMode}
+          {isAppleTheme}
           onViewModeChange={handleViewModeChange}
           {isAiChatOpen}
           onToggleAiChat={() => (isAiChatOpen = !isAiChatOpen)}
@@ -651,7 +735,7 @@
       {:else}
         <!-- Modern Empty Dashboard state when vault is open but no note is active -->
         <div class="relative flex-1 flex flex-col min-h-0 select-none bg-[var(--bg-main)]">
-          <AmbientGlow color="var(--accent)" size="500px" opacity={0.08} class="top-10 right-20" />
+          {#if !isAppleTheme}<AmbientGlow color="var(--accent)" size="500px" opacity={0.08} class="top-10 right-20" />{/if}
 
           <header class="h-11 flex items-center justify-between gap-3 px-3 border-b border-[var(--border)] bg-[var(--bg-sidebar)]/80 backdrop-blur-xl shrink-0">
             <div class="flex items-center gap-2 text-xs text-[var(--text-muted)]">
@@ -660,7 +744,7 @@
               <span class="text-[var(--text-dim)]">{$t('app.emptyState')}</span>
             </div>
 
-            <div class="flex items-center gap-1.5">
+            {#if !isAppleTheme}<div class="flex items-center gap-1.5">
               <button
                 onclick={() => (isGraphOpen = true)}
                 class="h-7 flex items-center px-2.5 rounded-md border border-[var(--border)] bg-[var(--bg-card)]/70 hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition shadow-sm cursor-pointer"
@@ -673,39 +757,79 @@
               >
                 <span>{$t('app.openAiChat')}</span>
               </button>
-            </div>
+            </div>{/if}
           </header>
 
           <div class="flex-1 flex flex-col items-center justify-center text-center p-8">
-            <div class="relative p-8 rounded-3xl border border-[var(--border)] bg-[var(--bg-card)]/60 backdrop-blur-xl shadow-2xl max-w-md w-full flex flex-col items-center glow-card-hover">
-              <BorderBeam size={180} duration={10} borderWidth={1.5} colorFrom="var(--accent)" colorTo="var(--accent-light)" />
-              <div class="w-16 h-16 rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 flex items-center justify-center text-3xl mb-4 shadow-inner">
-                📝
+            {#if isAppleTheme}
+              <!-- Apple Design System (apple.design.md) Canvas Hero -->
+              <div class="relative max-w-lg w-full flex flex-col items-center select-none animate-in fade-in-50 duration-200">
+                <span class="text-[11px] font-semibold text-[var(--accent)] tracking-wider uppercase mb-2">LowNotes</span>
+                <h2 class="text-4xl md:text-5xl font-semibold tracking-[-0.03em] text-[var(--text-main)] mb-3 text-center">
+                  {$t('app.appleEmptyTitle')}
+                </h2>
+                <p class="text-[17px] text-[var(--text-muted)] max-w-md leading-relaxed mb-8 text-center font-normal tracking-[-0.015em]">
+                  {$t('app.appleEmptyDescription')}
+                </p>
               </div>
-              <h2 class="text-lg font-bold text-[var(--text-main)] mb-1">
-                {$t('app.emptyState')}
-              </h2>
-              <p class="text-xs text-[var(--text-muted)] max-w-xs leading-relaxed mb-6">
-                Selecione uma nota no menu lateral ou abra o assistente de inteligência artificial.
-              </p>
+            {:else}
+              <div class="relative p-8 rounded-3xl border border-[var(--border)] bg-[var(--bg-card)]/60 backdrop-blur-xl shadow-2xl max-w-md w-full flex flex-col items-center glow-card-hover">
+                <BorderBeam size={180} duration={10} borderWidth={1.5} colorFrom="var(--accent)" colorTo="var(--accent-light)" />
+                <div class="w-14 h-14 rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 flex items-center justify-center mb-4 shadow-inner">
+                  <FileText size={24} strokeWidth={2} />
+                </div>
+                <h2 class="text-base font-semibold text-[var(--text-main)] mb-1 tracking-tight">
+                  {$t('app.emptyState')}
+                </h2>
+                <p class="text-xs text-[var(--text-muted)] max-w-xs leading-relaxed mb-6">
+                  Selecione uma nota no menu lateral ou utilize as ferramentas rápidas abaixo.
+                </p>
 
-              <div class="flex items-center gap-3">
-                <button
-                  onclick={() => (isGraphOpen = true)}
-                  class="px-4 py-2 rounded-xl border border-[var(--border)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-xs font-semibold text-[var(--text-main)] transition"
-                >
-                  🕸 Mapa de Grafos
-                </button>
-                <button
-                  onclick={() => (isAiChatOpen = true)}
-                  class="px-4 py-2 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] hover:opacity-90 text-xs font-bold transition shadow-md"
-                >
-                  💬 Assistente IA
-                </button>
+                <div class="flex items-center gap-2.5">
+                  <button
+                    onclick={() => handleQuickNewNote()}
+                    class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] hover:opacity-90 active:scale-95 text-xs font-semibold transition shadow-md cursor-pointer"
+                  >
+                    <Plus size={14} strokeWidth={2.5} />
+                    <span>{$t('sidebar.newNote')}</span>
+                  </button>
+                  <button
+                    onclick={() => (isGraphOpen = true)}
+                    class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--border)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--text-main)] active:scale-95 transition cursor-pointer"
+                  >
+                    <Network size={14} />
+                    <span>{$t('graph.title')}</span>
+                  </button>
+                  <button
+                    onclick={() => (isAiChatOpen = true)}
+                    class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--border)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--text-main)] active:scale-95 transition cursor-pointer"
+                  >
+                    <Sparkles size={14} class="text-[var(--accent)]" />
+                    <span>{$t('ai.title')}</span>
+                  </button>
+                </div>
               </div>
-            </div>
+            {/if}
           </div>
         </div>
+      {/if}
+
+      {#if isAppleTheme}
+        <!-- Floating macOS Apple Dock (Shadcnspace Apple Dock / Magic UI) -->
+        <AppleDock
+          onCreateNote={handleQuickNewNote}
+          onSearch={() => (isCommandPaletteOpen = true)}
+          onToggleGraph={() => (isGraphOpen = !isGraphOpen)}
+          onToggleAi={() => (isAiChatOpen = !isAiChatOpen)}
+          onOpenSettings={() => openSettings()}
+          onToggleTheme={toggleTheme}
+          onViewModeChange={(mode) => handleViewModeChange(mode)}
+          isGraphOpen={isGraphOpen}
+          isAiOpen={isAiChatOpen}
+          hasActiveNote={!!selectedNotePath}
+          viewMode={viewMode}
+          theme={theme}
+        />
       {/if}
     </div>
 
@@ -729,6 +853,35 @@
   {/if}
 
   <!-- Modals -->
+  {#if isAppleTheme && appleNewNoteOpen}
+    <div
+      class="apple-dialog-backdrop"
+      role="presentation"
+      onclick={(event) => { if (event.target === event.currentTarget) appleNewNoteOpen = false; }}
+    >
+      <div
+        bind:this={appleDialogElement}
+        class="apple-new-note-dialog"
+        role="dialog"
+        tabindex="-1"
+        aria-modal="true"
+        aria-labelledby="apple-new-note-title"
+        onkeydown={handleAppleDialogKeydown}
+      >
+        <form onsubmit={(event) => { event.preventDefault(); void submitAppleNewNote(); }}>
+        <span class="apple-dialog-eyebrow">LowNotes</span>
+        <h2 id="apple-new-note-title">{$t('sidebar.newNote')}</h2>
+        <p>{$t('sidebar.noteNamePlaceholder')}</p>
+        <input bind:this={appleNoteInput} bind:value={appleNewNoteName} placeholder={$t('sidebar.noteNamePlaceholder')} autocomplete="off" />
+        {#if appleNewNoteError}<p class="apple-dialog-error" role="alert">{appleNewNoteError}</p>{/if}
+        <div class="apple-dialog-actions">
+          <button type="button" class="apple-secondary-action" onclick={() => appleNewNoteOpen = false}>{$t('sidebar.cancel')}</button>
+          <button type="submit" class="apple-primary-action" disabled={!appleNewNoteName.trim()}>{$t('sidebar.create')}</button>
+        </div>
+        </form>
+      </div>
+    </div>
+  {/if}
   <PairModal
     bind:isOpen={isPairModalOpen}
     bind:pairCode

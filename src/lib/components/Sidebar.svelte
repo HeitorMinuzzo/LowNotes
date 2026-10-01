@@ -47,6 +47,7 @@
     onRefreshItems,
     onItemDeleted,
     onOpenCommandPalette,
+    isAppleTheme = false,
   } = $props<{
     activeVault: VaultConfig | null;
     vaults: VaultConfig[];
@@ -62,6 +63,7 @@
     onItemDeleted?: () => void;
     onOpenCommandPalette?: () => void;
     presence?: PresenceUser[];
+    isAppleTheme?: boolean;
   }>();
 
   let searchQuery = $state('');
@@ -181,7 +183,14 @@
   }}
 />
 
-<aside class="w-68 h-full flex flex-col border-r border-[var(--border)] bg-[var(--bg-sidebar)] select-none relative z-20">
+<aside class="apple-sidebar w-68 h-full flex flex-col border-r border-[var(--border)] bg-[var(--bg-sidebar)] select-none relative z-20">
+  {#if isAppleTheme}
+    <div class="apple-sidebar-brand">
+      <span class="apple-sidebar-brand-mark">L</span>
+      <span>LowNotes</span>
+    </div>
+  {/if}
+
   <!-- Vault Switcher Zone (Header & Collapsible Drawer) -->
   <div class="vault-switcher-zone flex flex-col shrink-0">
     <!-- Vault Switcher Header -->
@@ -257,8 +266,9 @@
   </div>
 
   <!-- Search & Quick Action Toolbar -->
-  <div class="p-2.5 flex flex-col gap-2 border-b border-[var(--border)]">
+  <div class="apple-sidebar-actions p-2.5 flex flex-col gap-2 border-b border-[var(--border)]">
     <!-- Spotlight Search Input -->
+    {#if !isAppleTheme}
     <div class="relative flex items-center">
       <Search size={13} class="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none" />
       <input
@@ -286,9 +296,11 @@
         </button>
       {/if}
     </div>
+    {/if}
 
     <!-- Quick Action Bar -->
     <div class="flex items-center gap-1.5">
+      {#if !isAppleTheme}
       <button
         onclick={() => (isCreatingNote = true)}
         class="h-7 flex-1 flex items-center justify-center gap-1.5 px-2.5 rounded-md bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-xs font-medium text-[var(--text-main)] hover:border-[var(--accent)]/40 transition-all shadow-sm cursor-pointer"
@@ -296,13 +308,15 @@
         <FilePlus size={13} class="text-[var(--accent)]" />
         <span>{$t('sidebar.newNote')}</span>
       </button>
+      {/if}
 
       <button
         onclick={() => (isCreatingFolder = true)}
-        class="h-7 w-7 flex items-center justify-center rounded-md bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] hover:border-[var(--accent)]/40 transition shadow-sm cursor-pointer"
+        class="h-7 flex items-center justify-center gap-2 rounded-md bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] hover:border-[var(--accent)]/40 transition shadow-sm cursor-pointer {isAppleTheme ? 'w-full px-3' : 'w-7'}"
         title={$t('sidebar.newFolder')}
       >
         <FolderPlus size={14} />
+        {#if isAppleTheme}<span>{$t('sidebar.newFolder')}</span>{/if}
       </button>
     </div>
 
@@ -388,11 +402,11 @@
           onclick={() => item.is_dir ? toggleFolder(item.path) : onSelectNote(item.path)}
           onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.is_dir ? toggleFolder(item.path) : onSelectNote(item.path); } }}
           aria-expanded={item.is_dir ? !collapsedFolders.has(item.path) : undefined}
-          class="group relative w-full h-7 flex items-center justify-between px-2 rounded-md text-xs text-left cursor-pointer transition-all duration-150 {isSelected ? 'bg-[var(--bg-card)] text-[var(--text-main)] font-medium shadow-sm border border-[var(--border)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]/70 hover:text-[var(--text-main)]'}"
+          class="apple-tree-item group relative w-full h-7 flex items-center justify-between px-2 rounded-md text-xs text-left cursor-pointer transition-all duration-150 {isSelected ? 'bg-[var(--bg-card)] text-[var(--text-main)] font-medium shadow-sm border border-[var(--border)]' : 'text-[var(--text-muted)] hover:bg-[var(--bg-hover)]/70 hover:text-[var(--text-main)]'}"
           style:padding-left={`${8 + depth * 14}px`}
         >
           {#if isSelected}
-            <span class="absolute left-1 top-2 bottom-2 w-1 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]"></span>
+            <span class="apple-tree-indicator absolute left-1 top-2 bottom-2 w-1 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]"></span>
           {/if}
 
           <div class="flex items-center gap-2 overflow-hidden flex-1 pl-1.5">
@@ -513,7 +527,7 @@
     </div>
 
     <!-- Settings Trigger Button -->
-    <button
+    {#if !isAppleTheme}<button
       onclick={onOpenSettings}
       class="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text-main)] hover:bg-[var(--bg-card)] border border-transparent hover:border-[var(--border)] transition-all shadow-sm group"
       title={$t('settings.title')}
@@ -523,6 +537,6 @@
         <span>{$t('settings.title')}</span>
       </div>
       <span class="text-[10px] text-[var(--text-dim)] font-mono">v0.2.1</span>
-    </button>
+    </button>{/if}
   </div>
 </aside>

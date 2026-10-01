@@ -206,7 +206,7 @@
     {
       id: 'settings-themes',
       title: `${$t('settings.themes')} - Paleta de Cores`,
-      subtitle: 'Megumin, Rimuru, Cyberpunk ou crie a sua',
+      subtitle: 'Apple macOS, Megumin, Rimuru ou crie a sua',
       category: 'system',
       icon: Palette,
       accent: '#f43f5e',
@@ -297,7 +297,7 @@
   >
     <!-- Modal Dialog -->
     <div
-      class="relative w-full max-w-xl rounded-2xl glass-panel border border-white/10 dark:border-white/[0.08] shadow-2xl overflow-hidden flex flex-col max-h-[70vh] animate-scale-in"
+      class="apple-command relative w-full max-w-xl rounded-2xl glass-panel border border-white/10 dark:border-white/[0.08] shadow-2xl overflow-hidden flex flex-col max-h-[70vh] animate-scale-in"
       role="dialog"
       aria-modal="true"
       aria-label="Paleta de Comandos"
@@ -305,7 +305,7 @@
       <BorderBeam size={180} duration={8} colorFrom="var(--accent)" colorTo="var(--accent-light)" borderWidth={1.5} />
 
       <!-- Top Search Input -->
-      <div class="flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.06] bg-black/20">
+      <div class="apple-command-header flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.06] bg-black/20">
         <Search size={18} class="text-neutral-400 shrink-0" />
         <input
           bind:this={inputEl}
@@ -383,7 +383,7 @@
       </div>
 
       <!-- Footer Info -->
-      <div class="px-4 py-2 border-t border-white/[0.06] bg-black/20 flex items-center justify-between text-[11px] text-neutral-400">
+      <div class="apple-command-footer px-4 py-2 border-t border-white/[0.06] bg-black/20 flex items-center justify-between text-[11px] text-neutral-400">
         <div class="flex items-center gap-3">
           <span class="flex items-center gap-1">
             <kbd class="px-1.5 py-0.5 rounded bg-white/[0.06] border border-white/[0.08] text-[10px]">↑</kbd>
