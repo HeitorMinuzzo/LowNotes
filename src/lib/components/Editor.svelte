@@ -4,7 +4,7 @@
   import { markdown } from '@codemirror/lang-markdown';
   import { Compartment, EditorState } from '@codemirror/state';
   import * as Y from 'yjs';
-  import { yCollab } from 'y-codemirror.next';
+  import { createLocalCollaboration } from '$lib/editor-collaboration';
   import mermaid from 'mermaid';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { crdtApplyClientUpdate, readNote, broadcastAwareness } from '../api';
@@ -59,7 +59,7 @@
 
   let editorContainer: HTMLDivElement | null = $state(null);
   let previewContainer: HTMLDivElement | null = $state(null);
-  let saveStatus = $state<'saved' | 'saving' | 'error'>('saved');
+  let saveStatus = $state<'saved' | 'error'>('saved');
   let currentContent = $state('');
   let wordCount = $derived(
     currentContent.trim() ? currentContent.trim().split(/\s+/).length : 0
@@ -68,13 +68,13 @@
 
   let editorView: EditorView | null = null;
   let yDoc: Y.Doc | null = null;
+  let undoManager: Y.UndoManager | null = null;
   let unlistenCrdt: UnlistenFn | null = null;
   let awareness: Awareness | null = null;
   let remoteUsers = $state<PresenceUser[]>([]);
   let awarenessSendTimer: ReturnType<typeof setTimeout> | null = null;
   let stalePruneTimer: ReturnType<typeof setInterval> | undefined;
   let unlistenAwareness: UnlistenFn | null = null;
-  let pendingSaves = 0;
   let pendingRemoteUpdates: Uint8Array[] = [];
   let disposed = false;
   let mermaidCounter = 0;
@@ -158,6 +158,10 @@
       editorView.destroy();
       editorView = null;
     }
+    if (undoManager) {
+      undoManager.destroy();
+      undoManager = null;
+    }
     if (yDoc) {
       yDoc.destroy();
       yDoc = null;
@@ -217,20 +221,19 @@
       if (origin !== 'remote') {
         onLocalEdit?.();
         const base64 = uint8ArrayToBase64(update);
-        pendingSaves += 1;
-        saveStatus = 'saving';
         crdtApplyClientUpdate(notePath, base64)
-          .catch((error) => { console.error('Failed to persist CRDT update:', error); saveStatus = 'error'; })
-          .finally(() => { pendingSaves -= 1; if (pendingSaves === 0 && saveStatus !== 'error') saveStatus = 'saved'; });
+          .catch((error) => { console.error('Failed to persist CRDT update:', error); saveStatus = 'error'; });
       }
     });
 
+    const collaboration = createLocalCollaboration(yText, awareness);
+    undoManager = collaboration.undoManager;
     const state = EditorState.create({
       doc: yText.toString(),
       extensions: [
         basicSetup,
         markdown(),
-        yCollab(yText, awareness),
+        collaboration.extension,
         editorTheme.of(codeMirrorTheme()),
       ],
     });
@@ -366,6 +369,7 @@
   onDestroy(() => {
     disposed = true;
     if (editorView) editorView.destroy();
+    if (undoManager) undoManager.destroy();
     if (yDoc) yDoc.destroy();
     if (unlistenCrdt) unlistenCrdt();
     if (unlistenAwareness) unlistenAwareness();
@@ -491,9 +495,6 @@
       <div class="flex items-center gap-1.5 text-xs text-[var(--text-dim)]">
         {#if saveStatus === 'error'}
           <span class="text-[var(--danger)]">{$t('editor.saveError')}</span>
-        {:else if saveStatus === 'saving'}
-          <span class="inline-block w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse"></span>
-          <span>{$t('editor.saving')}</span>
         {:else}
           <span class="inline-block w-2 h-2 rounded-full bg-[var(--success)]"></span>
           <span>{$t('editor.saved')}</span>

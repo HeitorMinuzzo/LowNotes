@@ -42,6 +42,9 @@ When you close the window, the app stays in the system tray by default. You can 
 ### Notes and organization
 
 - Editable Markdown with preview, tasks, tables, footnotes, syntax extensions and Mermaid diagrams.
+- Interface zoom with **Ctrl + +**, **Ctrl + -** or **Ctrl + mouse wheel**; **Ctrl + 0** resets to 100%. The chosen level is saved on the device.
+- **Ctrl + Z** undoes only your local note edits, preserving text from other devices; **Ctrl + Y** or **Ctrl + Shift + Z** redoes your edits.
+- Immediate autosave with a stable **Saved** indicator while typing and a warning if saving fails.
 - Folders, note search, `[[links between notes]]` and local Markdown links. The link map combines relations written in notes with relations added manually or by the assistant.
 - Export notes and drafts to Word (`.docx`) and PDF. Headings, lists, tasks, tables, code and external links are preserved; Mermaid diagrams are exported as code and images as alt text and address.
 - Settings gathered on one screen: general preferences, themes, AI, providers, web search sources and app information.
