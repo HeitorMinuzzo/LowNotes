@@ -9,6 +9,7 @@ pub mod assistant;
 pub mod web_search;
 pub mod chat_history;
 pub mod undo;
+pub mod export_images;
 
 use std::sync::Arc;
 use parking_lot::{Mutex, RwLock};
@@ -146,6 +147,7 @@ pub fn run() {
             commands::ai_chat_query,
             commands::ai_save_draft,
             commands::export_document,
+            commands::load_export_image,
             commands::mark_welcome_seen,
             commands::links_get,
             commands::links_apply,

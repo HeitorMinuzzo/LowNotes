@@ -188,6 +188,8 @@ const ptBR: Dictionary = {
     saved: 'Arquivo exportado',
     invalidFile: 'Arquivo de exportação inválido ou maior que 32 MB.',
     fontFailed: 'Não foi possível carregar as fontes locais do PDF.',
+    imageFailed: 'Não foi possível carregar uma imagem para exportação. Confira o endereço e tente novamente.',
+    diagramFailed: 'Não foi possível renderizar um diagrama Mermaid. Confira a sintaxe e tente novamente.',
   },
   pair: {
     title: 'Sincronização P2P & Dispositivos',

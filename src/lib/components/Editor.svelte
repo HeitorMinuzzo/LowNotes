@@ -5,7 +5,7 @@
   import { Compartment, EditorState } from '@codemirror/state';
   import * as Y from 'yjs';
   import { createLocalCollaboration } from '$lib/editor-collaboration';
-  import mermaid from 'mermaid';
+  import { renderMermaidSvg } from '$lib/mermaid-renderer';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { crdtApplyClientUpdate, readNote, broadcastAwareness } from '../api';
   import { renderMarkdown } from '../markdown';
@@ -93,9 +93,9 @@
     const blocks = previewContainer.querySelectorAll<HTMLDivElement>('.mermaid-block');
     if (blocks.length === 0) return;
 
-    mermaid.initialize({
+    const config = {
       startOnLoad: false,
-      theme: activeTheme === 'dark' ? 'dark' : 'default',
+      theme: activeTheme === 'dark' ? 'dark' as const : 'default' as const,
       ...(activeTheme === 'dark' ? {
         themeVariables: {
           darkMode: true,
@@ -109,8 +109,8 @@
         },
       } : {}),
       fontFamily: 'inherit',
-      securityLevel: 'strict',
-    });
+      securityLevel: 'strict' as const,
+    };
 
     for (const block of blocks) {
       const raw = block.getAttribute('data-mermaid');
@@ -121,7 +121,7 @@
 
       const id = `mermaid-${Date.now()}-${mermaidCounter++}`;
       try {
-        const { svg } = await mermaid.render(id, code);
+        const svg = await renderMermaidSvg(id, code, config);
         svgTarget.innerHTML = svg;
       } catch {
         svgTarget.innerHTML = `<pre class="text-xs text-amber-400/90 font-mono text-left w-full p-2 bg-[var(--bg-main)] rounded border border-amber-900/40 overflow-x-auto whitespace-pre-wrap">${code}</pre>`;

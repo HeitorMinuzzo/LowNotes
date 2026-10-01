@@ -188,6 +188,8 @@ const esES: Dictionary = {
     saved: 'Archivo exportado',
     invalidFile: 'Archivo de exportación inválido o mayor de 32 MB.',
     fontFailed: 'No se pudieron cargar las fuentes locales del PDF.',
+    imageFailed: 'No se pudo cargar una imagen para exportar. Comprueba su dirección e inténtalo de nuevo.',
+    diagramFailed: 'No se pudo renderizar un diagrama Mermaid. Comprueba su sintaxis e inténtalo de nuevo.',
   },
   pair: {
     title: 'Sincronización P2P y Dispositivos',
