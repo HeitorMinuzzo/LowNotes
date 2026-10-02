@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Check, Copy, X } from 'lucide-svelte';
   import type { NetworkEventPayload, PeerConfig } from '../types';
   import { networkRequestPair, networkRemovePeer, networkGetPairInfo } from '../api';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
@@ -134,9 +135,11 @@
         </div>
         <button
           onclick={() => (isOpen = false)}
+          title={$t('ai.close')}
+          aria-label={$t('ai.close')}
           class="w-7 h-7 flex items-center justify-center rounded-md text-[var(--text-dim)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition"
         >
-          ✕
+          <X size={16} />
         </button>
       </div>
 
@@ -204,7 +207,8 @@
                 disabled={!pairCode}
                 class="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed text-black text-xs font-semibold rounded-lg transition shadow-md flex items-center gap-1.5"
               >
-                {copied ? '✓ ' + $t('pair.copied') : $t('pair.copy')}
+                {#if copied}<Check size={15} />{:else}<Copy size={15} />{/if}
+                {copied ? $t('pair.copied') : $t('pair.copy')}
               </button>
             </div>
           </div>

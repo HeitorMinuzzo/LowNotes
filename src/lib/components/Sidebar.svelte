@@ -2,7 +2,7 @@
   import type { VaultConfig, VaultItem } from '../types';
   import type { PresenceUser } from '$lib/presence';
   import { visibleNoteRows } from '$lib/note-tree';
-  import { Settings2, RefreshCw } from 'lucide-svelte';
+  import { ChevronDown, ChevronRight, FilePlus2, FileText, Folder, FolderOpen, FolderPlus, NotebookPen, Pencil, RefreshCw, Settings2, Trash2, X } from 'lucide-svelte';
   import {
     createNote,
     createFolder,
@@ -140,15 +140,16 @@
   <div class="app-topbar relative flex items-center border-b border-[var(--border)] px-3">
     <button
       onclick={() => (isVaultDropdownOpen = !isVaultDropdownOpen)}
+      aria-expanded={isVaultDropdownOpen}
       class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-left transition group"
     >
       <div class="flex items-center gap-2 overflow-hidden">
-        <span class="text-[var(--accent-light)] font-bold text-sm">✦</span>
+        <NotebookPen size={16} class="shrink-0 text-[var(--accent-light)]" />
         <span class="text-xs font-semibold text-[var(--text-main)] truncate">
           {activeVault ? activeVault.name : $t('sidebar.selectVault')}
         </span>
       </div>
-      <span class="text-[10px] text-[var(--text-dim)] group-hover:text-[var(--text-muted)]">▼</span>
+      <ChevronDown size={14} class="shrink-0 text-[var(--text-dim)] group-hover:text-[var(--text-muted)]" />
     </button>
 
     <!-- Vault Dropdown -->
@@ -173,7 +174,7 @@
           onclick={handleOpenFolder}
           class="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left text-[var(--accent-light)] hover:bg-[var(--bg-hover)] transition font-medium"
         >
-          <span>+</span>
+          <FolderOpen size={15} />
           <span>{$t('sidebar.openComputerFolder')}</span>
         </button>
       </div>
@@ -192,9 +193,11 @@
       {#if searchQuery}
         <button
           onclick={() => (searchQuery = '')}
+          title={$t('sidebar.clearSearch')}
+          aria-label={$t('sidebar.clearSearch')}
           class="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-[var(--text-dim)] hover:text-[var(--text-main)]"
         >
-          ✕
+          <X size={14} />
         </button>
       {/if}
     </div>
@@ -203,16 +206,17 @@
     <div class="flex gap-1.5">
       <button
         onclick={() => (isCreatingNote = true)}
-        class="flex-1 py-1 px-2 text-xs font-medium rounded bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition text-center"
+        class="flex-1 inline-flex items-center justify-center gap-1.5 py-1 px-2 text-xs font-medium rounded bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition text-center"
       >
-        + {$t('sidebar.newNote')}
+        <FilePlus2 size={14} /> {$t('sidebar.newNote')}
       </button>
       <button
         onclick={() => (isCreatingFolder = true)}
-        class="py-1 px-2 text-xs font-medium rounded bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
+        class="inline-flex items-center justify-center py-1 px-2 text-xs font-medium rounded bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
         title={$t('sidebar.newFolder')}
+        aria-label={$t('sidebar.newFolder')}
       >
-        📁+
+        <FolderPlus size={16} />
       </button>
     </div>
 
@@ -297,36 +301,44 @@
         >
           <div class="flex items-center gap-2 overflow-hidden flex-1">
             {#if item.is_dir}
-              <span class="text-[var(--text-dim)] text-[10px]">{collapsedFolders.has(item.path) && !searchQuery.trim() ? '▸' : '▾'}</span>
-              <span class="text-[var(--text-dim)] text-[11px]">📁</span>
+              {#if collapsedFolders.has(item.path) && !searchQuery.trim()}
+                <ChevronRight size={12} class="shrink-0 text-[var(--text-dim)]" />
+                <Folder size={14} class="shrink-0 text-[var(--text-dim)]" />
+              {:else}
+                <ChevronDown size={12} class="shrink-0 text-[var(--text-dim)]" />
+                <FolderOpen size={14} class="shrink-0 text-[var(--text-dim)]" />
+              {/if}
             {:else}
-              <span class="text-[var(--text-dim)] text-[11px]">📄</span>
+              <FileText size={14} class="shrink-0 text-[var(--text-dim)]" />
             {/if}
             <span class="truncate" title={item.path}>{item.is_dir ? item.name : item.title}</span>
           </div>
 
           <!-- Hover actions -->
-          <div class="hidden group-hover:flex items-center gap-1 opacity-80">
+          <div class="hidden group-hover:flex group-focus-within:flex items-center gap-1 opacity-80">
             {#if item.is_dir}
               <button
                 onclick={(e) => { e.stopPropagation(); newNoteName = `${item.path}/`; isCreatingNote = true; }}
                 class="w-4 h-4 flex items-center justify-center text-[10px] text-[var(--text-dim)] hover:text-[var(--text-main)]"
                 title={$t('sidebar.newNote')}
-              >+</button>
+                aria-label={$t('sidebar.newNote')}
+              ><FilePlus2 size={12} /></button>
             {/if}
             <button
               onclick={(e) => handleRename(item.path, e)}
               class="w-4 h-4 flex items-center justify-center text-[10px] text-[var(--text-dim)] hover:text-[var(--text-main)]"
               title={$t('sidebar.rename')}
+              aria-label={$t('sidebar.rename')}
             >
-              ✎
+              <Pencil size={12} />
             </button>
             <button
               onclick={(e) => handleDelete(item.path, e)}
               class="w-4 h-4 flex items-center justify-center text-[10px] text-[var(--text-dim)] hover:text-red-400"
               title={$t('sidebar.delete')}
+              aria-label={$t('sidebar.delete')}
             >
-              ✕
+              <Trash2 size={12} />
             </button>
           </div>
         </div>

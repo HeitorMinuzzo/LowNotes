@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Bold, Code, Heading1, Heading2, Italic, List, ListTodo, MessageSquare, Network, Quote, Strikethrough } from 'lucide-svelte';
   import { onMount, onDestroy } from 'svelte';
   import { EditorView, basicSetup } from 'codemirror';
   import { markdown } from '@codemirror/lang-markdown';
@@ -416,65 +417,71 @@
         onclick={() => applyFormatting('**', '**')}
         class="px-2 py-1 text-xs font-bold rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
         title={$t('editor.bold')}
+        aria-label={$t('editor.bold')}
       >
-        B
+        <Bold size={14} />
       </button>
       <button
         onclick={() => applyFormatting('*', '*')}
         class="px-2 py-1 text-xs italic rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
         title={$t('editor.italic')}
+        aria-label={$t('editor.italic')}
       >
-        I
+        <Italic size={14} />
       </button>
       <button
         onclick={() => applyFormatting('~~', '~~')}
         class="px-2 py-1 text-xs line-through rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
         title={$t('editor.strikethrough')}
+        aria-label={$t('editor.strikethrough')}
       >
-        S
+        <Strikethrough size={14} />
       </button>
       <span class="w-[1px] h-4 bg-[var(--border)] mx-1"></span>
       <button
         onclick={() => applyFormatting('# ')}
         class="px-2 py-1 text-xs font-semibold rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
         title={$t('editor.heading1')}
+        aria-label={$t('editor.heading1')}
       >
-        H1
+        <Heading1 size={16} />
       </button>
       <button
         onclick={() => applyFormatting('## ')}
         class="px-2 py-1 text-xs font-semibold rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
         title={$t('editor.heading2')}
+        aria-label={$t('editor.heading2')}
       >
-        H2
+        <Heading2 size={16} />
       </button>
       <button
         onclick={() => applyFormatting('- ')}
-        class="px-2 py-1 text-xs rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
+        class="px-2 py-1 text-xs rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition inline-flex items-center gap-1.5"
         title={$t('editor.list')}
       >
-        • {$t('editor.list')}
+        <List size={14} /> {$t('editor.list')}
       </button>
       <button
         onclick={() => applyFormatting('- [ ] ')}
-        class="px-2 py-1 text-xs rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
+        class="px-2 py-1 text-xs rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition inline-flex items-center gap-1.5"
         title={$t('editor.checklist')}
       >
-        ☑ {$t('editor.task')}
+        <ListTodo size={14} /> {$t('editor.task')}
       </button>
       <button
         onclick={() => applyFormatting('`', '`')}
         class="px-2 py-1 text-xs font-mono rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
         title={$t('editor.code')}
+        aria-label={$t('editor.code')}
       >
-        &lt;/&gt;
+        <Code size={16} />
       </button>
       <button
         onclick={() => applyFormatting('> ')}
-        class="px-2 py-1 text-xs rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition"
+        class="px-2 py-1 text-xs rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition inline-flex items-center gap-1.5"
         title={$t('editor.quote')}
       >
-        ” {$t('editor.quote')}
+        <Quote size={14} /> {$t('editor.quote')}
       </button>
       <span class="w-[1px] h-4 bg-[var(--border)] mx-1"></span>
       <button
@@ -482,7 +489,7 @@
         class="px-2 py-1 text-xs rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition inline-flex items-center gap-1.5"
         title={$t('graph.toolbarTitle')}
       >
-        <span aria-hidden="true">🕸</span><span>{$t('graph.button')}</span>
+        <Network size={14} /><span>{$t('graph.button')}</span>
       </button>
     </div>
 
@@ -541,7 +548,7 @@
           class="px-2.5 py-1 text-xs rounded transition flex items-center gap-1.5 border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--accent-light)] {isAiChatOpen ? 'border-[var(--accent)] text-[var(--accent-light)] font-medium shadow-sm bg-[var(--bg-active)]' : ''}"
           title={$t('editor.openAiAssistant')}
         >
-          <span>💬</span>
+          <MessageSquare size={15} />
           <span class="font-medium">{$t('editor.assistant')}</span>
         </button>
       {/if}

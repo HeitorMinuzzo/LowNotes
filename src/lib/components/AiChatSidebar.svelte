@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Bot, Brain, Check, FileText, History, Link2, Pencil, Plus, Send, Settings2, Trash2, TriangleAlert, X } from 'lucide-svelte';
   import { onDestroy, onMount, tick } from 'svelte';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { renderChatMarkdown } from '../markdown';
@@ -323,29 +324,29 @@
     <!-- Top Header -->
     <header class="app-topbar flex items-center justify-between gap-2 px-4 border-b border-[var(--border)] bg-[var(--bg-card)] min-w-0">
       <div class="flex items-center gap-2 min-w-0">
-        <span class="text-[var(--accent-light)] font-bold text-sm shrink-0">✦</span>
+        <Bot size={16} class="text-[var(--accent-light)] shrink-0" />
         <h3 class="text-xs font-bold text-[var(--text-main)] truncate">{$t('ai.title')}</h3>
       </div>
       <div class="flex items-center gap-0.5 shrink-0">
         <button onclick={newChat} disabled={!historyReady}
           class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--accent-light)] disabled:opacity-40"
-          title={$t('ai.newChat')} aria-label={$t('ai.newChat')}>＋</button>
+          title={$t('ai.newChat')} aria-label={$t('ai.newChat')}><Plus size={16} /></button>
         <button onclick={() => (pane = pane === 'history' ? 'chat' : 'history')} disabled={!historyReady}
           class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--accent-light)] disabled:opacity-40"
-          title={$t('ai.history')} aria-label={$t('ai.history')}>◷</button>
+          title={$t('ai.history')} aria-label={$t('ai.history')}><History size={16} /></button>
         <button onclick={() => { memoryDraft = archive.memory; pane = pane === 'memory' ? 'chat' : 'memory'; }} disabled={!historyReady}
           class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-hover)] {archive.memory ? 'text-[var(--accent-light)]' : 'text-[var(--text-dim)]'} hover:text-[var(--accent-light)] disabled:opacity-40"
-          title={$t('ai.memory')} aria-label={$t('ai.memory')}>🧠</button>
+          title={$t('ai.memory')} aria-label={$t('ai.memory')}><Brain size={16} /></button>
         <button
           onclick={() => onOpenSettings(skill === 'research' ? 'web' : 'ai')}
           class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--accent-light)] transition"
           title={$t('ai.settings')} aria-label={$t('ai.settings')}
-        >⚙️</button>
+        ><Settings2 size={16} /></button>
         <button
           onclick={() => (isOpen = false)}
           class="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-main)] transition"
           title={$t('ai.close')} aria-label={$t('ai.close')}
-        >✕</button>
+        ><X size={16} /></button>
       </div>
     </header>
 
@@ -433,9 +434,9 @@
                 <span class="block text-[10px] text-[var(--text-dim)]">{new Date(chat.updatedAt).toLocaleDateString($locale)} · {chat.messages.length} {$t('ai.messages')}</span>
               </button>
               <button onclick={() => renameChat(chat.id)} title={$t('ai.renameChat')} aria-label={$t('ai.renameChat')}
-                class="w-7 h-7 rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-main)]">✎</button>
+                class="w-7 h-7 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text-main)]"><Pencil size={14} /></button>
               <button onclick={() => deleteChat(chat.id)} title={$t('ai.deleteChat')} aria-label={$t('ai.deleteChat')}
-                class="w-7 h-7 mr-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-red-400">✕</button>
+                class="w-7 h-7 mr-1 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-red-400"><Trash2 size={14} /></button>
             </div>
           {:else}
             <p class="text-xs text-[var(--text-dim)] text-center py-8">{$t('ai.noHistory')}</p>
@@ -468,7 +469,7 @@
       {:else if messages.length === 0}
         <div class="flex flex-col items-center justify-center my-auto py-8 text-center text-[var(--text-dim)] select-none">
           <div class="w-12 h-12 rounded-xl bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center text-xl mb-3">
-            ✦
+            <Bot size={24} />
           </div>
           <h4 class="text-xs font-bold text-[var(--text-main)] mb-1">{$t('ai.emptyTitle')}</h4>
           <p class="text-[11px] text-[var(--text-muted)] max-w-[240px] leading-relaxed mb-4">
@@ -505,7 +506,7 @@
               <span>{msg.timestamp}</span>
               {#if msg.role === 'user'}
                 <button onclick={() => rememberMessage(msg)} title={$t('ai.rememberMessage')}
-                  aria-label={$t('ai.rememberMessage')} class="ml-1 hover:text-[var(--accent-light)]">🧠</button>
+                  aria-label={$t('ai.rememberMessage')} class="ml-1 inline-flex items-center justify-center hover:text-[var(--accent-light)]"><Brain size={13} /></button>
               {/if}
             </div>
 
@@ -513,8 +514,11 @@
               class="max-w-[92%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed {msg.role === 'user' ? 'bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--text-main)]' : 'bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-main)] shadow-sm'}"
             >
               {#if msg.role === 'assistant'}
-                <div class="prose max-w-none text-xs leading-relaxed">
-                  {@html renderChatMarkdown(trError(msg.content))}
+                <div class="flex items-start gap-2">
+                  {#if msg.isError}<TriangleAlert size={16} class="shrink-0 mt-0.5 text-[var(--danger)]" />{/if}
+                  <div class="prose min-w-0 max-w-none text-xs leading-relaxed">
+                    {@html renderChatMarkdown(msg.isError ? trError(msg.content).replace(/^\u26a0\uFE0F?\s*/u, '') : trError(msg.content))}
+                  </div>
                 </div>
                 {#if msg.isError}
                   <button class="mt-3 text-xs font-semibold text-[var(--accent-light)] hover:underline" onclick={() => onOpenSettings(msg.errorSettingsTab || 'providers')}>{msg.errorSettingsTab === 'web' ? $t('settings.webSearch') : $t('settings.providers')}</button>
@@ -556,7 +560,7 @@
                         <div class="flex flex-wrap items-center gap-2">
                           {#if draft.savedPath}
                             <button onclick={() => onNavigateToSource(draft.savedPath!, 1)}
-                              class="text-[11px] text-[var(--accent-light)] hover:underline">✓ {$t('ai.openSavedNote')}</button>
+                              class="inline-flex items-center gap-1 text-[11px] text-[var(--accent-light)] hover:underline"><Check size={13} /> {$t('ai.openSavedNote')}</button>
                           {:else}
                             <button onclick={() => saveDraft(msg, draft)} disabled={draft.saving || !draft.content.trim()}
                               class="px-2 py-1 rounded bg-[var(--accent)] text-black text-[11px] disabled:opacity-40">
@@ -582,7 +586,7 @@
 
                 {#if msg.appliedLinks && msg.appliedLinks > 0}
                   <div class="mt-2 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--bg-main)] border border-[var(--border)] text-[10px] text-[var(--accent-light)] select-none">
-                    🔗 {$t('ai.linksApplied', { count: msg.appliedLinks })}
+                    <Link2 size={12} /> {$t('ai.linksApplied', { count: msg.appliedLinks })}
                   </div>
                 {/if}
 
@@ -597,7 +601,7 @@
                           class="px-2 py-0.5 rounded bg-[var(--bg-main)] hover:bg-[var(--bg-active)] border border-[var(--border)] text-[10px] text-[var(--accent-light)] flex items-center gap-1 transition"
                           title="{src.content.slice(0, 100)}..."
                         >
-                          <span>📄</span>
+                          <FileText size={12} class="shrink-0" />
                           <span class="truncate max-w-[140px]">{src.note_title}</span>
                           <span class="text-[var(--text-dim)]">:L{src.line_number}</span>
                         </button>
@@ -650,7 +654,7 @@
             class="px-3 py-1 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-black text-xs font-semibold rounded-md transition shadow flex items-center gap-1"
           >
             <span>{$t('ai.send')}</span>
-            <span>➤</span>
+            <Send size={13} />
           </button>
         </div>
       </form>

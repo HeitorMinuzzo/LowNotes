@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Link2 } from 'lucide-svelte';
   import type { PeerConfig } from '../types';
   import { networkAnswerPair } from '../api';
   import { t } from '$lib/i18n';
@@ -40,7 +41,7 @@
       tabindex="-1"
     >
       <div class="flex items-center gap-3">
-        <span class="text-2xl text-[var(--accent-light)]">🔗</span>
+        <Link2 size={24} class="shrink-0 text-[var(--accent-light)]" />
         <div>
           <h3 class="text-sm font-bold text-[var(--text-main)]">{$t('incoming.title')}</h3>
           <p class="text-xs text-[var(--text-dim)]">{$t('incoming.subtitle')}</p>

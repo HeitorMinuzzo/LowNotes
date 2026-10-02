@@ -2,7 +2,7 @@
   import { onMount, untrack } from 'svelte';
   import { getVersion } from '@tauri-apps/api/app';
   import { openUrl } from '@tauri-apps/plugin-opener';
-  import { ArrowLeft, Bot, Check, Download, Globe2, Monitor, Palette, Pencil, Plus, Settings2, Sparkles, Trash2 } from 'lucide-svelte';
+  import { ArrowLeft, Bot, Check, Download, Globe2, Monitor, NotebookPen, Palette, Pencil, Plus, Settings2, Sparkles, Trash2 } from 'lucide-svelte';
   import { fetchAiModels, saveAiSettings, saveCloseToTray, saveLanguage, saveLineWrapping, saveTheme, saveThemePalettes, saveUpdatePrefs, saveViewMode, saveWebSearchSettings } from '$lib/api';
   import { LOCALE_LABELS, SUPPORTED_LOCALES, t, trError, type LocaleCode } from '$lib/i18n';
   import { BUILTIN_PALETTES, DEFAULT_PALETTE_ID, TOKEN_GROUPS, applyTheme, isHexColor, newCustomPalette, resolvePalette, themeVarsStyle, type ThemeToken } from '$lib/themes';
@@ -286,7 +286,7 @@
                     {/each}
                   </div>
                   <div class="palette-demo" style={themeVarsStyle(editingPalette[editMode], editMode)}>
-                    <div class="palette-demo-bar"><span>LowNotes</span><span>✦</span></div>
+                    <div class="palette-demo-bar"><span>LowNotes</span><NotebookPen size={13} /></div>
                     <div class="palette-demo-body">
                       <div class="palette-demo-side">
                         <span class="palette-demo-item active">{$t('settings.demoNote')}</span>
@@ -368,7 +368,7 @@
         {:else}
           <section class="settings-section">
             <h2>{$t('settings.about')}</h2><p>{$t('settings.aboutHint')}</p>
-            <div class="settings-about"><div class="settings-about-mark">✦</div><div><strong>LowNotes</strong><span>{$t('settings.version')} {version}</span></div></div>
+            <div class="settings-about"><div class="settings-about-mark"><NotebookPen size={26} /></div><div><strong>LowNotes</strong><span>{$t('settings.version')} {version}</span></div></div>
             <label class="setting-row setting-toggle"><div><strong>{$t('update.autoCheck')}</strong><small>{$t('settings.updateHint')}</small></div><input type="checkbox" checked={settings.update_check} onchange={(event) => changeUpdates(event.currentTarget.checked)} /></label>
             <div class="setting-row"><div><strong>{$t('settings.device')}</strong><small>{settings.device_name}</small></div></div>
           </section>

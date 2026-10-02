@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ArrowLeft, Link2Off, Minus, Plus, Scan } from 'lucide-svelte';
   import { onMount } from 'svelte';
   import { linksGet, linksApply } from '../api';
   import type { LinkEdge, VaultItem } from '../types';
@@ -282,7 +283,7 @@
 
 <section class="flex flex-col h-full min-h-0 w-full bg-[var(--bg-main)]" aria-label={$t('graph.title')}>
   <header class="app-topbar flex items-center gap-3 px-4 border-b border-[var(--border)] bg-[var(--bg-sidebar)] select-none">
-    <button onclick={onClose} class="graph-button" title={$t('graph.back')} aria-label={$t('graph.back')}>←</button>
+    <button onclick={onClose} class="graph-button" title={$t('graph.back')} aria-label={$t('graph.back')}><ArrowLeft size={16} /></button>
     <div class="min-w-0 mr-auto">
       <h2 class="font-semibold text-sm text-[var(--text-main)]">{$t('graph.title')}</h2>
       <p class="text-[10px] text-[var(--text-dim)]">{$t('graph.notes', { count: notes.length })} · {$t('graph.links', { count: links.length })}</p>
@@ -363,10 +364,10 @@
       {/if}
 
       <div class="absolute bottom-4 right-4 z-10 flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] p-1 shadow">
-        <button class="graph-button" onclick={() => zoomAt(1.25, { x: 50, y: 50 })} title={$t('graph.zoomIn')} aria-label={$t('graph.zoomIn')}>+</button>
+        <button class="graph-button" onclick={() => zoomAt(1.25, { x: 50, y: 50 })} title={$t('graph.zoomIn')} aria-label={$t('graph.zoomIn')}><Plus size={16} /></button>
         <span class="text-[11px] text-[var(--text-muted)] tabular-nums min-w-10 text-center">{Math.round(viewport.scale * 100)}%</span>
-        <button class="graph-button" onclick={() => zoomAt(0.8, { x: 50, y: 50 })} title={$t('graph.zoomOut')} aria-label={$t('graph.zoomOut')}>−</button>
-        <button class="graph-button" onclick={resetView} title={$t('graph.resetView')} aria-label={$t('graph.resetView')}>◎</button>
+        <button class="graph-button" onclick={() => zoomAt(0.8, { x: 50, y: 50 })} title={$t('graph.zoomOut')} aria-label={$t('graph.zoomOut')}><Minus size={16} /></button>
+        <button class="graph-button" onclick={resetView} title={$t('graph.resetView')} aria-label={$t('graph.resetView')}><Scan size={16} /></button>
       </div>
       <p class="absolute bottom-4 left-4 z-10 max-w-[55%] text-[11px] text-[var(--text-dim)] pointer-events-none">{$t('graph.hint')}</p>
     </div>
@@ -386,7 +387,7 @@
             {#each selectedLinks as link (link.source + '→' + link.target + '→' + link.origin)}
               <div class="flex items-center justify-between gap-2 px-2 py-1.5 rounded-md bg-[var(--bg-card)] border border-[var(--border)]">
                 <span class="text-xs text-[var(--text-main)] truncate">{titleFor(link.source === selectedPath ? link.target : link.source)}</span>
-                <button onclick={() => void removeLink(link.source, link.target)} class="text-[10px] text-[var(--text-dim)] hover:text-[var(--danger)]" title={$t('graph.unlink')} aria-label={$t('graph.unlink')}>×</button>
+                <button onclick={() => void removeLink(link.source, link.target)} class="inline-flex items-center justify-center text-[10px] text-[var(--text-dim)] hover:text-[var(--danger)]" title={$t('graph.unlink')} aria-label={$t('graph.unlink')}><Link2Off size={14} /></button>
               </div>
             {/each}
           {/if}
@@ -398,7 +399,7 @@
 
 <style>
   .graph-area { background-color: var(--bg-main); background-image: radial-gradient(var(--border) 0.6px, transparent 0.6px); background-size: 20px 20px; }
-  .graph-button { min-width: 28px; min-height: 28px; padding: 0 7px; border-radius: 5px; color: var(--text-muted); }
+  .graph-button { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; min-height: 28px; padding: 0 7px; border-radius: 5px; color: var(--text-muted); }
   .graph-button:hover, .graph-button:focus-visible { background: var(--bg-hover); color: var(--text-main); outline: none; }
   .graph-button-active { background: var(--bg-active); color: var(--accent-light); }
   .edge-line { stroke: var(--text-dim); stroke-opacity: 0.58; stroke-width: 0.16; }

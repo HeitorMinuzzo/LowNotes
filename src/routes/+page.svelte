@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { FileText, FolderOpen, MessageSquare, Network, NotebookPen } from 'lucide-svelte';
   import { onMount, onDestroy } from 'svelte';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import type {
@@ -403,7 +404,7 @@
     <main class="flex-1 flex flex-col items-center justify-center p-8 text-center select-none">
       <button class="absolute top-5 right-6 text-sm text-[var(--text-muted)] hover:text-[var(--accent-light)]" onclick={() => openSettings()}>{$t('settings.title')}</button>
       <div class="w-16 h-16 rounded-2xl bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center text-3xl mb-6 shadow-xl">
-        ✦
+        <NotebookPen size={32} class="text-[var(--accent-light)]" />
       </div>
       <h1 class="text-2xl font-bold mb-2">{$t('app.welcomeTitle')}</h1>
       <p class="text-sm text-[var(--text-muted)] max-w-md mb-8 leading-relaxed">
@@ -414,7 +415,7 @@
         onclick={handleOpenVaultFolder}
         class="px-6 py-3 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-black font-semibold text-sm rounded-xl transition shadow-lg flex items-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
       >
-        <span>📁</span>
+        <FolderOpen size={18} />
         <span>{$t('app.chooseVaultFolder')}</span>
       </button>
 
@@ -502,18 +503,18 @@
           <header class="app-topbar flex items-center justify-between gap-2 px-4 border-b border-[var(--border)] bg-[var(--bg-sidebar)]">
             <button
               onclick={() => (isGraphOpen = true)}
-              class="px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-xs text-[var(--text-muted)] hover:text-[var(--accent-light)] transition"
-            >🕸 {$t('graph.button')}</button>
+              class="px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--accent-light)] transition"
+            ><Network size={15} /> {$t('graph.button')}</button>
             <button
               onclick={() => (isAiChatOpen = !isAiChatOpen)}
               class="px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-xs text-[var(--text-muted)] hover:text-[var(--accent-light)] flex items-center gap-1.5 transition shadow"
             >
-              <span>💬</span>
+              <MessageSquare size={15} />
               <span>{$t('app.openAiChat')}</span>
             </button>
           </header>
           <div class="flex-1 flex flex-col items-center justify-center text-center p-8">
-            <span class="text-4xl mb-3 opacity-60">📄</span>
+            <FileText size={42} class="mb-3 opacity-60" />
             <p class="text-sm">{$t('app.emptyState')}</p>
           </div>
         </div>

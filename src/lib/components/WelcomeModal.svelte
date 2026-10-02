@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Bot, FileText, Link2, MessageSquare } from 'lucide-svelte';
   import { markWelcomeSeen, saveLanguage } from '../api';
   import { t, locale, LOCALE_LABELS, SUPPORTED_LOCALES } from '$lib/i18n';
   import logoUrl from '../../../assets/brand/lownotes_logo.png';
@@ -66,7 +67,7 @@
       <div class="p-8 flex flex-col gap-4">
         <!-- Feature 1 -->
         <div class="flex items-start gap-3.5 p-3 rounded-xl bg-[var(--bg-main)] border border-[var(--border)]">
-          <span class="text-xl mt-0.5">📄</span>
+          <FileText size={22} class="shrink-0 mt-0.5 text-[var(--accent-light)]" />
           <div>
             <h4 class="text-xs font-bold text-[var(--text-main)] mb-0.5">{$t('welcome.feature1Title')}</h4>
             <p class="text-[11px] text-[var(--text-muted)] leading-relaxed">
@@ -77,7 +78,7 @@
 
         <!-- Feature 2 -->
         <div class="flex items-start gap-3.5 p-3 rounded-xl bg-[var(--bg-main)] border border-[var(--border)]">
-          <span class="text-xl mt-0.5">🔗</span>
+          <Link2 size={22} class="shrink-0 mt-0.5 text-[var(--accent-light)]" />
           <div>
             <h4 class="text-xs font-bold text-[var(--text-main)] mb-0.5">{$t('welcome.feature2Title')}</h4>
             <p class="text-[11px] text-[var(--text-muted)] leading-relaxed">
@@ -88,7 +89,7 @@
 
         <!-- Feature 3 -->
         <div class="flex items-start gap-3.5 p-3 rounded-xl bg-[var(--bg-main)] border border-[var(--accent)]/30">
-          <span class="text-xl mt-0.5">🤖</span>
+          <Bot size={22} class="shrink-0 mt-0.5 text-[var(--accent-light)]" />
           <div>
             <h4 class="text-xs font-bold text-[var(--text-main)] mb-0.5">{$t('welcome.feature3Title')}</h4>
             <p class="text-[11px] text-[var(--text-muted)] leading-relaxed">
@@ -119,7 +120,7 @@
             class="px-5 py-2.5 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-black text-xs font-semibold rounded-xl shadow-lg transition flex items-center gap-1.5"
           >
             <span>{$t('welcome.tryAi')}</span>
-            <span>💬</span>
+            <MessageSquare size={15} />
           </button>
         </div>
       </div>
