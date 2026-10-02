@@ -141,6 +141,7 @@ pub fn run() {
             commands::save_theme,
             commands::save_theme_palettes,
             commands::save_view_mode,
+            commands::save_line_wrapping,
             commands::save_language,
             commands::fetch_ai_models,
             commands::search_vault_rag,

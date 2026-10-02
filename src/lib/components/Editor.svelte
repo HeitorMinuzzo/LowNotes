@@ -28,6 +28,7 @@
     targetLine,
     theme,
     viewMode,
+    lineWrapping = true,
     onViewModeChange,
     isAiChatOpen = false,
     onToggleAiChat,
@@ -45,6 +46,7 @@
     targetLine?: number;
     theme: AppTheme;
     viewMode: ViewMode;
+    lineWrapping?: boolean;
     onViewModeChange: (mode: ViewMode) => void;
     isAiChatOpen?: boolean;
     onToggleAiChat?: () => void;
@@ -80,6 +82,7 @@
   let mermaidCounter = 0;
   let mermaidDebounce: ReturnType<typeof setTimeout> | null = null;
   const editorTheme = new Compartment();
+  const editorWrapping = new Compartment();
 
   function codeMirrorTheme() {
     return EditorView.theme({
@@ -235,6 +238,7 @@
         markdown(),
         collaboration.extension,
         editorTheme.of(codeMirrorTheme()),
+        editorWrapping.of(lineWrapping ? EditorView.lineWrapping : []),
       ],
     });
 
@@ -387,6 +391,13 @@
   });
 
   $effect(() => {
+    const wrap = lineWrapping;
+    if (editorView) {
+      editorView.dispatch({ effects: editorWrapping.reconfigure(wrap ? EditorView.lineWrapping : []) });
+    }
+  });
+
+  $effect(() => {
     if ((viewMode === 'split' || viewMode === 'preview') && previewContainer && currentContent) {
       const activeTheme = theme;
       if (mermaidDebounce) clearTimeout(mermaidDebounce);
@@ -397,7 +408,7 @@
   });
 </script>
 
-<div class="flex flex-col h-full w-full bg-[var(--bg-main)]">
+<div class="flex flex-col min-w-0 min-h-0 h-full w-full bg-[var(--bg-main)]">
   <!-- Top Editor Toolbar -->
   <header class="app-topbar flex items-center gap-3 overflow-x-auto whitespace-nowrap px-4 border-b border-[var(--border)] bg-[var(--bg-sidebar)] select-none">
     <div class="flex shrink-0 items-center gap-1">
@@ -538,11 +549,11 @@
   </header>
 
   <!-- Editor & Preview Body -->
-  <main class="flex-1 flex overflow-hidden relative">
+  <main class="flex-1 flex min-w-0 min-h-0 overflow-hidden relative">
     <!-- CodeMirror Container -->
     <div
       bind:this={editorContainer}
-      class="h-full overflow-hidden transition-all duration-150 {viewMode === 'edit' ? 'w-full' : viewMode === 'split' ? 'w-1/2 border-r border-[var(--border)]' : 'hidden'}"
+      class="min-w-0 h-full overflow-hidden transition-all duration-150 {viewMode === 'edit' ? 'w-full' : viewMode === 'split' ? 'w-1/2 border-r border-[var(--border)]' : 'hidden'}"
     ></div>
 
     <!-- Rendered Markdown Container -->
@@ -552,7 +563,7 @@
         bind:this={previewContainer}
         role="presentation"
         onclick={handlePreviewClick}
-        class="h-full overflow-y-auto px-8 py-6 select-text {viewMode === 'preview' ? 'w-full max-w-4xl mx-auto' : 'w-1/2'}"
+        class="min-w-0 h-full overflow-y-auto px-8 py-6 select-text {viewMode === 'preview' ? 'w-full max-w-4xl mx-auto' : 'w-1/2'}"
       >
         <article class="prose max-w-none text-[var(--text-main)]">
           {@html renderMarkdown(currentContent)}

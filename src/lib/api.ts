@@ -149,6 +149,10 @@ export async function saveViewMode(viewMode: ViewMode): Promise<void> {
   return await invoke('save_view_mode', { viewMode });
 }
 
+export async function saveLineWrapping(lineWrapping: boolean): Promise<void> {
+  return await invoke('save_line_wrapping', { lineWrapping });
+}
+
 export async function fetchAiModels(
   providerId?: string,
   customUrl?: string,

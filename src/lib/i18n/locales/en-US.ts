@@ -296,6 +296,7 @@ const enUS = {
     tokenAccent: 'Accent', tokenAccentLight: 'Links and hover', tokenAccentContrast: 'Text on accent', tokenSuccess: 'Success', tokenDanger: 'Danger',
     demoNote: 'Sample note', demoBody: 'Your notes will look like this with these colors.', demoLink: 'a link', demoButton: 'Button', demoSuccess: 'Saved', demoDanger: 'Alert',
     languageHint: 'Language used throughout the app.', defaultView: 'Default editor view', defaultViewHint: 'How a note opens.',
+    lineWrapping: 'Visual line wrapping', lineWrappingHint: 'Display long lines across multiple screen rows without changing the file or line numbers. Turn off to use horizontal scrolling.',
     behavior: 'Window behavior', behaviorHint: 'Control what happens when you close the window.',
     closeToTray: 'Keep running in the system tray', closeToTrayHint: 'Closing the window hides LowNotes. Use the tray icon to reopen or quit.',
     aiHint: 'Set the assistant’s default model and note behavior.', activeProvider: 'Active provider', activeProviderHint: 'Used for chat and note suggestions.', saveAi: 'Save AI settings',

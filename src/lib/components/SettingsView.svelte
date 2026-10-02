@@ -3,7 +3,7 @@
   import { getVersion } from '@tauri-apps/api/app';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { ArrowLeft, Bot, Check, Download, Globe2, Monitor, Palette, Pencil, Plus, Settings2, Sparkles, Trash2 } from 'lucide-svelte';
-  import { fetchAiModels, saveAiSettings, saveCloseToTray, saveLanguage, saveTheme, saveThemePalettes, saveUpdatePrefs, saveViewMode, saveWebSearchSettings } from '$lib/api';
+  import { fetchAiModels, saveAiSettings, saveCloseToTray, saveLanguage, saveLineWrapping, saveTheme, saveThemePalettes, saveUpdatePrefs, saveViewMode, saveWebSearchSettings } from '$lib/api';
   import { LOCALE_LABELS, SUPPORTED_LOCALES, t, trError, type LocaleCode } from '$lib/i18n';
   import { BUILTIN_PALETTES, DEFAULT_PALETTE_ID, TOKEN_GROUPS, applyTheme, isHexColor, newCustomPalette, resolvePalette, themeVarsStyle, type ThemeToken } from '$lib/themes';
   import type { AiProviderConfig, AiSettings, AppSettings, AppTheme, ThemePalette, ThemePalettesSettings, ViewMode, WebSearchSettings } from '$lib/types';
@@ -83,6 +83,11 @@
   }
   function changeViewMode(value: ViewMode) {
     void persist(saveViewMode(value), { ...settings, view_mode: value });
+  }
+  async function changeLineWrapping(control: HTMLInputElement) {
+    const value = control.checked;
+    await persist(saveLineWrapping(value), { ...settings, line_wrapping: value });
+    control.checked = settings.line_wrapping ?? true;
   }
   function changeTray(value: boolean) {
     void persist(saveCloseToTray(value), { ...settings, close_to_tray: value });
@@ -216,6 +221,7 @@
               <select value={settings.view_mode} onchange={(event) => changeViewMode(event.currentTarget.value as ViewMode)}>
                 <option value="edit">{$t('editor.modeEdit')}</option><option value="split">{$t('editor.modeSplit')}</option><option value="preview">{$t('editor.modePreview')}</option>
               </select></div>
+            <label class="setting-row setting-toggle"><div><strong>{$t('settings.lineWrapping')}</strong><small>{$t('settings.lineWrappingHint')}</small></div><input type="checkbox" checked={settings.line_wrapping ?? true} disabled={busy} onchange={(event) => void changeLineWrapping(event.currentTarget)} /></label>
           </section>
           <section class="settings-section">
             <h2>{$t('settings.behavior')}</h2><p>{$t('settings.behaviorHint')}</p>

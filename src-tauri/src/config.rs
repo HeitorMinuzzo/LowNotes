@@ -349,6 +349,8 @@ pub struct AppSettings {
     pub theme_palettes: ThemePalettesSettings,
     #[serde(default = "default_view_mode")]
     pub view_mode: String,
+    #[serde(default = "default_true")]
+    pub line_wrapping: bool,
     #[serde(default)]
     pub language: String,
     pub active_vault_id: Option<String>,
@@ -378,6 +380,7 @@ impl Default for AppSettings {
             device_name: host,
             theme: default_theme(),
             view_mode: default_view_mode(),
+            line_wrapping: default_true(),
             theme_palettes: ThemePalettesSettings::default(),
             language: String::new(),
             active_vault_id: None,
@@ -509,6 +512,20 @@ mod tests {
         saved.as_object_mut().unwrap().remove("close_to_tray");
         let restored: AppSettings = serde_json::from_value(saved).unwrap();
         assert!(restored.close_to_tray);
+    }
+
+    #[test]
+    fn line_wrapping_defaults_on_and_preserves_saved_preference() {
+        let mut saved = serde_json::to_value(AppSettings::default()).unwrap();
+        saved.as_object_mut().unwrap().remove("line_wrapping");
+        let restored: AppSettings = serde_json::from_value(saved).unwrap();
+        assert!(restored.line_wrapping);
+
+        let mut disabled = restored;
+        disabled.line_wrapping = false;
+        let serialized = serde_json::to_string(&disabled).unwrap();
+        let reloaded: AppSettings = serde_json::from_str(&serialized).unwrap();
+        assert!(!reloaded.line_wrapping);
     }
 
     #[test]

@@ -67,6 +67,7 @@ export interface AppSettings {
   theme: AppTheme;
   theme_palettes: ThemePalettesSettings;
   view_mode: ViewMode;
+  line_wrapping: boolean;
   language: string;
   update_check: boolean;
   close_to_tray: boolean;

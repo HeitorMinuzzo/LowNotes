@@ -45,6 +45,7 @@ When you close the window, the app stays in the system tray by default. You can 
 - Interface zoom with **Ctrl + +**, **Ctrl + -** or **Ctrl + mouse wheel**; **Ctrl + 0** resets to 100%. The chosen level is saved on the device.
 - **Ctrl + Z** undoes only your local note edits, preserving text from other devices; **Ctrl + Y** or **Ctrl + Shift + Z** redoes your edits.
 - Immediate autosave with a stable **Saved** indicator while typing and a warning if saving fails.
+- Long editor lines wrap visually by default, preserving the file's line breaks and numbering. Disable **Visual line wrapping** in **Settings → General** to use horizontal scrolling.
 - Folders, note search, `[[links between notes]]` and local Markdown links. The link map combines relations written in notes with relations added manually or by the assistant.
 - Export notes and drafts to Word (`.docx`) and PDF using the same Markdown dialect as the preview. Rich text, lists, tasks, aligned tables, links and footnotes are preserved; Mermaid diagrams and images are embedded as visuals. PDF text remains selectable and Word text remains editable. Images can come from the vault, HTTP(S) addresses or data URLs.
 - Settings gathered on one screen: general preferences, themes, AI, providers, web search sources and app information.
