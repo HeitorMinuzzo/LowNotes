@@ -11,6 +11,8 @@ pub mod chat_history;
 pub mod undo;
 pub mod export_images;
 pub mod updates;
+pub mod image_upload;
+pub mod local_images;
 
 use std::sync::Arc;
 use parking_lot::{Mutex, RwLock};
@@ -71,6 +73,14 @@ pub fn run() {
     };
 
     builder
+        .register_asynchronous_uri_scheme_protocol("lownotes-image", |context, request, responder| {
+            let app = context.app_handle().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                let state = app.state::<AppState>();
+                let settings = state.settings.read().clone();
+                responder.respond(local_images::protocol_response(&settings, request.uri().path()));
+            });
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
@@ -137,6 +147,8 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            image_upload::upload_clipboard_image,
+            image_upload::save_image_upload_settings,
             updates::get_update_policy,
             updates::check_external_update,
             commands::get_app_state,

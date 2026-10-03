@@ -77,6 +77,14 @@ export interface WebSearchSettings {
   searxng_url: string;
 }
 
+export type ImageUploadProvider = 'local' | 'catbox' | 'imgur';
+
+export interface ImageUploadSettings {
+  local_default_applied?: boolean;
+  provider: ImageUploadProvider;
+  imgur_client_id: string;
+}
+
 export interface AppSettings {
   device_name: string;
   theme: AppTheme;
@@ -91,6 +99,7 @@ export interface AppSettings {
   vaults: VaultConfig[];
   ai: AiSettings;
   web_search: WebSearchSettings;
+  image_upload: ImageUploadSettings;
   has_seen_welcome: boolean;
 }
 

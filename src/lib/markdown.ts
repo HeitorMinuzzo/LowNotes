@@ -66,8 +66,19 @@ markdown.renderer.rules.fence = (tokens, index, options, env, renderer) => {
     : renderer.renderToken(tokens, index, options);
 };
 
-export function renderMarkdown(source: string): string {
-  return markdown.render(source);
+const renderImage = markdown.renderer.rules.image;
+markdown.renderer.rules.image = (tokens, index, options, env, renderer) => {
+  const source = String(tokens[index].attrGet('src') ?? '');
+  const resolve = env?.resolveImage;
+  if (/^lownotes-image:[0-9a-f]{64}\.(png|jpg|gif|webp|bmp)$/.test(source) && typeof resolve === 'function') {
+    const resolved = resolve(source);
+    if (typeof resolved === 'string') tokens[index].attrSet('src', resolved);
+  }
+  return renderImage ? renderImage(tokens, index, options, env, renderer) : renderer.renderToken(tokens, index, options);
+};
+
+export function renderMarkdown(source: string, resolveImage?: (src: string) => string): string {
+  return markdown.render(source, { resolveImage });
 }
 
 export function renderChatMarkdown(source: string): string {

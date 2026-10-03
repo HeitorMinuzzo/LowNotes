@@ -341,6 +341,22 @@ fn default_palette_id() -> String {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ImageUploadSettings {
+    pub provider: String,
+    #[serde(default)]
+    pub local_default_applied: bool,
+    /// Public application identifier, never a Client Secret. Empty uses LowNotes' ID.
+    pub imgur_client_id: String,
+}
+
+impl Default for ImageUploadSettings {
+    fn default() -> Self {
+        Self { provider: "local".into(), imgur_client_id: String::new(), local_default_applied: true }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     pub device_name: String,
     #[serde(default = "default_theme")]
@@ -359,6 +375,8 @@ pub struct AppSettings {
     pub ai: AiSettings,
     #[serde(default)]
     pub web_search: WebSearchSettings,
+    #[serde(default)]
+    pub image_upload: ImageUploadSettings,
     #[serde(default)]
     pub has_seen_welcome: bool,
     #[serde(default = "default_true")]
@@ -387,6 +405,7 @@ impl Default for AppSettings {
             vaults: Vec::new(),
             ai: AiSettings::default(),
             web_search: WebSearchSettings::default(),
+            image_upload: ImageUploadSettings::default(),
             has_seen_welcome: false,
             update_check: default_true(),
             close_to_tray: default_true(),
@@ -415,6 +434,10 @@ impl AppSettings {
         settings.web_search.normalize();
         settings.theme_palettes.normalize();
         settings.ai.normalize();
+        if !settings.image_upload.local_default_applied || !matches!(settings.image_upload.provider.as_str(), "local" | "catbox" | "imgur") {
+            settings.image_upload.provider = "local".into();
+            settings.image_upload.local_default_applied = true;
+        }
         if !old_brave_key.is_empty() {
             if let Some(brave) = settings.web_search.sources.iter_mut().find(|s| s.id == "brave") {
                 if brave.api_key.is_empty() {
@@ -495,6 +518,41 @@ pub fn decode_pair_code(code: &str) -> anyhow::Result<PairInvite> {
 #[cfg(test)]
 mod tests {
     use super::{AppSettings, ThemeColors, ThemePalette, ThemePalettesSettings};
+
+    #[test]
+    fn image_host_settings_migrate_and_round_trip_without_resetting_user_data() {
+        let mut saved = serde_json::to_value(AppSettings::default()).unwrap();
+        saved["device_name"] = "Existing device".into();
+        saved.as_object_mut().unwrap().remove("image_upload");
+        let mut restored = AppSettings::from_saved_value(saved).unwrap();
+        assert_eq!(restored.image_upload.provider, "local");
+        assert_eq!(restored.device_name, "Existing device");
+        restored.image_upload.provider = "imgur".into();
+        restored.image_upload.imgur_client_id = "custom123".into();
+        let mut saved = serde_json::to_value(restored).unwrap();
+        let restored = AppSettings::from_saved_value(saved.clone()).unwrap();
+        assert_eq!(restored.image_upload.provider, "imgur");
+        assert_eq!(restored.image_upload.imgur_client_id, "custom123");
+        saved["image_upload"]["provider"] = "unknown-future-host".into();
+        let restored = AppSettings::from_saved_value(saved).unwrap();
+        assert_eq!(restored.device_name, "Existing device");
+        assert_eq!(restored.image_upload.provider, "local");
+        assert_eq!(restored.image_upload.imgur_client_id, "custom123");
+    }
+
+    #[test]
+    fn existing_host_settings_switch_to_local_once_and_keep_later_choices() {
+        let mut saved = serde_json::to_value(AppSettings::default()).unwrap();
+        saved["image_upload"]["provider"] = "imgur".into();
+        saved["image_upload"]["imgur_client_id"] = "myId123".into();
+        saved["image_upload"].as_object_mut().unwrap().remove("local_default_applied");
+        let mut restored = AppSettings::from_saved_value(saved).unwrap();
+        assert_eq!(restored.image_upload.provider, "local");
+        assert_eq!(restored.image_upload.imgur_client_id, "myId123");
+        restored.image_upload.provider = "catbox".into();
+        let restored = AppSettings::from_saved_value(serde_json::to_value(restored).unwrap()).unwrap();
+        assert_eq!(restored.image_upload.provider, "catbox");
+    }
 
     #[test]
     fn existing_settings_without_view_mode_open_split() {

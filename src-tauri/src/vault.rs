@@ -307,6 +307,7 @@ pub fn build_manifest(root: &Path) -> anyhow::Result<Manifest> {
         }
     }
 
+    manifest.extend(crate::local_images::manifest(root)?);
     Ok(manifest)
 }
 

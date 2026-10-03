@@ -1,18 +1,19 @@
 <script lang="ts">
-  import { Bold, Code, Heading1, Heading2, Italic, List, ListTodo, MessageSquare, Network, Quote, Strikethrough } from 'lucide-svelte';
+  import { Bold, Code, Heading1, Heading2, Italic, List, ListTodo, LoaderCircle, MessageSquare, Network, Quote, Strikethrough } from 'lucide-svelte';
   import { onMount, onDestroy } from 'svelte';
   import { EditorView, basicSetup } from 'codemirror';
   import { markdown } from '@codemirror/lang-markdown';
   import { Compartment, EditorState } from '@codemirror/state';
   import * as Y from 'yjs';
   import { createLocalCollaboration } from '$lib/editor-collaboration';
+  import { createImagePaste, type ImagePasteStatus } from '$lib/image-paste';
   import { renderMermaidSvg } from '$lib/mermaid-renderer';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-  import { crdtApplyClientUpdate, readNote, broadcastAwareness } from '../api';
+  import { crdtApplyClientUpdate, readNote, broadcastAwareness, uploadClipboardImage, localImageUrl } from '../api';
   import { renderMarkdown } from '../markdown';
   import DocumentActions from './DocumentActions.svelte';
-  import type { AppTheme, ViewMode } from '../types';
-  import { t, ts } from '$lib/i18n';
+  import type { AppTheme, ViewMode, ImageUploadProvider } from '../types';
+  import { t, ts, trError } from '$lib/i18n';
   import {
     Awareness,
     applyAwarenessUpdate,
@@ -30,6 +31,8 @@
     theme,
     viewMode,
     lineWrapping = true,
+    imageUploadProvider = 'local',
+    vaultId = '',
     onViewModeChange,
     isAiChatOpen = false,
     onToggleAiChat,
@@ -48,6 +51,8 @@
     theme: AppTheme;
     viewMode: ViewMode;
     lineWrapping?: boolean;
+    imageUploadProvider?: ImageUploadProvider;
+    vaultId?: string;
     onViewModeChange: (mode: ViewMode) => void;
     isAiChatOpen?: boolean;
     onToggleAiChat?: () => void;
@@ -68,6 +73,10 @@
     currentContent.trim() ? currentContent.trim().split(/\s+/).length : 0
   );
   let charCount = $derived(currentContent.length);
+  let imageUploads = $state<ImagePasteStatus[]>([]);
+  let imageRevision = $state(0);
+  let unlistenImages: UnlistenFn | null = null;
+  let imagePaste: ReturnType<typeof createImagePaste> | null = null;
 
   let editorView: EditorView | null = null;
   let yDoc: Y.Doc | null = null;
@@ -157,6 +166,8 @@
 
   function initEditor(content = initialContent, snapshot = crdtUpdateBase64) {
     if (!editorContainer) return;
+    imagePaste?.destroy();
+    imageUploads = [];
 
     if (editorView) {
       editorView.destroy();
@@ -232,12 +243,20 @@
 
     const collaboration = createLocalCollaboration(yText, awareness);
     undoManager = collaboration.undoManager;
+    const uploadVaultId = vaultId;
+    imagePaste = createImagePaste({
+      upload: (bytes, provider) => uploadClipboardImage(bytes, provider, uploadVaultId),
+      getProvider: () => imageUploadProvider,
+      onStatus: (statuses) => { imageUploads = statuses; },
+      isolateUndo: () => undoManager?.stopCapturing(),
+    });
     const state = EditorState.create({
       doc: yText.toString(),
       extensions: [
         basicSetup,
         markdown(),
         collaboration.extension,
+        imagePaste.extension,
         editorTheme.of(codeMirrorTheme()),
         editorWrapping.of(lineWrapping ? EditorView.lineWrapping : []),
       ],
@@ -352,6 +371,9 @@
     );
     if (disposed) { stopAwareness(); return; }
     unlistenAwareness = stopAwareness;
+    const stopImages = await listen('p2p:synced', () => { imageRevision++; });
+    if (disposed) { stopImages(); return; }
+    unlistenImages = stopImages;
 
     // Read after listeners are ready so edits arriving while this note opens are not lost.
     try {
@@ -372,12 +394,14 @@
   });
 
   onDestroy(() => {
+    imagePaste?.destroy();
     disposed = true;
     if (editorView) editorView.destroy();
     if (undoManager) undoManager.destroy();
     if (yDoc) yDoc.destroy();
     if (unlistenCrdt) unlistenCrdt();
     if (unlistenAwareness) unlistenAwareness();
+    if (unlistenImages) unlistenImages();
     if (awarenessSendTimer) clearTimeout(awarenessSendTimer);
     if (stalePruneTimer) clearInterval(stalePruneTimer);
     if (awareness) {
@@ -400,6 +424,7 @@
 
   $effect(() => {
     if ((viewMode === 'split' || viewMode === 'preview') && previewContainer && currentContent) {
+      imageRevision;
       const activeTheme = theme;
       if (mermaidDebounce) clearTimeout(mermaidDebounce);
       mermaidDebounce = setTimeout(() => {
@@ -556,6 +581,27 @@
   </header>
 
   <!-- Editor & Preview Body -->
+  {#if imageUploads.length}
+    <div class="border-b border-[var(--border)] bg-[var(--bg-card)] px-4 py-2 text-xs space-y-2">
+      {#each imageUploads as upload (upload.id)}
+        <div class="flex flex-wrap items-center gap-2">
+          {#if upload.status === 'uploading'}
+            <span role="status" class="flex items-center gap-2 text-[var(--accent-light)]">
+              <LoaderCircle size={15} class="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+              {$t(upload.provider === 'local' ? 'editor.imageSavingLocal' : 'editor.imageUploading', { provider: upload.provider === 'imgur' ? 'Imgur' : 'Catbox', name: upload.name, uploaded: upload.uploaded, count: upload.count })}
+            </span>
+          {:else if upload.status === 'error'}
+            <span role="alert" class="text-[var(--danger)]">{upload.name}: {trError(upload.error)}</span>
+            <button class="underline text-[var(--accent-light)]" onclick={() => imagePaste?.retry(upload.id)}>{$t('editor.imageRetry')}</button>
+          {:else}
+            <span role="status">{$t('editor.imagePositionDeleted')}</span>
+            <button class="underline text-[var(--accent-light)]" onclick={() => imagePaste?.insertAtCursor(upload.id)}>{$t('editor.imageInsertHere')}</button>
+          {/if}
+          <button class="ml-auto shrink-0 underline text-[var(--text-muted)]" onclick={() => imagePaste?.cancel(upload.id)}>{$t('editor.imageCancel')}</button>
+        </div>
+      {/each}
+    </div>
+  {/if}
   <main class="flex-1 flex min-w-0 min-h-0 overflow-hidden relative">
     <!-- CodeMirror Container -->
     <div
@@ -573,7 +619,7 @@
         class="min-w-0 h-full overflow-y-auto px-8 py-6 select-text {viewMode === 'preview' ? 'w-full max-w-4xl mx-auto' : 'w-1/2'}"
       >
         <article class="prose max-w-none text-[var(--text-main)]">
-          {@html renderMarkdown(currentContent)}
+          {@html renderMarkdown(currentContent, (src) => localImageUrl(src, vaultId, imageRevision))}
         </article>
       </div>
     {/if}

@@ -3,10 +3,10 @@
   import { getVersion } from '@tauri-apps/api/app';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { ArrowLeft, Bot, Check, Download, Globe2, Monitor, NotebookPen, Palette, Pencil, Plus, Settings2, Sparkles, Trash2 } from 'lucide-svelte';
-  import { fetchAiModels, saveAiSettings, saveCloseToTray, saveLanguage, saveLineWrapping, saveTheme, saveThemePalettes, saveUpdatePrefs, saveViewMode, saveWebSearchSettings } from '$lib/api';
+  import { fetchAiModels, saveAiSettings, saveCloseToTray, saveImageUploadSettings, saveLanguage, saveLineWrapping, saveTheme, saveThemePalettes, saveUpdatePrefs, saveViewMode, saveWebSearchSettings } from '$lib/api';
   import { LOCALE_LABELS, SUPPORTED_LOCALES, t, trError, type LocaleCode } from '$lib/i18n';
   import { BUILTIN_PALETTES, DEFAULT_PALETTE_ID, TOKEN_GROUPS, applyTheme, isHexColor, newCustomPalette, resolvePalette, themeVarsStyle, type ThemeToken } from '$lib/themes';
-  import type { AiProviderConfig, AiSettings, AppSettings, AppTheme, ThemePalette, ThemePalettesSettings, ViewMode, WebSearchSettings } from '$lib/types';
+  import type { AiProviderConfig, AiSettings, AppSettings, AppTheme, ImageUploadProvider, ThemePalette, ThemePalettesSettings, ViewMode, WebSearchSettings } from '$lib/types';
   import { version as packageVersion } from '../../../package.json';
 
   type Tab = 'general' | 'themes' | 'ai' | 'providers' | 'web' | 'about';
@@ -20,6 +20,8 @@
   let tab = $state<Tab>(untrack(() => initialTab));
   let aiDraft = $state<AiSettings>(untrack(() => $state.snapshot(settings.ai)));
   let webDraft = $state<WebSearchSettings>(untrack(() => $state.snapshot(settings.web_search)));
+  let imgurClientId = $state(untrack(() => settings.image_upload?.imgur_client_id ?? ''));
+  const imageProvider = $derived(settings.image_upload?.provider ?? 'local');
   const webSources: Record<string, { name: string; keyless: boolean; keyUrl?: string }> = {
     firecrawl: { name: 'Firecrawl', keyless: true, keyUrl: 'https://www.firecrawl.dev/' },
     keenable: { name: 'Keenable', keyless: true, keyUrl: 'https://keenable.ai/console' },
@@ -102,6 +104,15 @@
   function saveWeb() {
     const nextWeb = $state.snapshot(webDraft);
     void persist(saveWebSearchSettings(nextWeb), { ...settings, web_search: nextWeb });
+  }
+  async function changeImageProvider(control: HTMLSelectElement) {
+    const next = { provider: control.value as ImageUploadProvider, imgur_client_id: settings.image_upload?.imgur_client_id ?? '', local_default_applied: true };
+    await persist(saveImageUploadSettings(next), { ...settings, image_upload: next });
+    control.value = settings.image_upload?.provider ?? 'local';
+  }
+  function saveImgurClientId() {
+    const next = { provider: imageProvider, imgur_client_id: imgurClientId.trim(), local_default_applied: true };
+    void persist(saveImageUploadSettings(next), { ...settings, image_upload: next });
   }
   function addProvider() {
     if (!newName.trim() || !newUrl.trim()) return;
@@ -226,6 +237,19 @@
           <section class="settings-section">
             <h2>{$t('settings.behavior')}</h2><p>{$t('settings.behaviorHint')}</p>
             <label class="setting-row setting-toggle"><div><strong>{$t('settings.closeToTray')}</strong><small>{$t('settings.closeToTrayHint')}</small></div><input type="checkbox" checked={settings.close_to_tray} onchange={(event) => changeTray(event.currentTarget.checked)} /></label>
+          </section>
+          <section class="settings-section">
+            <h2>{$t('settings.pastedImages')}</h2><p>{$t('settings.pastedImagesHint')}</p>
+            <div class="setting-row"><div><label for="image-upload-provider"><strong>{$t('settings.imageUploadProvider')}</strong></label><small>{$t('settings.imageUploadProviderHint')}</small></div>
+              <select id="image-upload-provider" value={imageProvider} disabled={busy} onchange={(event) => void changeImageProvider(event.currentTarget)}>
+                <option value="local">{$t('settings.localImages')}</option><option value="catbox">Catbox</option><option value="imgur">Imgur</option>
+              </select></div>
+            <p>{$t(imageProvider === 'local' ? 'settings.localImagesHint' : imageProvider === 'imgur' ? 'settings.imgurImagesHint' : 'settings.catboxImagesHint')}</p>
+            {#if imageProvider === 'imgur'}
+              <label class="setting-field">{$t('settings.imgurClientId')}<input bind:value={imgurClientId} placeholder={$t('settings.imgurClientIdPlaceholder')} maxlength="128" disabled={busy} autocomplete="off" spellcheck="false" /></label>
+              <p>{$t('settings.imgurClientIdHint')}</p>
+              <div class="settings-actions"><button class="settings-primary" onclick={saveImgurClientId} disabled={busy}>{$t('settings.saveImageUpload')}</button></div>
+            {/if}
           </section>
         {:else if tab === 'themes'}
           <section class="settings-section">

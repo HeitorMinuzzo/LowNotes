@@ -491,6 +491,8 @@
           {theme}
           {viewMode}
           lineWrapping={settings?.line_wrapping ?? true}
+          imageUploadProvider={settings?.image_upload?.provider ?? 'local'}
+          vaultId={settings?.active_vault_id ?? ''}
           onViewModeChange={handleViewModeChange}
           {isAiChatOpen}
           onToggleAiChat={() => (isAiChatOpen = !isAiChatOpen)}

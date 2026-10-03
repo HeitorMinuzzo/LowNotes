@@ -1,6 +1,16 @@
 import { expect, test } from 'bun:test';
 import { renderMarkdown } from '../src/lib/markdown';
 
+test('local image references resolve for preview without rewriting Markdown or external links', () => {
+  const reference = `lownotes-image:${'a'.repeat(64)}.webp`;
+  const source = `![local](${reference})\n\n![external](https://files.catbox.moe/one.png)`;
+  const html = renderMarkdown(source, () => 'http://lownotes-image.localhost/vault/image.webp?revision=1');
+  expect(html).toContain('src="http://lownotes-image.localhost/vault/image.webp?revision=1"');
+  expect(html).toContain('src="https://files.catbox.moe/one.png"');
+  expect(source).toContain(reference);
+  expect(renderMarkdown(`![bad](javascript:alert(1))`)).not.toContain('<img');
+});
+
 test('renderiza listas de definição com marcação e vários blocos', () => {
   const html = renderMarkdown(`Term 1
 : Definition 1 with lazy continuation.
