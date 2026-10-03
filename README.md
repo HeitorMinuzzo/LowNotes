@@ -35,7 +35,7 @@ LowNotes is a desktop editor for people who want **readable Markdown files**, a 
 4. To sync another computer, open **Manage Connections** in the sidebar and follow [P2P pairing](#p2p-pairing).
 5. To use AI, pick a model under **Settings → Providers**. Ollama and LM Studio work locally when the service and model are installed; remote providers need their credentials.
 
-When you close the window, the app stays in the system tray by default. You can change this in **Settings → General**; the tray menu also lets you quit completely.
+When you close the window, the app stays in the system tray by default. Opening LowNotes again shows and focuses the existing window, restoring it if minimized. Only one instance runs at a time. You can change the close-to-tray behavior in **Settings → General**; the tray menu also lets you quit completely.
 
 ## What the app offers
 
