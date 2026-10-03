@@ -37,6 +37,8 @@ LowNotes is a desktop editor for people who want **readable Markdown files**, a 
 
 When you close the window, the app stays in the system tray by default. Opening LowNotes again shows and focuses the existing window, restoring it if minimized. Only one instance runs at a time. You can change the close-to-tray behavior in **Settings → General**; the tray menu also lets you quit completely.
 
+On Linux, updates follow the installation format. Arch, DEB and RPM packages show a new-version notice with a download for the matching package; install it through pacman, APT or your RPM package manager. Repository, AUR, Flatpak and Snap installations should be updated through their original source when the new version becomes available there. Portable `.tar.gz` installations require replacing the application files manually. Only unmanaged AppImages in a writable folder update inside LowNotes. Native packages never replace their executable with an AppImage.
+
 ## What the app offers
 
 ### Notes and organization

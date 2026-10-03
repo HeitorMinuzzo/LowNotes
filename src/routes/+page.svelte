@@ -10,10 +10,12 @@
     VaultItem,
     PeerConfig,
     NetworkEventPayload,
+    UpdatePolicy,
   } from '$lib/types';
-  import { check, type Update } from '@tauri-apps/plugin-updater';
+  import { checkAvailableUpdate, type AvailableUpdate } from '$lib/updates';
   import {
     getAppState,
+    getUpdatePolicy,
     listNotes,
     readNote,
     pickVaultDirectory,
@@ -66,7 +68,8 @@
   let settingsTab = $state<'general' | 'themes' | 'ai' | 'providers' | 'web' | 'about'>('general');
   let isWelcomeOpen = $state(false);
   let targetLine = $state<number | undefined>(undefined);
-  let pendingUpdate = $state<Update | null>(null);
+  let pendingUpdate = $state<AvailableUpdate | null>(null);
+  let updatePolicy = $state<UpdatePolicy | null>(null);
   let isUpdateOpen = $state(false);
   let updateCheckLocal = $state(true);
   let updateTimer: ReturnType<typeof setInterval> | undefined;
@@ -140,7 +143,8 @@
   async function checkForUpdates() {
     if (settings?.update_check === false) return;
     try {
-      const update = await check();
+      updatePolicy = await getUpdatePolicy();
+      const update = await checkAvailableUpdate(updatePolicy);
       if (update && update.version !== settings?.skipped_version) {
         pendingUpdate = update;
         isUpdateOpen = true;
@@ -570,6 +574,7 @@
   <UpdateModal
     bind:isOpen={isUpdateOpen}
     update={pendingUpdate}
+    policy={updatePolicy}
     bind:autoCheck={updateCheckLocal}
     onAutoCheckChange={async (v) => {
       updateCheckLocal = v;

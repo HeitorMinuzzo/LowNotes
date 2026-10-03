@@ -10,6 +10,7 @@ pub mod web_search;
 pub mod chat_history;
 pub mod undo;
 pub mod export_images;
+pub mod updates;
 
 use std::sync::Arc;
 use parking_lot::{Mutex, RwLock};
@@ -57,11 +58,23 @@ pub fn run() {
         show_main_window(app);
     }));
 
+    let update_policy = updates::UpdatePolicy::detect();
+    let builder = if update_policy.can_install {
+        let mut updater = tauri_plugin_updater::Builder::new();
+        if let Some(target) = &update_policy.updater_target {
+            updater = updater.target(target);
+        }
+        builder.plugin(updater.build())
+    } else {
+        // Native packages and read-only AppImages cannot invoke updater installation.
+        builder
+    };
+
     builder
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .manage(update_policy)
         .manage(app_state)
         .setup(move |app| {
             let mut s = settings.write();
@@ -124,6 +137,8 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            updates::get_update_policy,
+            updates::check_external_update,
             commands::get_app_state,
             commands::chat_history_get,
             commands::chat_history_save,

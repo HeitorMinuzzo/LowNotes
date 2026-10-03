@@ -7,6 +7,21 @@ export interface VaultItem {
   is_dir: boolean;
 }
 
+export type UpdateChannel = 'internal' | 'appimage' | 'arch' | 'deb' | 'rpm'
+  | 'flatpak' | 'snap' | 'portable' | 'linux_package';
+
+export interface UpdatePolicy {
+  channel: UpdateChannel;
+  can_install: boolean;
+  updater_target: string | null;
+}
+
+export interface ReleaseNotice {
+  version: string;
+  body: string;
+  download_url: string | null;
+}
+
 export interface PeerConfig {
   name: string;
   endpoint_id: string;

@@ -9,6 +9,8 @@ import type {
   ChatHistory,
   ChatResponse,
   InitialStateResponse,
+  UpdatePolicy,
+  ReleaseNotice,
   LinkEdge,
   LinkOperation,
   LinkOrigin,
@@ -23,6 +25,14 @@ import type {
 
 export async function getAppState(): Promise<InitialStateResponse> {
   return await invoke('get_app_state');
+}
+
+export async function getUpdatePolicy(): Promise<UpdatePolicy> {
+  return await invoke('get_update_policy');
+}
+
+export async function checkExternalUpdate(): Promise<ReleaseNotice | null> {
+  return await invoke('check_external_update');
 }
 
 export async function selectVault(path: string): Promise<InitialStateResponse> {

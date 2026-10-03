@@ -1,6 +1,6 @@
 [package]
 name = "lownotes"
-version = "0.2.6"
+version = "0.2.7"
 description = "Local-first Markdown notes with serverless P2P sync and real-time collaboration"
 authors = ["LowBloat"]
 license = "AGPL-3.0-only"
@@ -40,6 +40,8 @@ hostname = "0.4"
 filetime = "0.2"
 reqwest = { version = "0.13", features = ["json"] }
 html-escape = "0.2"
+semver = "1"
+tempfile = "3"
 tauri-plugin-updater = "2.13.0"
 tauri-plugin-process = "2.4.0"
 
