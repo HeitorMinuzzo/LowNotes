@@ -49,7 +49,6 @@
   import CommandPalette from '$lib/components/CommandPalette.svelte';
   import BorderBeam from '$lib/components/ui/BorderBeam.svelte';
   import AmbientGlow from '$lib/components/ui/AmbientGlow.svelte';
-  import AppleDock from '$lib/components/ui/AppleDock.svelte';
   import MacTrafficLights from '$lib/components/ui/MacTrafficLights.svelte';
   import {
     FolderOpen,
@@ -76,7 +75,11 @@
   $effect(() => {
     if (!appleNewNoteOpen) return;
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    queueMicrotask(() => appleNoteInput?.focus());
+    queueMicrotask(() => {
+      appleNoteInput?.focus();
+      const end = appleNoteInput?.value.length ?? 0;
+      appleNoteInput?.setSelectionRange(end, end);
+    });
     return () => previous?.focus();
   });
 
@@ -179,9 +182,9 @@
     }
   }
 
-  async function handleQuickNewNote() {
+  async function handleQuickNewNote(folder = '') {
     if (isAppleTheme) {
-      appleNewNoteName = '';
+      appleNewNoteName = folder;
       appleNewNoteError = '';
       appleNewNoteOpen = true;
       return;
@@ -689,10 +692,19 @@
       onOpenCommandPalette={() => (isCommandPaletteOpen = true)}
       presence={activeEditors}
       {isAppleTheme}
+      {theme}
+      {viewMode}
+      {isGraphOpen}
+      isAiOpen={isAiChatOpen}
+      onCreateNote={handleQuickNewNote}
+      onToggleGraph={() => (isGraphOpen = !isGraphOpen)}
+      onToggleAi={() => (isAiChatOpen = !isAiChatOpen)}
+      onToggleTheme={toggleTheme}
+      onViewModeChange={handleViewModeChange}
     />
 
     <!-- Editor Surface -->
-    <div class="flex-1 flex flex-col h-full overflow-hidden bg-[var(--bg-main)] relative">
+    <div class="flex-1 min-w-0 flex flex-col h-full overflow-hidden bg-[var(--bg-main)] relative">
       {#if conflictNotice}
         <div role="alert" class="flex items-center gap-3 px-5 py-2.5 border-b border-[var(--danger)]/50 bg-[var(--bg-card)]/95 backdrop-blur-md text-xs shadow-lg">
           <div class="flex-1 min-w-0">
@@ -737,11 +749,11 @@
         <div class="relative flex-1 flex flex-col min-h-0 select-none bg-[var(--bg-main)]">
           {#if !isAppleTheme}<AmbientGlow color="var(--accent)" size="500px" opacity={0.08} class="top-10 right-20" />{/if}
 
-          <header class="h-11 flex items-center justify-between gap-3 px-3 border-b border-[var(--border)] bg-[var(--bg-sidebar)]/80 backdrop-blur-xl shrink-0">
+          <header class:app-topbar={isAppleTheme} class="h-11 flex items-center justify-between gap-3 px-3 border-b border-[var(--border)] bg-[var(--bg-sidebar)]/80 backdrop-blur-xl shrink-0">
             <div class="flex items-center gap-2 text-xs text-[var(--text-muted)]">
               <span class="font-semibold text-[var(--text-main)]">{activeVault.name}</span>
               <span>/</span>
-              <span class="text-[var(--text-dim)]">{$t('app.emptyState')}</span>
+              <span class="text-[var(--text-dim)]">{isAppleTheme ? $t('sidebar.allNotes') : $t('app.emptyState')}</span>
             </div>
 
             {#if !isAppleTheme}<div class="flex items-center gap-1.5">
@@ -812,24 +824,6 @@
             {/if}
           </div>
         </div>
-      {/if}
-
-      {#if isAppleTheme}
-        <!-- Floating macOS Apple Dock (Shadcnspace Apple Dock / Magic UI) -->
-        <AppleDock
-          onCreateNote={handleQuickNewNote}
-          onSearch={() => (isCommandPaletteOpen = true)}
-          onToggleGraph={() => (isGraphOpen = !isGraphOpen)}
-          onToggleAi={() => (isAiChatOpen = !isAiChatOpen)}
-          onOpenSettings={() => openSettings()}
-          onToggleTheme={toggleTheme}
-          onViewModeChange={(mode) => handleViewModeChange(mode)}
-          isGraphOpen={isGraphOpen}
-          isAiOpen={isAiChatOpen}
-          hasActiveNote={!!selectedNotePath}
-          viewMode={viewMode}
-          theme={theme}
-        />
       {/if}
     </div>
 
