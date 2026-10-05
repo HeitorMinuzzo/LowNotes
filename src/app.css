@@ -189,9 +189,13 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 }
 
 .cm-scroller {
-  padding: 32px 40px;
+  padding: 24px 0;
   overflow: auto;
   line-height: 1.75;
+}
+
+.cm-content {
+  padding-right: 32px !important;
 }
 
 .cm-cursor {
@@ -212,11 +216,11 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 }
 
 .cm-gutters {
-  background-color: transparent !important;
+  background-color: var(--bg-main) !important;
   color: var(--text-dim) !important;
   border-right: 1px solid var(--border) !important;
-  padding-right: 12px;
-  padding-left: 8px;
+  padding-left: 32px;
+  padding-right: 8px;
 }
 
 .cm-selectionBackground, ::selection {

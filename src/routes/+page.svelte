@@ -9,10 +9,12 @@
     VaultItem,
     PeerConfig,
     NetworkEventPayload,
+    UpdatePolicy,
   } from '$lib/types';
-  import { check, type Update } from '@tauri-apps/plugin-updater';
+  import { checkAvailableUpdate, type AvailableUpdate } from '$lib/updates';
   import {
     getAppState,
+    getUpdatePolicy,
     listNotes,
     readNote,
     pickVaultDirectory,
@@ -51,14 +53,16 @@
   import AmbientGlow from '$lib/components/ui/AmbientGlow.svelte';
   import MacTrafficLights from '$lib/components/ui/MacTrafficLights.svelte';
   import {
-    FolderOpen,
-    Settings2,
+    ArrowRight,
     FileText,
+    FolderOpen,
+    MessageSquare,
+    Network,
+    NotebookPen,
+    Plus,
+    Settings2,
     ShieldCheck,
     Sparkles,
-    Network,
-    Plus,
-    ArrowRight,
   } from 'lucide-svelte';
 
   let settings = $state<AppSettings | null>(null);
@@ -127,7 +131,8 @@
   let settingsTab = $state<'general' | 'themes' | 'ai' | 'providers' | 'web' | 'about'>('general');
   let isWelcomeOpen = $state(false);
   let targetLine = $state<number | undefined>(undefined);
-  let pendingUpdate = $state<Update | null>(null);
+  let pendingUpdate = $state<AvailableUpdate | null>(null);
+  let updatePolicy = $state<UpdatePolicy | null>(null);
   let isUpdateOpen = $state(false);
   let updateCheckLocal = $state(true);
   let updateTimer: ReturnType<typeof setInterval> | undefined;
@@ -308,7 +313,8 @@
   async function checkForUpdates() {
     if (settings?.update_check === false) return;
     try {
-      const update = await check();
+      updatePolicy = await getUpdatePolicy();
+      const update = await checkAvailableUpdate(updatePolicy);
       if (update && update.version !== settings?.skipped_version) {
         pendingUpdate = update;
         isUpdateOpen = true;
@@ -721,7 +727,7 @@
           {items}
           vaultId={activeVault.id}
           onClose={() => (isGraphOpen = false)}
-          onOpenNote={(path) => void openNote(path)}
+          onOpenNote={(path: string) => void openNote(path)}
         />
       {:else if selectedNotePath}
         {#key selectedNotePath}
@@ -733,10 +739,13 @@
           {theme}
           {viewMode}
           {isAppleTheme}
+          lineWrapping={settings?.line_wrapping ?? true}
+          imageUploadProvider={settings?.image_upload?.provider ?? 'local'}
+          vaultId={settings?.active_vault_id ?? ''}
           onViewModeChange={handleViewModeChange}
           {isAiChatOpen}
           onToggleAiChat={() => (isAiChatOpen = !isAiChatOpen)}
-          onOpenNote={(path) => openNote(path)}
+          onOpenNote={(path: string) => openNote(path)}
           onOpenGraph={() => (isGraphOpen = true)}
           onLocalEdit={() => (lastUndoableAction = 'text')}
           onOpenWikilink={handleOpenWikilink}
@@ -756,20 +765,22 @@
               <span class="text-[var(--text-dim)]">{isAppleTheme ? $t('sidebar.allNotes') : $t('app.emptyState')}</span>
             </div>
 
-            {#if !isAppleTheme}<div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5">
               <button
                 onclick={() => (isGraphOpen = true)}
-                class="h-7 flex items-center px-2.5 rounded-md border border-[var(--border)] bg-[var(--bg-card)]/70 hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition shadow-sm cursor-pointer"
+                class="h-7 flex items-center gap-1.5 px-2.5 rounded-md border border-[var(--border)] bg-[var(--bg-card)]/70 hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition shadow-sm cursor-pointer"
               >
+                <Network size={13} />
                 <span>{$t('graph.button')}</span>
               </button>
               <button
                 onclick={() => (isAiChatOpen = !isAiChatOpen)}
-                class="h-7 flex items-center px-2.5 rounded-md border border-[var(--border)] bg-[var(--bg-card)]/70 hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--accent)] transition shadow-sm cursor-pointer"
+                class="h-7 flex items-center gap-1.5 px-2.5 rounded-md border border-[var(--border)] bg-[var(--bg-card)]/70 hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--accent)] transition shadow-sm cursor-pointer"
               >
+                <MessageSquare size={13} />
                 <span>{$t('app.openAiChat')}</span>
               </button>
-            </div>{/if}
+            </div>
           </header>
 
           <div class="flex-1 flex flex-col items-center justify-center text-center p-8">
@@ -905,6 +916,7 @@
   <UpdateModal
     bind:isOpen={isUpdateOpen}
     update={pendingUpdate}
+    policy={updatePolicy}
     bind:autoCheck={updateCheckLocal}
     onAutoCheckChange={async (v) => {
       updateCheckLocal = v;
@@ -926,7 +938,7 @@
     {viewMode}
     {theme}
     onClose={() => (isCommandPaletteOpen = false)}
-    onOpenNote={(path) => void openNote(path)}
+    onOpenNote={(path: string) => void openNote(path)}
     onCreateNote={() => void handleQuickNewNote()}
     onCreateFolder={() => void handleQuickNewFolder()}
     onToggleAi={() => (isAiChatOpen = !isAiChatOpen)}

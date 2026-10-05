@@ -70,6 +70,7 @@ jobs:
         run: |
           bun run check
           bun test
+          python3 .github/scripts/test_update_manifest.py
 
   windows:
     name: Windows x64
@@ -197,6 +198,14 @@ jobs:
             (cd dist && sha256sum "$dest_deb" > "$dest_deb.sha256")
           fi
 
+          # Coletar .rpm
+          rpm_file=$(find src-tauri/target/release/bundle/rpm -name "*.rpm" | head -n 1 || true)
+          if [[ -n "$rpm_file" && -f "$rpm_file" ]]; then
+            dest_rpm="LowNotes-${VERSION}-linux-x64.rpm"
+            cp "$rpm_file" "dist/$dest_rpm"
+            (cd dist && sha256sum "$dest_rpm" > "$dest_rpm.sha256")
+          fi
+
           # Coletar .AppImage
           appimage=$(find src-tauri/target/release/bundle/appimage -name "*.AppImage" | head -n 1 || true)
           if [[ -n "$appimage" && -f "$appimage" ]]; then
@@ -315,6 +324,11 @@ jobs:
     needs: [verify, windows, linux, macos]
     runs-on: ubuntu-22.04
     steps:
+      - name: Baixar código
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_ref || env.RELEASE_TAG }}
+
       - name: Baixar todos os artefatos
         uses: actions/download-artifact@v8
         with:
@@ -332,39 +346,7 @@ jobs:
           VERSION: ${{ needs.verify.outputs.version }}
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import json, os, subprocess, datetime
-          version = os.environ["VERSION"]
-          tag = os.environ["RELEASE_TAG"]
-          repo = os.environ["GITHUB_REPOSITORY"]
-          base = f"https://github.com/{repo}/releases/download/{tag}"
-          platforms = {}
-          def add(key, asset):
-              sig_path = f"release-assets/{asset}.sig"
-              if os.path.exists(sig_path):
-                  with open(sig_path) as f:
-                      platforms[key] = {"signature": f.read().strip(), "url": f"{base}/{asset}"}
-          add("windows-x86_64", f"LowNotes-{version}-windows-x64-setup.exe")
-          add("darwin-aarch64", f"LowNotes-{version}-macos-universal.app.tar.gz")
-          add("darwin-x86_64", f"LowNotes-{version}-macos-universal.app.tar.gz")
-          add("linux-x86_64", f"LowNotes-{version}-linux-x64.AppImage")
-          notes = f"LowNotes {version}"
-          try:
-              out = subprocess.run(["gh", "release", "view", tag, "--repo", repo, "--json", "body", "-q", ".body"], capture_output=True, text=True)
-              if out.returncode == 0 and out.stdout.strip():
-                  notes = out.stdout.strip()
-          except Exception:
-              pass
-          doc = {
-              "version": version,
-              "notes": notes,
-              "pub_date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-              "platforms": platforms,
-          }
-          with open("release-assets/latest.json", "w") as f:
-              json.dump(doc, f, indent=2)
-          print("latest.json platforms:", sorted(platforms))
-          PY
+          python3 .github/scripts/update_manifest.py
           mapfile -t files < <(find release-assets -maxdepth 1 -type f)
           if [[ ${#files[@]} -eq 0 ]]; then
             echo "Nenhum arquivo encontrado em release-assets." >&2

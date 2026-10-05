@@ -1,9 +1,20 @@
 <script lang="ts">
+  import {
+    ArrowLeft,
+    FileText,
+    Link2,
+    Link2Off,
+    Maximize2,
+    Minus,
+    Plus,
+    RotateCcw,
+    Search,
+    X,
+  } from 'lucide-svelte';
   import { onMount } from 'svelte';
   import { linksGet, linksApply } from '../api';
   import type { LinkEdge, VaultItem } from '../types';
   import { t } from '$lib/i18n';
-  import { ArrowLeft, Search, Plus, Minus, RotateCcw, Link2, X, FileText, Maximize2 } from 'lucide-svelte';
 
   let { items, vaultId, onClose, onOpenNote } = $props<{
     items: VaultItem[];
@@ -445,11 +456,11 @@
                   <span class="text-xs font-semibold text-[var(--text-main)] truncate">{titleFor(link.source === selectedPath ? link.target : link.source)}</span>
                   <button
                     onclick={() => void removeLink(link.source, link.target)}
-                    class="p-1 rounded-lg text-[var(--text-dim)] hover:text-[var(--danger)] hover:bg-[var(--danger)]/10 transition cursor-pointer"
+                    class="p-1 rounded-lg text-[var(--text-dim)] hover:text-[var(--danger)] hover:bg-[var(--danger)]/10 transition cursor-pointer inline-flex items-center justify-center"
                     title={$t('graph.unlink')}
                     aria-label={$t('graph.unlink')}
                   >
-                    <X size={12} />
+                    <Link2Off size={14} />
                   </button>
                 </div>
               {/each}

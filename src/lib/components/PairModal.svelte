@@ -1,11 +1,11 @@
 <script lang="ts">
+  import { Check, Copy, Laptop, Link, RefreshCw, Share2, Trash2, X } from 'lucide-svelte';
   import type { NetworkEventPayload, PeerConfig } from '../types';
   import { networkRequestPair, networkRemovePeer, networkGetPairInfo } from '../api';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { onDestroy, onMount } from 'svelte';
   import { t, trError, ts } from '$lib/i18n';
   import { dismissibleModal } from '$lib/modal-dismiss';
-  import { Share2, Link, Laptop, Copy, Check, Trash2, X, RefreshCw } from 'lucide-svelte';
   import BorderBeam from './ui/BorderBeam.svelte';
 
   let {
@@ -147,6 +147,8 @@
         </div>
         <button
           onclick={() => (isOpen = false)}
+          title={$t('ai.close')}
+          aria-label={$t('ai.close')}
           class="p-1.5 rounded-lg text-[var(--text-dim)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition cursor-pointer"
         >
           <X size={16} />

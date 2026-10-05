@@ -3,22 +3,24 @@
   import type { PresenceUser } from '$lib/presence';
   import { visibleNoteRows } from '$lib/note-tree';
   import {
-    Settings2,
-    RefreshCw,
-    Search,
-    FilePlus,
-    FolderPlus,
-    ChevronRight,
     ChevronDown,
+    ChevronRight,
+    FilePlus,
+    FilePlus2,
     FileText,
     Folder,
+    FolderArchive,
     FolderOpen,
-    Trash2,
+    FolderPlus,
+    NotebookPen,
     Pencil,
     Plus,
+    Radio,
+    RefreshCw,
+    Search,
+    Settings2,
+    Trash2,
     X,
-    FolderArchive,
-    Radio
   } from 'lucide-svelte';
   import {
     createNote,
@@ -279,7 +281,7 @@
           onclick={handleOpenFolder}
           class="h-7 w-full flex items-center gap-1.5 px-2 rounded-md text-xs text-left text-[var(--accent)] hover:bg-[var(--bg-hover)] transition-all font-medium cursor-pointer"
         >
-          <Plus size={13} />
+          <FolderOpen size={14} />
           <span>{$t('sidebar.openComputerFolder')}</span>
         </button>
       </div>
@@ -302,7 +304,9 @@
       {#if searchQuery}
         <button
           onclick={() => (searchQuery = '')}
-          class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-[var(--text-dim)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition"
+          title={$t('sidebar.clearSearch')}
+          aria-label={$t('sidebar.clearSearch')}
+          class="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded text-[var(--text-dim)] hover:text-[var(--text-main)] hover:bg-[var(--bg-hover)] transition cursor-pointer"
         >
           <X size={12} />
         </button>
@@ -329,8 +333,9 @@
 
       <button
         onclick={() => (isCreatingFolder = true)}
-        class="w-7 h-7 flex items-center justify-center gap-2 rounded-md bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] hover:border-[var(--accent)]/40 transition shadow-sm cursor-pointer"
+        class="w-7 h-7 flex items-center justify-center gap-2 rounded-md bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] hover:border-[var(--accent)]/40 transition shadow-sm cursor-pointer" 
         title={$t('sidebar.newFolder')}
+        aria-label={$t('sidebar.newFolder')}
       >
         <FolderPlus size={14} />
       </button>
@@ -455,12 +460,13 @@
           </div>
 
           <!-- Hover Action Toolbar -->
-          <div class="hidden group-hover:flex items-center gap-1 opacity-90 pl-1 shrink-0">
+          <div class="hidden group-hover:flex group-focus-within:flex items-center gap-1 opacity-90 pl-1 shrink-0">
             {#if item.is_dir}
               <button
                 onclick={(e) => { e.stopPropagation(); newNoteName = `${item.path}/`; isCreatingNote = true; }}
                 class="p-1 rounded-md text-[var(--text-dim)] hover:text-[var(--text-main)] hover:bg-[var(--bg-card)] transition"
                 title={$t('sidebar.newNote')}
+                aria-label={$t('sidebar.newNote')}
               >
                 <Plus size={12} />
               </button>
@@ -469,6 +475,7 @@
               onclick={(e) => handleRename(item.path, e)}
               class="p-1 rounded-md text-[var(--text-dim)] hover:text-[var(--text-main)] hover:bg-[var(--bg-card)] transition"
               title={$t('sidebar.rename')}
+              aria-label={$t('sidebar.rename')}
             >
               <Pencil size={12} />
             </button>
@@ -476,6 +483,7 @@
               onclick={(e) => handleDelete(item.path, e)}
               class="p-1 rounded-md text-[var(--text-dim)] hover:text-[var(--danger)] hover:bg-[var(--bg-card)] transition"
               title={$t('sidebar.delete')}
+              aria-label={$t('sidebar.delete')}
             >
               <Trash2 size={12} />
             </button>

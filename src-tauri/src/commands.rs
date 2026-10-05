@@ -493,6 +493,17 @@ pub fn save_view_mode(view_mode: String, state: State<'_, AppState>) -> Result<(
 }
 
 #[tauri::command]
+pub fn save_line_wrapping(line_wrapping: bool, state: State<'_, AppState>) -> Result<(), String> {
+    let mut settings = state.settings.write();
+    let previous = std::mem::replace(&mut settings.line_wrapping, line_wrapping);
+    if let Err(error) = settings.save() {
+        settings.line_wrapping = previous;
+        return Err(error.to_string());
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub fn save_language(language: String, state: State<'_, AppState>) -> Result<(), String> {
     if !matches!(language.as_str(), "en-US" | "pt-BR" | "es-ES") {
         return Err("errors.invalidLanguage".to_string());

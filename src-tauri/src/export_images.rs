@@ -54,6 +54,11 @@ fn image_data(bytes: Vec<u8>) -> anyhow::Result<ExportImageData> {
 }
 
 pub async fn load_image(root: &Path, note_path: &str, src: &str) -> anyhow::Result<ExportImageData> {
+    if src.starts_with(crate::local_images::LINK_PREFIX) {
+        let name = crate::local_images::link_name(src)?;
+        let image = crate::local_images::load(root, name)?;
+        return Ok(ExportImageData { bytes: image.bytes, mime_type: image.mime.into() });
+    }
     let bytes = if src.starts_with("https://") || src.starts_with("http://") {
         let client = reqwest::Client::builder().timeout(Duration::from_secs(20))
             .redirect(reqwest::redirect::Policy::limited(5)).build()?;

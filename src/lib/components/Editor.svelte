@@ -1,4 +1,25 @@
 <script lang="ts">
+  import {
+    AlertCircle,
+    Bold,
+    CheckCircle2,
+    Code,
+    Columns,
+    Edit3,
+    Eye,
+    Heading1,
+    Heading2,
+    Italic,
+    List,
+    ListTodo,
+    Loader2,
+    LoaderCircle,
+    MessageSquare,
+    Network,
+    Quote,
+    Sparkles,
+    Strikethrough,
+  } from 'lucide-svelte';
   import { onMount, onDestroy } from 'svelte';
   import { EditorView, basicSetup } from 'codemirror';
   import { markdown } from '@codemirror/lang-markdown';
@@ -7,32 +28,14 @@
   import { tags } from '@lezer/highlight';
   import * as Y from 'yjs';
   import { createLocalCollaboration } from '$lib/editor-collaboration';
+  import { createImagePaste, type ImagePasteStatus } from '$lib/image-paste';
   import { renderMermaidSvg } from '$lib/mermaid-renderer';
   import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-  import { crdtApplyClientUpdate, readNote, broadcastAwareness } from '../api';
+  import { crdtApplyClientUpdate, readNote, broadcastAwareness, uploadClipboardImage, localImageUrl } from '../api';
   import { renderMarkdown } from '../markdown';
   import DocumentActions from './DocumentActions.svelte';
-  import type { AppTheme, ViewMode } from '../types';
-  import { t, ts } from '$lib/i18n';
-  import {
-    Bold,
-    Italic,
-    Strikethrough,
-    Heading1,
-    Heading2,
-    List,
-    ListTodo,
-    Code,
-    Quote,
-    Network,
-    Sparkles,
-    CheckCircle2,
-    Loader2,
-    AlertCircle,
-    Eye,
-    Columns,
-    Edit3
-  } from 'lucide-svelte';
+  import type { AppTheme, ViewMode, ImageUploadProvider } from '../types';
+  import { t, ts, trError } from '$lib/i18n';
   import {
     Awareness,
     applyAwarenessUpdate,
@@ -50,6 +53,9 @@
     theme,
     viewMode,
     isAppleTheme = false,
+    lineWrapping = true,
+    imageUploadProvider = 'local',
+    vaultId = '',
     onViewModeChange,
     isAiChatOpen = false,
     onToggleAiChat,
@@ -68,6 +74,9 @@
     theme: AppTheme;
     viewMode: ViewMode;
     isAppleTheme?: boolean;
+    lineWrapping?: boolean;
+    imageUploadProvider?: ImageUploadProvider;
+    vaultId?: string;
     onViewModeChange: (mode: ViewMode) => void;
     isAiChatOpen?: boolean;
     onToggleAiChat?: () => void;
@@ -88,6 +97,10 @@
     currentContent.trim() ? currentContent.trim().split(/\s+/).length : 0
   );
   let charCount = $derived(currentContent.length);
+  let imageUploads = $state<ImagePasteStatus[]>([]);
+  let imageRevision = $state(0);
+  let unlistenImages: UnlistenFn | null = null;
+  let imagePaste: ReturnType<typeof createImagePaste> | null = null;
 
   let editorView: EditorView | null = null;
   let yDoc: Y.Doc | null = null;
@@ -103,6 +116,7 @@
   let mermaidCounter = 0;
   let mermaidDebounce: ReturnType<typeof setTimeout> | null = null;
   const editorTheme = new Compartment();
+  const editorWrapping = new Compartment();
 
   function codeMirrorTheme() {
     const isDark = theme === 'dark';
@@ -222,6 +236,8 @@
 
   function initEditor(content = initialContent, snapshot = crdtUpdateBase64) {
     if (!editorContainer) return;
+    imagePaste?.destroy();
+    imageUploads = [];
 
     if (editorView) {
       editorView.destroy();
@@ -297,13 +313,22 @@
 
     const collaboration = createLocalCollaboration(yText, awareness);
     undoManager = collaboration.undoManager;
+    const uploadVaultId = vaultId;
+    imagePaste = createImagePaste({
+      upload: (bytes, provider) => uploadClipboardImage(bytes, provider, uploadVaultId),
+      getProvider: () => imageUploadProvider,
+      onStatus: (statuses) => { imageUploads = statuses; },
+      isolateUndo: () => undoManager?.stopCapturing(),
+    });
     const state = EditorState.create({
       doc: yText.toString(),
       extensions: [
         basicSetup,
         markdown(),
         collaboration.extension,
+        imagePaste.extension,
         editorTheme.of(codeMirrorTheme()),
+        editorWrapping.of(lineWrapping ? EditorView.lineWrapping : []),
       ],
     });
 
@@ -416,6 +441,9 @@
     );
     if (disposed) { stopAwareness(); return; }
     unlistenAwareness = stopAwareness;
+    const stopImages = await listen('p2p:synced', () => { imageRevision++; });
+    if (disposed) { stopImages(); return; }
+    unlistenImages = stopImages;
 
     // Read after listeners are ready so edits arriving while this note opens are not lost.
     try {
@@ -436,12 +464,14 @@
   });
 
   onDestroy(() => {
+    imagePaste?.destroy();
     disposed = true;
     if (editorView) editorView.destroy();
     if (undoManager) undoManager.destroy();
     if (yDoc) yDoc.destroy();
     if (unlistenCrdt) unlistenCrdt();
     if (unlistenAwareness) unlistenAwareness();
+    if (unlistenImages) unlistenImages();
     if (awarenessSendTimer) clearTimeout(awarenessSendTimer);
     if (stalePruneTimer) clearInterval(stalePruneTimer);
     if (awareness) {
@@ -456,7 +486,15 @@
   });
 
   $effect(() => {
+    const wrap = lineWrapping;
+    if (editorView) {
+      editorView.dispatch({ effects: editorWrapping.reconfigure(wrap ? EditorView.lineWrapping : []) });
+    }
+  });
+
+  $effect(() => {
     if ((viewMode === 'split' || viewMode === 'preview') && previewContainer && currentContent) {
+      imageRevision;
       const activeTheme = theme;
       const activePalette = isAppleTheme;
       if (mermaidDebounce) clearTimeout(mermaidDebounce);
@@ -477,6 +515,7 @@
           onclick={() => applyFormatting('**', '**')}
           class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
           title={$t('editor.bold')}
+          aria-label={$t('editor.bold')}
         >
           <Bold size={13} />
         </button>
@@ -484,6 +523,7 @@
           onclick={() => applyFormatting('*', '*')}
           class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
           title={$t('editor.italic')}
+          aria-label={$t('editor.italic')}
         >
           <Italic size={13} />
         </button>
@@ -491,6 +531,7 @@
           onclick={() => applyFormatting('~~', '~~')}
           class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
           title={$t('editor.strikethrough')}
+          aria-label={$t('editor.strikethrough')}
         >
           <Strikethrough size={13} />
         </button>
@@ -501,6 +542,7 @@
           onclick={() => applyFormatting('# ')}
           class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
           title={$t('editor.heading1')}
+          aria-label={$t('editor.heading1')}
         >
           <Heading1 size={13} />
         </button>
@@ -508,6 +550,7 @@
           onclick={() => applyFormatting('## ')}
           class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
           title={$t('editor.heading2')}
+          aria-label={$t('editor.heading2')}
         >
           <Heading2 size={13} />
         </button>
@@ -518,6 +561,7 @@
           onclick={() => applyFormatting('- ')}
           class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
           title={$t('editor.list')}
+          aria-label={$t('editor.list')}
         >
           <List size={13} />
         </button>
@@ -525,6 +569,7 @@
           onclick={() => applyFormatting('- [ ] ')}
           class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
           title={$t('editor.checklist')}
+          aria-label={$t('editor.checklist')}
         >
           <ListTodo size={13} />
         </button>
@@ -532,6 +577,7 @@
           onclick={() => applyFormatting('`', '`')}
           class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
           title={$t('editor.code')}
+          aria-label={$t('editor.code')}
         >
           <Code size={13} />
         </button>
@@ -539,19 +585,23 @@
           onclick={() => applyFormatting('> ')}
           class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
           title={$t('editor.quote')}
+          aria-label={$t('editor.quote')}
         >
           <Quote size={13} />
         </button>
       </div>
 
-      {#if !isAppleTheme}<button
+      {#if !isAppleTheme}
+      <button
         onclick={() => onOpenGraph?.()}
         class="h-7 flex items-center gap-1.5 px-2.5 rounded-md border border-[var(--border)] bg-[var(--bg-card)]/70 hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition shadow-sm cursor-pointer"
         title={$t('graph.toolbarTitle')}
+        aria-label={$t('graph.toolbarTitle')}
       >
         <Network size={13} class="text-[var(--accent)]" />
         <span>{$t('graph.button')}</span>
-      </button>{/if}
+      </button>
+      {/if}
     </div>
 
     <!-- Right Controls: Save Status, View Mode, Export, AI Chat -->
@@ -627,11 +677,32 @@
   </header>
 
   <!-- Editor & Preview Body -->
-  <main class="flex-1 flex overflow-hidden relative">
+  {#if imageUploads.length}
+    <div class="border-b border-[var(--border)] bg-[var(--bg-card)] px-4 py-2 text-xs space-y-2">
+      {#each imageUploads as upload (upload.id)}
+        <div class="flex flex-wrap items-center gap-2">
+          {#if upload.status === 'uploading'}
+            <span role="status" class="flex items-center gap-2 text-[var(--accent-light)]">
+              <LoaderCircle size={15} class="animate-spin motion-reduce:animate-none" aria-hidden="true" />
+              {$t(upload.provider === 'local' ? 'editor.imageSavingLocal' : 'editor.imageUploading', { provider: upload.provider === 'imgur' ? 'Imgur' : 'Catbox', name: upload.name, uploaded: upload.uploaded, count: upload.count })}
+            </span>
+          {:else if upload.status === 'error'}
+            <span role="alert" class="text-[var(--danger)]">{upload.name}: {trError(upload.error)}</span>
+            <button class="underline text-[var(--accent-light)]" onclick={() => imagePaste?.retry(upload.id)}>{$t('editor.imageRetry')}</button>
+          {:else}
+            <span role="status">{$t('editor.imagePositionDeleted')}</span>
+            <button class="underline text-[var(--accent-light)]" onclick={() => imagePaste?.insertAtCursor(upload.id)}>{$t('editor.imageInsertHere')}</button>
+          {/if}
+          <button class="ml-auto shrink-0 underline text-[var(--text-muted)]" onclick={() => imagePaste?.cancel(upload.id)}>{$t('editor.imageCancel')}</button>
+        </div>
+      {/each}
+    </div>
+  {/if}
+  <main class="flex-1 flex min-w-0 min-h-0 overflow-hidden relative">
     <!-- CodeMirror Container -->
     <div
       bind:this={editorContainer}
-      class="h-full overflow-hidden transition-all duration-200 {viewMode === 'edit' ? 'w-full' : viewMode === 'split' ? 'w-1/2 border-r border-[var(--border)]' : 'hidden'}"
+      class="min-w-0 h-full overflow-hidden transition-all duration-200 {viewMode === 'edit' ? 'w-full' : viewMode === 'split' ? 'w-1/2 border-r border-[var(--border)]' : 'hidden'}"
     ></div>
 
     <!-- Rendered Markdown Container -->
@@ -641,10 +712,10 @@
         bind:this={previewContainer}
         role="presentation"
         onclick={handlePreviewClick}
-        class="apple-editor-preview h-full overflow-y-auto px-10 py-8 select-text {viewMode === 'preview' ? 'w-full max-w-4xl mx-auto' : 'w-1/2'}"
+        class="apple-editor-preview min-w-0 h-full overflow-y-auto px-10 py-8 select-text {viewMode === 'preview' ? 'w-full max-w-4xl mx-auto' : 'w-1/2'}"
       >
         <article class="prose max-w-none text-[var(--text-main)]">
-          {@html renderMarkdown(currentContent)}
+          {@html renderMarkdown(currentContent, (src) => localImageUrl(src, vaultId, imageRevision))}
         </article>
       </div>
     {/if}

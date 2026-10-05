@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import type {
   AiSettings,
@@ -9,6 +9,8 @@ import type {
   ChatHistory,
   ChatResponse,
   InitialStateResponse,
+  UpdatePolicy,
+  ReleaseNotice,
   LinkEdge,
   LinkOperation,
   LinkOrigin,
@@ -19,10 +21,33 @@ import type {
   ViewMode,
   ThemePalettesSettings,
   WebSearchSettings,
+  ImageUploadProvider,
+  ImageUploadSettings,
 } from './types';
+
+export async function uploadClipboardImage(bytes: Uint8Array, provider: ImageUploadProvider, vaultId = ''): Promise<string> {
+  return await invoke('upload_clipboard_image', bytes, { headers: { 'x-upload-provider': provider, 'x-vault-id': vaultId } });
+}
+
+export function localImageUrl(src: string, vaultId: string, revision = 0): string {
+  if (!/^lownotes-image:[0-9a-f]{64}\.(png|jpg|gif|webp|bmp)$/.test(src) || !vaultId) return src;
+  return convertFileSrc(`${vaultId}/${src.slice('lownotes-image:'.length)}`, 'lownotes-image') + `?revision=${revision}`;
+}
+
+export async function saveImageUploadSettings(settings: ImageUploadSettings): Promise<void> {
+  await invoke('save_image_upload_settings', { settings });
+}
 
 export async function getAppState(): Promise<InitialStateResponse> {
   return await invoke('get_app_state');
+}
+
+export async function getUpdatePolicy(): Promise<UpdatePolicy> {
+  return await invoke('get_update_policy');
+}
+
+export async function checkExternalUpdate(): Promise<ReleaseNotice | null> {
+  return await invoke('check_external_update');
 }
 
 export async function selectVault(path: string): Promise<InitialStateResponse> {
@@ -147,6 +172,10 @@ export async function saveThemePalettes(palettes: ThemePalettesSettings): Promis
 
 export async function saveViewMode(viewMode: ViewMode): Promise<void> {
   return await invoke('save_view_mode', { viewMode });
+}
+
+export async function saveLineWrapping(lineWrapping: boolean): Promise<void> {
+  return await invoke('save_line_wrapping', { lineWrapping });
 }
 
 export async function fetchAiModels(

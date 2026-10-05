@@ -1,9 +1,9 @@
 <script lang="ts">
+  import { Check, Laptop, Link2, X } from 'lucide-svelte';
   import type { PeerConfig } from '../types';
   import { networkAnswerPair } from '../api';
   import { t } from '$lib/i18n';
   import { dismissibleModal } from '$lib/modal-dismiss';
-  import { Link, Check, X, ShieldAlert, Laptop } from 'lucide-svelte';
   import BorderBeam from './ui/BorderBeam.svelte';
 
   let {
@@ -45,7 +45,7 @@
 
       <div class="flex items-center gap-3.5">
         <div class="w-10 h-10 rounded-2xl bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/30 flex items-center justify-center text-lg shadow-sm">
-          <Link size={18} />
+          <Link2 size={18} />
         </div>
         <div>
           <h3 class="text-sm font-bold text-[var(--text-main)]">{$t('incoming.title')}</h3>

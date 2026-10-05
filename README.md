@@ -35,16 +35,24 @@ LowNotes is a desktop editor for people who want **readable Markdown files**, a 
 4. To sync another computer, open **Manage Connections** in the sidebar and follow [P2P pairing](#p2p-pairing).
 5. To use AI, pick a model under **Settings → Providers**. Ollama and LM Studio work locally when the service and model are installed; remote providers need their credentials.
 
-When you close the window, the app stays in the system tray by default. You can change this in **Settings → General**; the tray menu also lets you quit completely.
+When you close the window, the app stays in the system tray by default. Opening LowNotes again shows and focuses the existing window, restoring it if minimized. Only one instance runs at a time. You can change the close-to-tray behavior in **Settings → General**; the tray menu also lets you quit completely.
+
+On Linux, updates follow the installation format. Arch, DEB and RPM packages show a new-version notice with a download for the matching package; install it through pacman, APT or your RPM package manager. Repository, AUR, Flatpak and Snap installations should be updated through their original source when the new version becomes available there. Portable `.tar.gz` installations require replacing the application files manually. Only unmanaged AppImages in a writable folder update inside LowNotes. Native packages never replace their executable with an AppImage.
 
 ## What the app offers
 
 ### Notes and organization
 
 - Editable Markdown with preview, tasks, tables, footnotes, syntax extensions and Mermaid diagrams.
+- Paste an image anywhere in the text editor to save it and insert a Markdown reference. Choose **Local (default)**, Catbox or Imgur under **Settings → General → Pasted images**. The choice is saved per device; each paste keeps its provider during processing and retries. Progress and retry appear above the editor.
+  - **Local:** works offline without accounts or application keys. Images are stored in a single hidden SQLite file, `.lownotes/images.sqlite3`, inside the vault. Static images are optimized with lossless WebP when smaller; GIF frames, timing, transparency and loop counts are preserved. Already smaller originals and animated PNG/WebP remain intact. Repeated content is deduplicated. Limits: 50 MB input (20 MB GIF), 32 megapixels, 16 MB stored per image. Markdown uses stable `lownotes-image:<content-hash>.<extension>` references, so moving or renaming notes does not break images. Preview and Word/PDF export resolve them locally. Copy the entire vault, including `.lownotes`, for a complete backup; these references require LowNotes to read the database.
+  - **P2P images:** only missing immutable blobs are transferred and verified by content hash, rather than copying or syncing SQLite database files. Images created offline on different devices merge without overwriting one another. Both devices need this image-capable version; ordinary note sync remains compatible with older versions. Removing a note or undoing a paste retains its image blob so another note, undo or an offline peer can still reference it.
+  - [Catbox](https://catbox.moe/): PNG, JPEG, GIF, WebP or BMP; 200 MB per image, 20 MB for GIFs. No account or key required. Its [FAQ](https://catbox.moe/faq.php) states that anonymous files expire after two years without access. LowNotes uses anonymous uploads.
+  - [Imgur](https://apidocs.imgur.com/): PNG, JPEG or GIF; LowNotes uses a conservative 10 MB limit based on Imgur’s [legacy image API documentation](https://api.imgur.com/endpoints/image). Anonymous uploads use a public Client ID, never a Client Secret. Leave the optional Client ID empty to use LowNotes’ shared quota (approximately 1,250 uploads/day across users), or provide your own application ID. Imgur may compress or convert images. Anonymous deletion hashes are stored locally in `imgur-uploads.jsonl` beside the app settings, outside the synced vault.
 - Interface zoom with **Ctrl + +**, **Ctrl + -** or **Ctrl + mouse wheel**; **Ctrl + 0** resets to 100%. The chosen level is saved on the device.
 - **Ctrl + Z** undoes only your local note edits, preserving text from other devices; **Ctrl + Y** or **Ctrl + Shift + Z** redoes your edits.
 - Immediate autosave with a stable **Saved** indicator while typing and a warning if saving fails.
+- Long editor lines wrap visually by default, preserving the file's line breaks and numbering. Disable **Visual line wrapping** in **Settings → General** to use horizontal scrolling.
 - Folders, note search, `[[links between notes]]` and local Markdown links. The link map combines relations written in notes with relations added manually or by the assistant.
 - Export notes and drafts to Word (`.docx`) and PDF using the same Markdown dialect as the preview. Rich text, lists, tasks, aligned tables, links and footnotes are preserved; Mermaid diagrams and images are embedded as visuals. PDF text remains selectable and Word text remains editable. Images can come from the vault, HTTP(S) addresses or data URLs.
 - Settings gathered on one screen: general preferences, themes, AI, providers, web search sources and app information.

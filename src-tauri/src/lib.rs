@@ -10,6 +10,9 @@ pub mod web_search;
 pub mod chat_history;
 pub mod undo;
 pub mod export_images;
+pub mod updates;
+pub mod image_upload;
+pub mod local_images;
 
 use std::sync::Arc;
 use parking_lot::{Mutex, RwLock};
@@ -20,6 +23,14 @@ use crdt::CrdtManager;
 use network::{NetworkIdentity, NetworkService};
 use commands::AppState;
 use undo::UndoHistory;
+
+fn show_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -41,11 +52,39 @@ pub fn run() {
         undo: Mutex::new(UndoHistory::default()),
     };
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+
+    // Register first so duplicate launches exit before the tray and network start.
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        show_main_window(app);
+    }));
+
+    let update_policy = updates::UpdatePolicy::detect();
+    let builder = if update_policy.can_install {
+        let mut updater = tauri_plugin_updater::Builder::new();
+        if let Some(target) = &update_policy.updater_target {
+            updater = updater.target(target);
+        }
+        builder.plugin(updater.build())
+    } else {
+        // Native packages and read-only AppImages cannot invoke updater installation.
+        builder
+    };
+
+    builder
+        .register_asynchronous_uri_scheme_protocol("lownotes-image", |context, request, responder| {
+            let app = context.app_handle().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                let state = app.state::<AppState>();
+                let settings = state.settings.read().clone();
+                responder.respond(local_images::protocol_response(&settings, request.uri().path()));
+            });
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .manage(update_policy)
         .manage(app_state)
         .setup(move |app| {
             let mut s = settings.write();
@@ -85,21 +124,13 @@ pub fn run() {
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
-                    "open" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
-                    }
+                    "open" => show_main_window(app),
                     "quit" => app.exit(0),
                     _ => {}
                 })
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click { button: MouseButton::Left, .. } = event {
-                        if let Some(window) = tray.app_handle().get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
+                        show_main_window(tray.app_handle());
                     }
                 })
                 .build(app)?;
@@ -116,6 +147,10 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            image_upload::upload_clipboard_image,
+            image_upload::save_image_upload_settings,
+            updates::get_update_policy,
+            updates::check_external_update,
             commands::get_app_state,
             commands::chat_history_get,
             commands::chat_history_save,
@@ -141,6 +176,7 @@ pub fn run() {
             commands::save_theme,
             commands::save_theme_palettes,
             commands::save_view_mode,
+            commands::save_line_wrapping,
             commands::save_language,
             commands::fetch_ai_models,
             commands::search_vault_rag,

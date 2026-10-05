@@ -6,6 +6,7 @@ use std::{
 };
 
 use anyhow::{Context, bail};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use iroh::{Endpoint, SecretKey, endpoint::presets};
 use iroh_tickets::endpoint::EndpointTicket;
 use parking_lot::RwLock;
@@ -19,7 +20,8 @@ use crate::{
     vault::{self, Manifest, NoteMeta},
 };
 
-const ALPN: &[u8] = b"lownotes/sync/2";
+const ALPN: &[u8] = b"lownotes/sync/3";
+const LEGACY_ALPN: &[u8] = b"lownotes/sync/2";
 const MAX_PACKET_BYTES: usize = 24 * 1024 * 1024;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,6 +87,10 @@ pub enum Packet {
     Put {
         meta: NoteMeta,
         content: Vec<u8>,
+    },
+    ImagePut {
+        meta: NoteMeta,
+        content_base64: String,
     },
     Request {
         path: String,
@@ -245,7 +251,7 @@ async fn run_network(
 ) -> anyhow::Result<()> {
     let endpoint = Endpoint::builder(presets::N0)
         .secret_key(identity.secret_key.clone())
-        .alpns(vec![ALPN.to_vec()])
+        .alpns(vec![ALPN.to_vec(), LEGACY_ALPN.to_vec()])
         .bind()
         .await?;
 
@@ -570,7 +576,7 @@ async fn handle_incoming_connection(
                 .cloned()
                 .context("errors.unauthorizedDevice")?;
 
-            let changed = serve_sync(&mut send, &mut recv, &vault, remote_manifest, Some(&app)).await?;
+            let changed = serve_sync(&mut send, &mut recv, &vault, remote_manifest, Some(&app), connection.alpn() == ALPN).await?;
             connection.close(0u32.into(), b"sync complete");
 
             let direct = connection_is_direct(&connection);
@@ -631,7 +637,7 @@ async fn dial_pair(
     sync_in_flight: Arc<parking_lot::Mutex<HashSet<String>>>,
 ) -> anyhow::Result<()> {
     let addr = invite.peer.endpoint_addr()?;
-    let connection = endpoint.connect(addr, ALPN).await?;
+    let connection = endpoint.connect(addr, LEGACY_ALPN).await?;
     let (mut send, mut recv) = connection.open_bi().await?;
 
     let my_requester = PeerConfig {
@@ -753,10 +759,14 @@ async fn dial_sync(
     app: Option<&AppHandle>,
 ) -> anyhow::Result<(usize, Option<bool>, bool)> {
     let addr = peer.endpoint_addr()?;
-    let connection = endpoint.connect(addr, ALPN).await?;
+    let connection = match endpoint.connect(addr.clone(), ALPN).await {
+        Ok(connection) => connection,
+        Err(_) => endpoint.connect(addr, LEGACY_ALPN).await?,
+    };
     let (mut send, mut recv) = connection.open_bi().await?;
 
-    let my_manifest = vault::build_manifest(&vault)?;
+    let images_supported = connection.alpn() == ALPN;
+    let my_manifest = sync_manifest(&vault, images_supported)?;
     send_packet(&mut send, &Packet::Manifest(my_manifest.clone())).await?;
 
     let mut changed = 0;
@@ -765,11 +775,11 @@ async fn dial_sync(
         let packet: Packet = recv_packet(&mut recv).await?;
         match packet {
             Packet::Request { path } => {
-                let bytes = read_sync_content(&vault, &path)?;
                 let meta = my_manifest.get(&path).context("errors.metaMissing")?;
-                send_packet(&mut send, &Packet::Put { meta: meta.clone(), content: bytes }).await?;
+                send_sync_content(&mut send, &vault, meta).await?;
             }
-            Packet::Put { meta, content } => {
+            packet @ (Packet::Put { .. } | Packet::ImagePut { .. }) => {
+                let (meta, content) = unpack_sync_content(packet, images_supported)?;
                 let outcome = write_sync_content(&vault, &meta.path, &content, app)?;
                 if outcome.changed {
                     changed += 1;
@@ -792,8 +802,12 @@ async fn serve_sync(
     vault: &Path,
     remote_manifest: Manifest,
     app: Option<&AppHandle>,
+    images_supported: bool,
 ) -> anyhow::Result<usize> {
-    let local_manifest = vault::build_manifest(vault)?;
+    let local_manifest = sync_manifest(vault, images_supported)?;
+    if !images_supported && remote_manifest.keys().any(|path| crate::local_images::is_sync_image(path)) {
+        bail!("errors.unexpectedPacketSync");
+    }
     let mut changed = 0;
 
     // Send notes that remote doesn't have or remote has older
@@ -806,9 +820,7 @@ async fn serve_sync(
         };
 
         if needs_send {
-            if let Ok(bytes) = read_sync_content(vault, path) {
-                send_packet(send, &Packet::Put { meta: local_meta.clone(), content: bytes }).await?;
-            }
+            send_sync_content(send, vault, local_meta).await?;
         }
     }
 
@@ -824,10 +836,10 @@ async fn serve_sync(
         if needs_request {
             send_packet(send, &Packet::Request { path: path.clone() }).await?;
             let packet: Packet = recv_packet(recv).await?;
-            if let Packet::Put { meta, content } = packet {
-                if write_sync_content(vault, &meta.path, &content, app)?.changed {
-                    changed += 1;
-                }
+            let (meta, content) = unpack_sync_content(packet, images_supported)?;
+            if meta.path != *path { bail!("errors.unexpectedPacketSync"); }
+            if write_sync_content(vault, &meta.path, &content, app)?.changed {
+                changed += 1;
             }
         }
     }
@@ -838,6 +850,38 @@ async fn serve_sync(
     send.finish()?;
     let _ = tokio::time::timeout(Duration::from_secs(2), send.stopped()).await;
     Ok(changed)
+}
+
+fn sync_manifest(root: &Path, images_supported: bool) -> anyhow::Result<Manifest> {
+    let mut manifest = vault::build_manifest(root)?;
+    if !images_supported { manifest.retain(|path, _| !crate::local_images::is_sync_image(path)); }
+    Ok(manifest)
+}
+
+async fn send_sync_content(send: &mut iroh::endpoint::SendStream, root: &Path, meta: &NoteMeta) -> anyhow::Result<()> {
+    let content = read_sync_content(root, &meta.path)?;
+    let packet = if crate::local_images::is_sync_image(&meta.path) {
+        Packet::ImagePut { meta: meta.clone(), content_base64: STANDARD.encode(content) }
+    } else { Packet::Put { meta: meta.clone(), content } };
+    send_packet(send, &packet).await
+}
+
+fn unpack_sync_content(packet: Packet, images_supported: bool) -> anyhow::Result<(NoteMeta, Vec<u8>)> {
+    match packet {
+        Packet::Put { meta, content } if !crate::local_images::is_sync_image(&meta.path) => Ok((meta, content)),
+        Packet::ImagePut { meta, content_base64 } if images_supported => {
+            let name = crate::local_images::sync_name(&meta.path)?;
+            let (id, _) = crate::local_images::image_name(name)?;
+            if meta.hash != id || meta.size > crate::local_images::MAX_STORED_BYTES as u64
+                || content_base64.len() > crate::local_images::MAX_STORED_BYTES.div_ceil(3) * 4 {
+                bail!("errors.localImageInvalid");
+            }
+            let content = STANDARD.decode(content_base64)?;
+            if content.len() as u64 != meta.size { bail!("errors.localImageInvalid"); }
+            Ok((meta, content))
+        }
+        _ => bail!("errors.unexpectedPacketSync"),
+    }
 }
 
 fn is_crdt_state(path: &str) -> bool {
@@ -851,7 +895,9 @@ fn skip_markdown_sync(path: &str, local: &Manifest, remote: &Manifest) -> bool {
 }
 
 fn read_sync_content(vault_path: &Path, path: &str) -> anyhow::Result<Vec<u8>> {
-    if is_crdt_state(path) {
+    if crate::local_images::is_sync_image(path) {
+        Ok(crate::local_images::load(vault_path, crate::local_images::sync_name(path)?)?.bytes)
+    } else if is_crdt_state(path) {
         Ok(std::fs::read(vault::safe_join(vault_path, path)?)?)
     } else {
         Ok(vault::read_note(vault_path, path)?.into_bytes())
@@ -864,7 +910,10 @@ struct WriteOutcome {
 }
 
 fn write_sync_content(vault_path: &Path, path: &str, content: &[u8], app: Option<&AppHandle>) -> anyhow::Result<WriteOutcome> {
-    if is_crdt_state(path) {
+    if crate::local_images::is_sync_image(path) {
+        let changed = crate::local_images::insert(vault_path, crate::local_images::sync_name(path)?, content)?;
+        Ok(WriteOutcome { changed, conflict_created: false })
+    } else if is_crdt_state(path) {
         let manager = app.map(|app| app.state::<AppState>().crdt.clone()).unwrap_or_default();
         let (note_path, result) = manager.merge_state_file(vault_path, path, content)?;
         if let (Some(app), Some(conflict_path)) = (app, result.conflict_path.as_ref()) {
@@ -894,7 +943,7 @@ async fn send_crdt_to_peer(
     update: Vec<u8>,
 ) -> anyhow::Result<()> {
     let addr = peer.endpoint_addr()?;
-    let connection = endpoint.connect(addr, ALPN).await?;
+    let connection = endpoint.connect(addr, LEGACY_ALPN).await?;
     let (mut send, _) = connection.open_bi().await?;
     send_packet(&mut send, &Packet::CrdtUpdate { note_path, update }).await?;
     send.finish()?;
@@ -910,7 +959,7 @@ async fn send_awareness_to_peer(
     update: Vec<u8>,
 ) -> anyhow::Result<()> {
     let addr = peer.endpoint_addr()?;
-    let connection = endpoint.connect(addr, ALPN).await?;
+    let connection = endpoint.connect(addr, LEGACY_ALPN).await?;
     let (mut send, _) = connection.open_bi().await?;
     send_packet(&mut send, &Packet::Awareness { note_path, update }).await?;
     send.finish()?;
@@ -925,7 +974,7 @@ async fn send_delete_to_peer(
     path: String,
 ) -> anyhow::Result<()> {
     let addr = peer.endpoint_addr()?;
-    let connection = endpoint.connect(addr, ALPN).await?;
+    let connection = endpoint.connect(addr, LEGACY_ALPN).await?;
     let (mut send, _) = connection.open_bi().await?;
     send_packet(&mut send, &Packet::Delete { path }).await?;
     send.finish()?;
@@ -1022,7 +1071,7 @@ mod tests {
                 let packet: Packet = recv_packet(&mut recv).await.unwrap();
                 match packet {
                     Packet::Manifest(remote_manifest) => {
-                        serve_sync(&mut send, &mut recv, &accept_vault, remote_manifest, None)
+                        serve_sync(&mut send, &mut recv, &accept_vault, remote_manifest, None, true)
                             .await
                             .unwrap();
                     }
@@ -1104,6 +1153,93 @@ mod tests {
         let _ = peer_b;
         let _ = fs::remove_dir_all(&vault_a);
         let _ = fs::remove_dir_all(&vault_b);
+    }
+
+    #[tokio::test]
+    async fn images_created_offline_on_both_devices_sync_incrementally_without_database_conflicts() {
+        use image::ImageEncoder;
+        let a = tempfile::tempdir().unwrap();
+        let b = tempfile::tempdir().unwrap();
+        let make_png = |color| {
+            let image = image::RgbaImage::from_pixel(16, 16, image::Rgba(color));
+            let mut bytes = Vec::new();
+            image::codecs::png::PngEncoder::new(&mut bytes).write_image(&image, 16, 16, image::ExtendedColorType::Rgba8).unwrap();
+            bytes
+        };
+        let link_a = crate::local_images::save_pasted(a.path(), make_png([255, 0, 0, 255])).unwrap();
+        let link_b = crate::local_images::save_pasted(b.path(), make_png([0, 255, 0, 128])).unwrap();
+        fs::write(a.path().join("a.md"), format!("![red]({link_a})")).unwrap();
+        fs::write(b.path().join("b.md"), format!("![green]({link_b})")).unwrap();
+        let ep_a = bind_endpoint().await;
+        let ep_b = bind_endpoint().await;
+        let peer_a = peer_of(&ep_a, "A");
+        let server_ep = ep_a.clone();
+        let server_root = a.path().to_path_buf();
+        let responder = tokio::spawn(async move {
+            for _ in 0..2 {
+                let connection = ep_accept(&server_ep).await.await.unwrap();
+                let (mut send, mut recv) = connection.accept_bi().await.unwrap();
+                let Packet::Manifest(manifest) = recv_packet(&mut recv).await.unwrap() else { panic!("Expected manifest"); };
+                serve_sync(&mut send, &mut recv, &server_root, manifest, None, true).await.unwrap();
+            }
+        });
+        let (changed, _, _) = dial_sync(ep_b.clone(), b.path().to_path_buf(), peer_a.clone(), None).await.unwrap();
+        assert_eq!(changed, 2, "one new note and one new image");
+        assert_eq!(crate::local_images::manifest(a.path()).unwrap().len(), 2);
+        assert_eq!(crate::local_images::manifest(b.path()).unwrap().len(), 2);
+        for link in [&link_a, &link_b] {
+            let name = crate::local_images::link_name(link).unwrap();
+            assert_eq!(crate::local_images::load(a.path(), name).unwrap().bytes, crate::local_images::load(b.path(), name).unwrap().bytes);
+        }
+        assert_eq!(dial_sync(ep_b.clone(), b.path().to_path_buf(), peer_a, None).await.unwrap().0, 0);
+        responder.await.unwrap();
+        ep_a.close().await;
+        ep_b.close().await;
+    }
+
+    #[tokio::test]
+    async fn legacy_sync_still_exchanges_notes_without_sending_image_packets() {
+        let a = tempfile::tempdir().unwrap();
+        let b = tempfile::tempdir().unwrap();
+        fs::write(a.path().join("a.md"), "old-compatible note").unwrap();
+        let bytes = STANDARD.decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4//8/AAX+Av4N70a4AAAAAElFTkSuQmCC").unwrap();
+        crate::local_images::save_pasted(a.path(), bytes).unwrap();
+        let ep_a = Endpoint::builder(presets::N0).secret_key(SecretKey::generate()).alpns(vec![LEGACY_ALPN.to_vec()]).bind().await.unwrap();
+        let ep_b = bind_endpoint().await;
+        let peer_a = peer_of(&ep_a, "Old device");
+        let root = a.path().to_path_buf();
+        let server_ep = ep_a.clone();
+        let responder = tokio::spawn(async move {
+            // Ignore the incompatible v3 handshake, then accept the v2 fallback.
+            loop {
+                let incoming = ep_accept(&server_ep).await;
+                let Ok(connection) = incoming.await else { continue; };
+                let (mut send, mut recv) = connection.accept_bi().await.unwrap();
+                let Packet::Manifest(manifest) = recv_packet(&mut recv).await.unwrap() else { panic!("Expected manifest"); };
+                assert!(!manifest.keys().any(|p| crate::local_images::is_sync_image(p)));
+                serve_sync(&mut send, &mut recv, &root, manifest, None, false).await.unwrap();
+                break;
+            }
+        });
+        let result = tokio::time::timeout(Duration::from_secs(30), dial_sync(ep_b.clone(), b.path().to_path_buf(), peer_a, None)).await.unwrap().unwrap();
+        assert_eq!(result.0, 1);
+        assert_eq!(fs::read_to_string(b.path().join("a.md")).unwrap(), "old-compatible note");
+        assert!(crate::local_images::manifest(b.path()).unwrap().is_empty());
+        responder.await.unwrap();
+        ep_a.close().await;
+        ep_b.close().await;
+    }
+
+    #[test]
+    fn binary_image_packets_fit_the_limit_and_reject_inconsistent_metadata() {
+        let content = vec![255; crate::local_images::MAX_STORED_BYTES];
+        let id = blake3::hash(&content).to_hex().to_string();
+        let meta = NoteMeta { path: format!(".lownotes/images/{id}.png"), hash: id, size: content.len() as u64, modified_ms: 0 };
+        let packet = Packet::ImagePut { meta: meta.clone(), content_base64: STANDARD.encode(&content) };
+        assert!(serde_json::to_vec(&packet).unwrap().len() < MAX_PACKET_BYTES);
+        assert!(unpack_sync_content(packet, false).is_err());
+        let packet = Packet::ImagePut { meta, content_base64: STANDARD.encode(b"different data") };
+        assert!(unpack_sync_content(packet, true).is_err());
     }
 
     async fn ep_accept(endpoint: &Endpoint) -> iroh::endpoint::Incoming {

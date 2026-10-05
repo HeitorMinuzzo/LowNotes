@@ -1,7 +1,7 @@
 <script lang="ts">
+  import { Check, FileDown, FileText, Loader2 } from 'lucide-svelte';
   import { t, trError } from '$lib/i18n';
   import type { ExportFormat } from '../document-export';
-  import { FileDown, FileText, Check, Loader2 } from 'lucide-svelte';
 
   let { content, path } = $props<{ content: string; path: string }>();
   let busy = $state(false);

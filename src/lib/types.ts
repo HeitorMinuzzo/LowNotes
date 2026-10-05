@@ -7,6 +7,21 @@ export interface VaultItem {
   is_dir: boolean;
 }
 
+export type UpdateChannel = 'internal' | 'appimage' | 'arch' | 'deb' | 'rpm'
+  | 'flatpak' | 'snap' | 'portable' | 'linux_package';
+
+export interface UpdatePolicy {
+  channel: UpdateChannel;
+  can_install: boolean;
+  updater_target: string | null;
+}
+
+export interface ReleaseNotice {
+  version: string;
+  body: string;
+  download_url: string | null;
+}
+
 export interface PeerConfig {
   name: string;
   endpoint_id: string;
@@ -62,11 +77,20 @@ export interface WebSearchSettings {
   searxng_url: string;
 }
 
+export type ImageUploadProvider = 'local' | 'catbox' | 'imgur';
+
+export interface ImageUploadSettings {
+  local_default_applied?: boolean;
+  provider: ImageUploadProvider;
+  imgur_client_id: string;
+}
+
 export interface AppSettings {
   device_name: string;
   theme: AppTheme;
   theme_palettes: ThemePalettesSettings;
   view_mode: ViewMode;
+  line_wrapping: boolean;
   language: string;
   update_check: boolean;
   close_to_tray: boolean;
@@ -75,6 +99,7 @@ export interface AppSettings {
   vaults: VaultConfig[];
   ai: AiSettings;
   web_search: WebSearchSettings;
+  image_upload: ImageUploadSettings;
   has_seen_welcome: boolean;
 }
 

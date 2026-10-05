@@ -1,10 +1,10 @@
 <script lang="ts">
+  import { ArrowRight, Bot, FileText, Link2, MessageSquare, Sparkles } from 'lucide-svelte';
   import { markWelcomeSeen, saveLanguage } from '../api';
   import { t, locale, LOCALE_LABELS, SUPPORTED_LOCALES } from '$lib/i18n';
   import logoUrl from '../../../assets/brand/lownotes_logo.png';
   import { dismissibleModal } from '$lib/modal-dismiss';
   import BorderBeam from './ui/BorderBeam.svelte';
-  import { Sparkles, FileText, Link, Bot, ArrowRight } from 'lucide-svelte';
 
   let {
     isOpen = $bindable(false),
@@ -89,7 +89,7 @@
         <!-- Feature 2 -->
         <div class="flex items-start gap-3.5 p-3.5 rounded-2xl bg-[var(--bg-main)]/70 border border-[var(--border)] glow-card-hover">
           <div class="w-9 h-9 rounded-xl bg-blue-500/15 text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0">
-            <Link size={16} />
+            <Link2 size={16} />
           </div>
           <div>
             <h4 class="text-xs font-bold text-[var(--text-main)] mb-0.5">{$t('welcome.feature2Title')}</h4>
@@ -131,9 +131,10 @@
           </button>
           <button
             onclick={() => handleDismiss(true)}
-            class="h-8 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-contrast)] text-xs font-semibold rounded-md shadow-sm transition cursor-pointer"
+            class="h-8 px-4 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--accent-contrast)] text-xs font-semibold rounded-md shadow-sm transition cursor-pointer flex items-center gap-1.5"
           >
             <span>{$t('welcome.tryAi')}</span>
+            <MessageSquare size={14} />
           </button>
         </div>
       </div>
