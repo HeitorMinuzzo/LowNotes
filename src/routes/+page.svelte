@@ -31,7 +31,7 @@
   import { locale, resolveLocale, t, trError } from '$lib/i18n';
   import { resolveNoteLink } from '$lib/note-links';
   import { DEFAULT_PALETTE_ID, applyTheme } from '$lib/themes';
-  import Sidebar from '$lib/components/Sidebar.svelte';
+  import Sidebar from '$lib/components/AppleSidebar.svelte';
   import * as Y from 'yjs';
   import {
     Awareness,
@@ -49,16 +49,13 @@
   import UpdateModal from '$lib/components/UpdateModal.svelte';
   import SettingsView from '$lib/components/SettingsView.svelte';
   import CommandPalette from '$lib/components/CommandPalette.svelte';
-  import BorderBeam from '$lib/components/ui/BorderBeam.svelte';
-  import AmbientGlow from '$lib/components/ui/AmbientGlow.svelte';
-  import MacTrafficLights from '$lib/components/ui/MacTrafficLights.svelte';
   import {
-    ArrowRight,
+    ChevronRight,
     FileText,
+    NotebookPen,
     FolderOpen,
     MessageSquare,
     Network,
-    NotebookPen,
     Plus,
     Settings2,
     ShieldCheck,
@@ -68,11 +65,12 @@
   let settings = $state<AppSettings | null>(null);
   let theme = $state<AppTheme>('light');
   let viewMode = $state<ViewMode>('split');
-  let activePaletteId = $derived(settings?.theme_palettes?.active_palette_id ?? DEFAULT_PALETTE_ID);
-  let isAppleTheme = $derived(activePaletteId === 'apple');
   let appleNewNoteOpen = $state(false);
   let appleNewNoteName = $state('');
   let appleNewNoteError = $state('');
+  let appleCreateKind = $state<'note' | 'folder'>('note');
+  let appleCreateBusy = $state(false);
+  let appError = $state('');
   let appleNoteInput = $state<HTMLInputElement | null>(null);
   let appleDialogElement = $state<HTMLDivElement | null>(null);
 
@@ -188,46 +186,33 @@
   }
 
   async function handleQuickNewNote(folder = '') {
-    if (isAppleTheme) {
-      appleNewNoteName = folder;
-      appleNewNoteError = '';
-      appleNewNoteOpen = true;
-      return;
-    }
-    const name = prompt($t('sidebar.noteNamePlaceholder') || 'Nome da nova nota:');
-    if (!name || !name.trim()) return;
-    try {
-      const trimmed = name.trim();
-      const path = await createNote(trimmed, trimmed.split('/').at(-1) || trimmed);
-      await refreshItems();
-      await openNote(path);
-    } catch (e: any) {
-      alert(trError(typeof e === 'string' ? e : e.message || 'sidebar.errorCreateNote'));
-    }
+    appleCreateKind = 'note';
+    appleNewNoteName = folder;
+    appleNewNoteError = '';
+    appleNewNoteOpen = true;
   }
 
   async function submitAppleNewNote() {
     const name = appleNewNoteName.trim();
-    if (!name) return;
+    if (!name || appleCreateBusy) return;
+    appleCreateBusy = true;
     try {
-      const path = await createNote(name, name.split('/').at(-1) || name);
+      let path = '';
+      if (appleCreateKind === 'note') path = await createNote(name, name.split('/').at(-1) || name);
+      else await createFolder(name);
       appleNewNoteOpen = false;
       await refreshItems();
-      await openNote(path);
+      if (path) await openNote(path);
     } catch (e: any) {
       appleNewNoteError = trError(typeof e === 'string' ? e : e.message || 'sidebar.errorCreateNote');
-    }
+    } finally { appleCreateBusy = false; }
   }
 
   async function handleQuickNewFolder() {
-    const name = prompt($t('sidebar.folderNamePlaceholder') || 'Nome da nova pasta:');
-    if (!name || !name.trim()) return;
-    try {
-      await createFolder(name.trim());
-      await refreshItems();
-    } catch (e: any) {
-      alert(trError(typeof e === 'string' ? e : e.message || 'sidebar.errorCreateFolder'));
-    }
+    appleCreateKind = 'folder';
+    appleNewNoteName = '';
+    appleNewNoteError = '';
+    appleNewNoteOpen = true;
   }
 
   async function handleQuickSync() {
@@ -273,7 +258,7 @@
         lastUndoableAction = restored.has_more ? 'delete' : 'text';
       } else lastUndoableAction = 'text';
     } catch (error) {
-      alert(trError(String(error)));
+      appError = trError(String(error));
     } finally {
       undoPending = false;
     }
@@ -425,14 +410,20 @@
     locale.set(resolveLocale(next.language));
   }
 
+  let viewModeRevision = 0;
+  let viewModeSave: Promise<void> = Promise.resolve();
   async function handleViewModeChange(next: ViewMode) {
+    if (next === viewMode) return;
     const previous = viewMode;
     viewMode = next;
+    const revision = ++viewModeRevision;
+    const saving = viewModeSave.catch(() => {}).then(() => saveViewMode(next));
+    viewModeSave = saving;
     try {
-      await saveViewMode(next);
-      if (settings) settings.view_mode = next;
+      await saving;
+      if (settings && revision === viewModeRevision) settings.view_mode = next;
     } catch (error) {
-      viewMode = previous;
+      if (revision === viewModeRevision) viewMode = previous;
       console.error('Failed to save view mode:', error);
     }
   }
@@ -572,95 +563,21 @@
   });
 </script>
 
-<div class="flex h-screen w-screen overflow-hidden bg-[var(--bg-main)] text-[var(--text-main)]">
+<div class="apple-app-shell flex h-screen w-screen overflow-hidden bg-[var(--bg-main)] text-[var(--text-main)]">
   {#if isSettingsOpen && settings}
     <SettingsView {settings} initialTab={settingsTab} onClose={() => void closeSettings()} onChange={handleSettingsChange} />
   {:else if !activeVault}
-    <!-- Welcome screen when no vault is configured (Magic UI Bento Showcase) -->
-    <main class="apple-welcome relative flex-1 flex flex-col items-center justify-center p-6 md:p-12 text-center select-none overflow-y-auto">
-      {#if isAppleTheme}
-        <!-- macOS Window Traffic Lights in Top-Left -->
-        <div class="absolute top-6 left-8 flex items-center z-20">
-          <MacTrafficLights />
-        </div>
-      {:else}
-        <AmbientGlow color="var(--accent)" size="600px" opacity={0.12} class="top-[-100px] left-1/2 -translate-x-1/2" />
-        <AmbientGlow color="var(--danger)" size="450px" opacity={0.08} class="bottom-[-150px] right-[-100px]" />
-      {/if}
-
-      <!-- Topbar actions -->
-      <div class="absolute top-6 right-8 flex items-center gap-3 z-20">
-        <button
-          onclick={() => openSettings()}
-          class="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[var(--border)] bg-[var(--bg-card)]/80 hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all duration-150 active:scale-95 shadow-sm backdrop-blur-md cursor-pointer"
-        >
-          <Settings2 size={13} class="text-[var(--text-muted)]" />
-          <span>{$t('settings.title')}</span>
-        </button>
-      </div>
-
-      <!-- Hero Header -->
-      <div class="relative z-10 max-w-2xl flex flex-col items-center mt-6">
-        <!-- Floating badge -->
-        <div class="inline-flex items-center gap-2 px-3.5 py-1 rounded-full border border-[var(--border)] bg-[var(--bg-card)]/80 backdrop-blur-md text-xs font-medium text-[var(--accent)] mb-6 shadow-sm">
-          <span class="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-[pulse-subtle_2s_infinite]"></span>
-          <span>{isAppleTheme ? 'LowNotes · macOS Cupertino' : 'LowNotes · Local & P2P'}</span>
-        </div>
-
-        <h1 class="text-3xl md:text-5xl font-semibold tracking-[-0.03em] mb-4 text-[var(--text-main)] leading-tight">
-          {$t('app.welcomeTitle')}
-        </h1>
-
-        <p class="text-sm md:text-base text-[var(--text-muted)] max-w-lg mb-8 leading-relaxed font-normal tracking-[-0.015em]">
-          {$t('app.welcomeSubtitle')}
-        </p>
-
-        <!-- CTA Action Button (macOS Pill Button with subtle micro-scale) -->
-        <div class="relative mb-12">
-          <button
-            onclick={handleOpenVaultFolder}
-            class="group relative inline-flex items-center gap-2.5 px-7 py-3 rounded-full bg-[var(--accent)] text-[var(--accent-contrast)] hover:opacity-95 active:scale-95 transition-all duration-150 font-semibold text-sm shadow-[0_4px_20px_-2px_var(--accent-glow)] cursor-pointer"
-          >
-            <FolderOpen size={16} strokeWidth={2.2} class="transition-transform duration-150 group-hover:scale-110" />
-            <span>{$t('app.chooseVaultFolder')}</span>
-            <ArrowRight size={14} class="opacity-70 group-hover:translate-x-0.5 transition-transform" />
-          </button>
-        </div>
-      </div>
-
-      <!-- Bento Grid features with Lucide icons (No raw emojis) -->
-      <div class="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl w-full text-left">
-        <div class="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)]/75 backdrop-blur-xl p-5 hover:border-[var(--accent)]/40 hover:bg-[var(--bg-hover)]/40 transition-all duration-200 group flex flex-col shadow-sm">
-          <div class="w-10 h-10 rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/15 flex items-center justify-center mb-3.5 shadow-inner">
-            <FileText size={18} strokeWidth={2} />
-          </div>
-          <h3 class="text-sm font-semibold text-[var(--text-main)] mb-1 tracking-tight">{$t('app.featureMarkdownTitle')}</h3>
-          <p class="text-xs text-[var(--text-muted)] leading-relaxed">
-            {$t('app.featureMarkdownDesc')}
-          </p>
-        </div>
-
-        <div class="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)]/75 backdrop-blur-xl p-5 hover:border-[var(--accent)]/40 hover:bg-[var(--bg-hover)]/40 transition-all duration-200 group flex flex-col shadow-sm">
-          {#if !isAppleTheme}
-            <BorderBeam size={100} duration={8} borderWidth={1.5} colorFrom="var(--accent)" colorTo="var(--accent-light)" />
-          {/if}
-          <div class="w-10 h-10 rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/15 flex items-center justify-center mb-3.5 shadow-inner">
-            <ShieldCheck size={18} strokeWidth={2} />
-          </div>
-          <h3 class="text-sm font-semibold text-[var(--text-main)] mb-1 tracking-tight">{$t('app.featureP2PTitle')}</h3>
-          <p class="text-xs text-[var(--text-muted)] leading-relaxed">
-            {$t('app.featureP2PDesc')}
-          </p>
-        </div>
-
-        <div class="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-card)]/75 backdrop-blur-xl p-5 hover:border-[var(--accent)]/40 hover:bg-[var(--bg-hover)]/40 transition-all duration-200 group flex flex-col shadow-sm">
-          <div class="w-10 h-10 rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/15 flex items-center justify-center mb-3.5 shadow-inner">
-            <Sparkles size={18} strokeWidth={2} />
-          </div>
-          <h3 class="text-sm font-semibold text-[var(--text-main)] mb-1 tracking-tight">{$t('app.featureAiTitle')}</h3>
-          <p class="text-xs text-[var(--text-muted)] leading-relaxed">
-            {$t('app.featureAiDesc')}
-          </p>
+    <main class="apple-welcome">
+      <div class="apple-welcome-content">
+        <span class="apple-welcome-mark"><NotebookPen size={34} strokeWidth={1.5} /></span>
+        <h1>{$t('app.welcomeTitle')}</h1>
+        <p class="apple-welcome-intro">{$t('app.welcomeSubtitle')}</p>
+        <div class="apple-welcome-actions"><button class="apple-primary-button" onclick={handleOpenVaultFolder}><FolderOpen size={17} />{$t('app.chooseVaultFolder')}</button><button class="apple-secondary-button" onclick={() => openSettings()}><Settings2 size={17} />{$t('settings.title')}</button></div>
+        <p class="apple-welcome-footnote">{$t('app.filesReadable')}</p>
+        <div class="apple-welcome-features">
+          <section><FileText size={22} strokeWidth={1.6} /><h2>{$t('app.featureMarkdownTitle')}</h2><p>{$t('app.featureMarkdownDesc')}</p></section>
+          <section><ShieldCheck size={22} strokeWidth={1.6} /><h2>{$t('app.featureP2PTitle')}</h2><p>{$t('app.featureP2PDesc')}</p></section>
+          <section><Sparkles size={22} strokeWidth={1.6} /><h2>{$t('app.featureAiTitle')}</h2><p>{$t('app.featureAiDesc')}</p></section>
         </div>
       </div>
     </main>
@@ -697,7 +614,6 @@
       onItemDeleted={() => (lastUndoableAction = 'delete')}
       onOpenCommandPalette={() => (isCommandPaletteOpen = true)}
       presence={activeEditors}
-      {isAppleTheme}
       {theme}
       {viewMode}
       {isGraphOpen}
@@ -710,7 +626,7 @@
     />
 
     <!-- Editor Surface -->
-    <div class="flex-1 min-w-0 flex flex-col h-full overflow-hidden bg-[var(--bg-main)] relative">
+    <div class="apple-content-surface flex-1 min-w-0 flex flex-col h-full overflow-hidden relative">
       {#if conflictNotice}
         <div role="alert" class="flex items-center gap-3 px-5 py-2.5 border-b border-[var(--danger)]/50 bg-[var(--bg-card)]/95 backdrop-blur-md text-xs shadow-lg">
           <div class="flex-1 min-w-0">
@@ -738,7 +654,6 @@
           {targetLine}
           {theme}
           {viewMode}
-          {isAppleTheme}
           lineWrapping={settings?.line_wrapping ?? true}
           imageUploadProvider={settings?.image_upload?.provider ?? 'local'}
           vaultId={settings?.active_vault_id ?? ''}
@@ -754,86 +669,9 @@
         />
         {/key}
       {:else}
-        <!-- Modern Empty Dashboard state when vault is open but no note is active -->
-        <div class="relative flex-1 flex flex-col min-h-0 select-none bg-[var(--bg-main)]">
-          {#if !isAppleTheme}<AmbientGlow color="var(--accent)" size="500px" opacity={0.08} class="top-10 right-20" />{/if}
-
-          <header class:app-topbar={isAppleTheme} class="h-11 flex items-center justify-between gap-3 px-3 border-b border-[var(--border)] bg-[var(--bg-sidebar)]/80 backdrop-blur-xl shrink-0">
-            <div class="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-              <span class="font-semibold text-[var(--text-main)]">{activeVault.name}</span>
-              <span>/</span>
-              <span class="text-[var(--text-dim)]">{isAppleTheme ? $t('sidebar.allNotes') : $t('app.emptyState')}</span>
-            </div>
-
-            <div class="flex items-center gap-1.5">
-              <button
-                onclick={() => (isGraphOpen = true)}
-                class="h-7 flex items-center gap-1.5 px-2.5 rounded-md border border-[var(--border)] bg-[var(--bg-card)]/70 hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition shadow-sm cursor-pointer"
-              >
-                <Network size={13} />
-                <span>{$t('graph.button')}</span>
-              </button>
-              <button
-                onclick={() => (isAiChatOpen = !isAiChatOpen)}
-                class="h-7 flex items-center gap-1.5 px-2.5 rounded-md border border-[var(--border)] bg-[var(--bg-card)]/70 hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--accent)] transition shadow-sm cursor-pointer"
-              >
-                <MessageSquare size={13} />
-                <span>{$t('app.openAiChat')}</span>
-              </button>
-            </div>
-          </header>
-
-          <div class="flex-1 flex flex-col items-center justify-center text-center p-8">
-            {#if isAppleTheme}
-              <!-- Apple Design System (apple.design.md) Canvas Hero -->
-              <div class="relative max-w-lg w-full flex flex-col items-center select-none animate-in fade-in-50 duration-200">
-                <span class="text-[11px] font-semibold text-[var(--accent)] tracking-wider uppercase mb-2">LowNotes</span>
-                <h2 class="text-4xl md:text-5xl font-semibold tracking-[-0.03em] text-[var(--text-main)] mb-3 text-center">
-                  {$t('app.appleEmptyTitle')}
-                </h2>
-                <p class="text-[17px] text-[var(--text-muted)] max-w-md leading-relaxed mb-8 text-center font-normal tracking-[-0.015em]">
-                  {$t('app.appleEmptyDescription')}
-                </p>
-              </div>
-            {:else}
-              <div class="relative p-8 rounded-3xl border border-[var(--border)] bg-[var(--bg-card)]/60 backdrop-blur-xl shadow-2xl max-w-md w-full flex flex-col items-center glow-card-hover">
-                <BorderBeam size={180} duration={10} borderWidth={1.5} colorFrom="var(--accent)" colorTo="var(--accent-light)" />
-                <div class="w-14 h-14 rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 flex items-center justify-center mb-4 shadow-inner">
-                  <FileText size={24} strokeWidth={2} />
-                </div>
-                <h2 class="text-base font-semibold text-[var(--text-main)] mb-1 tracking-tight">
-                  {$t('app.emptyState')}
-                </h2>
-                <p class="text-xs text-[var(--text-muted)] max-w-xs leading-relaxed mb-6">
-                  Selecione uma nota no menu lateral ou utilize as ferramentas rápidas abaixo.
-                </p>
-
-                <div class="flex items-center gap-2.5">
-                  <button
-                    onclick={() => handleQuickNewNote()}
-                    class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] text-[var(--accent-contrast)] hover:opacity-90 active:scale-95 text-xs font-semibold transition shadow-md cursor-pointer"
-                  >
-                    <Plus size={14} strokeWidth={2.5} />
-                    <span>{$t('sidebar.newNote')}</span>
-                  </button>
-                  <button
-                    onclick={() => (isGraphOpen = true)}
-                    class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--border)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--text-main)] active:scale-95 transition cursor-pointer"
-                  >
-                    <Network size={14} />
-                    <span>{$t('graph.title')}</span>
-                  </button>
-                  <button
-                    onclick={() => (isAiChatOpen = true)}
-                    class="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-[var(--border)] bg-[var(--bg-main)] hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--text-main)] active:scale-95 transition cursor-pointer"
-                  >
-                    <Sparkles size={14} class="text-[var(--accent)]" />
-                    <span>{$t('ai.title')}</span>
-                  </button>
-                </div>
-              </div>
-            {/if}
-          </div>
+        <div class="apple-empty-library">
+          <header class="app-topbar flex items-center gap-3 px-6 border-b border-[var(--border)] text-xs text-[var(--text-muted)]"><span>{activeVault.name}</span><ChevronRight size={12} /><span>{$t('sidebar.allNotes')}</span></header>
+          <div class="apple-empty-message"><span class="apple-welcome-mark"><NotebookPen size={28} strokeWidth={1.5} /></span><h2>{$t('app.appleEmptyTitle')}</h2><p>{$t('app.appleEmptyDescription')}</p></div>
         </div>
       {/if}
     </div>
@@ -858,9 +696,11 @@
   {/if}
 
   <!-- Modals -->
-  {#if isAppleTheme && appleNewNoteOpen}
+  {#if appError}<div class="apple-app-notice" role="alert"><span>{appError}</span><button aria-label={$t('ai.close')} onclick={() => (appError = '')}>✕</button></div>{/if}
+  {#if appleNewNoteOpen}
     <div
       class="apple-dialog-backdrop"
+      data-modal-backdrop="apple-create"
       role="presentation"
       onclick={(event) => { if (event.target === event.currentTarget) appleNewNoteOpen = false; }}
     >
@@ -875,13 +715,13 @@
       >
         <form onsubmit={(event) => { event.preventDefault(); void submitAppleNewNote(); }}>
         <span class="apple-dialog-eyebrow">LowNotes</span>
-        <h2 id="apple-new-note-title">{$t('sidebar.newNote')}</h2>
-        <p>{$t('sidebar.noteNamePlaceholder')}</p>
-        <input bind:this={appleNoteInput} bind:value={appleNewNoteName} placeholder={$t('sidebar.noteNamePlaceholder')} autocomplete="off" />
+        <h2 id="apple-new-note-title">{$t(appleCreateKind === 'note' ? 'sidebar.newNote' : 'sidebar.newFolder')}</h2>
+        <p>{$t(appleCreateKind === 'note' ? 'sidebar.noteNamePlaceholder' : 'sidebar.folderNamePlaceholder')}</p>
+        <input bind:this={appleNoteInput} bind:value={appleNewNoteName} aria-label={$t(appleCreateKind === 'note' ? 'sidebar.noteNamePlaceholder' : 'sidebar.folderNamePlaceholder')} placeholder={$t(appleCreateKind === 'note' ? 'sidebar.noteNamePlaceholder' : 'sidebar.folderNamePlaceholder')} autocomplete="off" disabled={appleCreateBusy} />
         {#if appleNewNoteError}<p class="apple-dialog-error" role="alert">{appleNewNoteError}</p>{/if}
         <div class="apple-dialog-actions">
           <button type="button" class="apple-secondary-action" onclick={() => appleNewNoteOpen = false}>{$t('sidebar.cancel')}</button>
-          <button type="submit" class="apple-primary-action" disabled={!appleNewNoteName.trim()}>{$t('sidebar.create')}</button>
+          <button type="submit" class="apple-primary-action" disabled={appleCreateBusy || !appleNewNoteName.trim()}>{$t('sidebar.create')}</button>
         </div>
         </form>
       </div>

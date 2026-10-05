@@ -470,9 +470,7 @@ fn validate_theme_palettes(palettes: &ThemePalettesSettings) -> Result<(), Strin
             return Err("errors.invalidPalette".to_string());
         }
     }
-    if !BUILTIN_PALETTE_IDS.contains(&palettes.active_palette_id.as_str())
-        && !ids.contains(palettes.active_palette_id.as_str())
-    {
+    if !BUILTIN_PALETTE_IDS.contains(&palettes.active_palette_id.as_str()) {
         return Err("errors.invalidPalette".to_string());
     }
     Ok(())

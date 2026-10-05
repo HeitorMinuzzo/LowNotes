@@ -14,6 +14,7 @@
   import { visibleNoteRows } from '$lib/note-tree';
   import { createFolder, deleteItem, renameItem, pickVaultDirectory, selectVault, networkSyncNow } from '$lib/api';
   import { t, trError } from '$lib/i18n';
+  import SegmentedControl from './ui/SegmentedControl.svelte';
 
   let {
     activeVault, vaults, items, selectedPath, syncStatus, peerCount, presence = [],
@@ -52,6 +53,7 @@
   let collapsed = $state(false);
   let mobileOpen = $state(false);
   let vaultMenuOpen = $state(false);
+  let vaultError = $state('');
   let collapsedFolders = $state(new Set<string>());
   let syncing = $state(false);
   let sidebarElement = $state<HTMLElement>();
@@ -69,16 +71,9 @@
   const expansion = new Spring(1, { stiffness: .2, damping: .9 });
   const drawer = new Spring(0, { stiffness: .2, damping: .9 });
   const selection = new Spring(0, { stiffness: .22, damping: .85 });
-  const modeSelection = new Spring(1, { stiffness: .25, damping: .9 });
   let panelClosed = $derived(narrow.current ? !mobileOpen : collapsed);
   let rows = $derived(visibleNoteRows(items, collapsedFolders));
   let noteCount = $derived(items.filter((item: VaultItem) => !item.is_dir).length);
-  let modes = $derived([
-    { value: 'edit' as const, icon: FilePenLine, label: $t('editor.modeEdit') },
-    { value: 'split' as const, icon: Columns2, label: $t('editor.modeSplit') },
-    { value: 'preview' as const, icon: Eye, label: $t('editor.modePreview') },
-  ]);
-
   // Retargeting a live Spring preserves its position and velocity, including rapid reversals.
   $effect(() => {
     const instant = prefersReducedMotion.current;
@@ -86,7 +81,6 @@
     void expansion.set(collapsed ? 0 : 1, { instant });
     void drawer.set(mobileOpen ? 1 : 0, { instant });
     void selection.set(isGraphOpen ? 1 : 0, { instant });
-    void modeSelection.set(modes.findIndex((mode) => mode.value === viewMode), { instant });
   });
 
   $effect(() => {
@@ -152,6 +146,7 @@
 
   async function chooseVault(vault?: VaultConfig) {
     vaultMenuOpen = false;
+    vaultError = '';
     try {
       const path = vault?.path ?? await pickVaultDirectory();
       if (!path) return;
@@ -162,7 +157,8 @@
         mobileOpen = false;
       }
     } catch (error) {
-      alert(trError(String(error)));
+      vaultError = trError(String(error));
+      vaultMenuOpen = true;
     }
   }
 
@@ -311,6 +307,7 @@
             <button onclick={() => void chooseVault(vault)}><Folder size={16} /><span>{vault.name}</span>{#if vault.id === activeVault?.id}<Check size={15} />{/if}</button>
           {/each}
           <button class="apple-vault-open" onclick={() => void chooseVault()}><FolderPlus size={16} /><span>{$t('sidebar.openComputerFolder')}</span></button>
+          {#if vaultError}<p class="apple-danger p-2 text-xs" role="alert">{vaultError}</p>{/if}
         </div>
       {/if}
     </div>
@@ -349,10 +346,14 @@
 
     {#if selectedPath && !isGraphOpen}
       <div class="apple-sidebar-view"><span class="apple-section-label">{$t('editor.viewMode')}</span>
-        <div class="apple-view-control" role="group" aria-label={$t('editor.viewMode')}>
-          <span aria-hidden="true" class="apple-view-selection" style:transform="translateX({modeSelection.current * 100}%)"></span>
-          {#each modes as mode (mode.value)}<button class:active={viewMode === mode.value} aria-pressed={viewMode === mode.value} onclick={() => onViewModeChange?.(mode.value)} title={mode.label}><mode.icon size={15} /><span>{mode.label}</span></button>{/each}
-        </div>
+        {#snippet editIcon()}<FilePenLine size={15} />{/snippet}
+        {#snippet splitIcon()}<Columns2 size={15} />{/snippet}
+        {#snippet previewIcon()}<Eye size={15} />{/snippet}
+        <SegmentedControl value={viewMode} onchange={(mode) => onViewModeChange?.(mode)} label={$t('editor.viewMode')} vertical options={[
+          { id: 'edit', label: $t('editor.modeEdit'), icon: editIcon },
+          { id: 'split', label: $t('editor.modeSplit'), icon: splitIcon },
+          { id: 'preview', label: $t('editor.modePreview'), icon: previewIcon },
+        ]} />
       </div>
     {/if}
 
@@ -382,7 +383,7 @@
 {/if}
 
 {#if dialog}
-  <div class="apple-sidebar-dialog-backdrop" role="presentation" onclick={(event) => { if (event.target === event.currentTarget && !dialogBusy) dialog = null; }} transition:fade={{ duration: prefersReducedMotion.current ? 0 : 150 }}>
+  <div class="apple-sidebar-dialog-backdrop" data-modal-backdrop="apple-library" role="presentation" onclick={(event) => { if (event.target === event.currentTarget && !dialogBusy) dialog = null; }} transition:fade={{ duration: prefersReducedMotion.current ? 0 : 150 }}>
     <div bind:this={dialogElement} class="apple-sidebar-dialog" role="dialog" aria-modal="true" aria-labelledby="apple-sidebar-dialog-title" aria-busy={dialogBusy} tabindex="-1">
     <form onsubmit={submitDialog}>
       <div class="apple-sidebar-dialog-heading"><span class="apple-dialog-symbol" class:apple-danger={dialog.kind === 'delete'}>{#if dialog.kind === 'delete'}<Trash2 size={23} />{:else if dialog.kind === 'folder'}<FolderPlus size={23} />{:else}<Pencil size={23} />{/if}</span><button type="button" class="apple-icon-button" disabled={dialogBusy} onclick={() => dialog = null} aria-label={$t('ai.close')}><X size={18} /></button></div>
@@ -398,7 +399,7 @@
 
 <style>
   .apple-sidebar-frame {
-    position: relative; flex: 0 0 auto; height: 100%; overflow: hidden;
+    position: relative; flex: 0 0 auto; height: var(--sidebar-frame-height, 100%); overflow: hidden;
     --sidebar-material: color-mix(in srgb, var(--bg-sidebar) 91%, transparent);
     --sidebar-selection: color-mix(in srgb, var(--accent) 12%, var(--bg-sidebar));
     --sidebar-wash: color-mix(in srgb, var(--bg-card) 65%, transparent);
@@ -441,8 +442,8 @@
   .apple-sidebar-search:hover { background: var(--bg-hover); }
   .apple-sidebar-search > span { flex: 1; text-align: left; font-size: .75rem; }
   kbd { font: inherit; font-size: .5625rem; color: var(--text-muted); opacity: .75; white-space: nowrap; }
-  .apple-compose { display: flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.375rem; padding: .5rem .875rem; border-radius: .625rem; background: var(--apple-action); color: #fff; font-size: .8125rem; font-weight: 550; }
-  .apple-compose:hover { background: #0071e3; }
+  .apple-compose { display: flex; align-items: center; justify-content: center; gap: .5rem; min-height: 2.375rem; padding: .5rem .875rem; border-radius: .625rem; background: var(--control-primary); color: var(--control-primary-text); font-size: .8125rem; font-weight: 550; }
+  .apple-compose:hover { background: var(--control-hover); }
   .apple-compose > span { flex: 1; text-align: left; }
   .apple-navigation-area { padding: 1rem .875rem .75rem; flex: 0 0 auto; }
   .apple-sidebar-navigation { position: relative; display: flex; flex-direction: column; gap: .25rem; }
@@ -477,11 +478,6 @@
   .apple-library-empty p { font-size: .75rem; }
   .apple-sidebar-view { padding: .625rem 1rem .875rem; flex: 0 0 auto; }
   .apple-sidebar-view > span { display: block; padding-bottom: .5rem; font-size: .5625rem; }
-  .apple-view-control { display: flex; position: relative; padding: .1875rem; border-radius: .625rem; background: color-mix(in srgb, var(--text-main) 6%, transparent); }
-  .apple-view-control > button { position: relative; display: flex; flex-direction: column; gap: .25rem; align-items: center; justify-content: center; width: 33.3333%; min-height: 2.625rem; padding: .375rem .0625rem; color: var(--text-muted); border-radius: .4375rem; }
-  .apple-view-control > button.active { color: var(--text-main); }
-  .apple-view-control > button > span { font-size: .625rem; letter-spacing: .01em; }
-  .apple-view-selection { position: absolute; top: .1875rem; bottom: .1875rem; left: .1875rem; width: calc((100% - .375rem) / 3); border-radius: .4375rem; background: var(--bg-card); box-shadow: 0 1px 3px #0001; pointer-events: none; }
   .apple-presence { display: flex; flex-wrap: wrap; gap: .375rem .75rem; padding: .25rem 1.25rem .75rem; font-size: .625rem; color: var(--text-muted); }
   .apple-presence span { display: flex; align-items: center; gap: .3125rem; }
   .apple-presence i { width: .375rem; height: .375rem; border-radius: 50%; }
@@ -521,13 +517,13 @@
   .apple-sidebar-dialog input { width: 100%; padding: .625rem .75rem; border: 1px solid var(--apple-hairline); border-radius: .625rem; background: var(--bg-main); color: var(--text-main); }
   .apple-sidebar-dialog-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1.5rem; }
   .apple-dialog-cancel { border-radius: .625rem; padding: .5rem .875rem; color: var(--text-main); background: var(--bg-hover); }
-  .apple-compose.destructive { background: var(--danger); }
+  .apple-compose.destructive { background: var(--control-danger); color: #fff; }
   @keyframes apple-sync-rotation { to { transform: rotate(360deg); } }
   @media (hover: none) { .apple-note-more { opacity: .7; } }
   @media (pointer: coarse) { .apple-icon-button { min-height: 2.5rem; min-width: 2.5rem; } .apple-note-row, .apple-note-button { min-height: 2.75rem; } .apple-sidebar-navigation > button { height: 2.5rem; } }
-  @media (max-height: 660px) { .apple-sidebar-header { padding-block: .75rem; } .apple-vault-switcher { margin-bottom: .625rem; } .apple-navigation-area { padding-block: .625rem .375rem; } .apple-sidebar-view { padding-block: .375rem; } .apple-sidebar-view > .apple-section-label { display: none; } .apple-view-control > button { min-height: 2rem; } .apple-view-control > button > span { display: none; } }
+  @media (max-height: 660px) { .apple-sidebar-header { padding-block: .75rem; } .apple-vault-switcher { margin-bottom: .625rem; } .apple-navigation-area { padding-block: .625rem .375rem; } .apple-sidebar-view { padding-block: .375rem; } .apple-sidebar-view > .apple-section-label { display: none; }  }
   @media (max-height: 620px) { .apple-sidebar-panel { overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; } .apple-library { flex: 0 0 auto; overflow: visible; } .apple-note-tree { overflow: visible; mask-image: none; } .apple-sidebar-rail { overflow-y: auto; } .apple-rail-footer { padding-top: 1rem; } }
   @media (prefers-reduced-motion: reduce) { button, .apple-note-button > :global(.apple-folder-chevron) { transition: none; } button:not(:disabled):active { transform: none; } .apple-sync-status :global(.apple-sync-spinning) { animation: none; } }
   @media (prefers-reduced-transparency: reduce) { .apple-sidebar-panel { background: var(--bg-sidebar); backdrop-filter: none; -webkit-backdrop-filter: none; } .apple-sidebar-panel::before { display: none; } .apple-sidebar-dialog-backdrop { backdrop-filter: none; } }
-  @media (prefers-contrast: more) { .apple-sidebar-frame, .apple-vault-button, .apple-sidebar-search, .apple-view-control, .apple-sidebar-dialog { border: 1px solid var(--text-muted); } .apple-nav-selection, .apple-note-row.selected { outline: 1px solid var(--accent); } .apple-note-more { opacity: 1; } }
+  @media (prefers-contrast: more) { .apple-sidebar-frame, .apple-vault-button, .apple-sidebar-search, .apple-sidebar-dialog { border: 1px solid var(--text-muted); } .apple-nav-selection, .apple-note-row.selected { outline: 1px solid var(--accent); } .apple-note-more { opacity: 1; } }
 </style>

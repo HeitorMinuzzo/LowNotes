@@ -1,5 +1,6 @@
 <script lang="ts">
   import '../app.css';
+  import '../lib/apple-system.css';
   import { onMount } from 'svelte';
   import { isTauri } from '@tauri-apps/api/core';
   import { getCurrentWebview } from '@tauri-apps/api/webview';

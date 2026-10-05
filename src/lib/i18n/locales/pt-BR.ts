@@ -65,6 +65,7 @@ const ptBR: Dictionary = {
     syncError: 'A última sincronização falhou',
   },
   editor: {
+    formatting: 'Formatação do texto',
     imageUploading: 'Enviando ao {provider}: {name} ({uploaded}/{count})…',
     imageSavingLocal: "Comprimindo e salvando: {name} ({uploaded}/{count})…",
     imageRetry: 'Tentar novamente',
@@ -208,6 +209,7 @@ const ptBR: Dictionary = {
     rememberMessage: 'Adicionar à memória',
   },
   export: {
+    menu: 'Exportar',
     word: 'Exportar para Word (.docx)',
     pdf: 'Exportar para PDF',
     exporting: 'Exportando...',
@@ -318,6 +320,9 @@ const ptBR: Dictionary = {
     active: '{count} dispositivos editando',
   },
   settings: {
+    appleThemesHint: 'Dois estilos Apple, o mesmo espaço para suas ideias.',
+    appleThemeDescription: 'Superfícies limpas, controles precisos e uma experiência tranquila e familiar.',
+    glassThemeDescription: 'Vidro luminoso, reflexos suaves e tons serenos de azul e verde.',
     pastedImages: 'Imagens coladas',
     pastedImagesHint: "Cole uma imagem em qualquer parte do editor para salvar e inserir a referência em Markdown.",
     imageUploadProvider: "Serviço de imagens",

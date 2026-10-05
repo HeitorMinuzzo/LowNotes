@@ -7,7 +7,6 @@
   } from 'lucide-svelte';
   import { t } from '$lib/i18n';
   import type { VaultItem, ViewMode } from '$lib/types';
-  import BorderBeam from './ui/BorderBeam.svelte';
 
   interface Props {
     isOpen: boolean;
@@ -88,7 +87,7 @@
       category: 'actions',
       icon: FilePlus,
       shortcut: 'Ctrl+N',
-      accent: '#10b981',
+      accent: 'var(--accent)',
       run: () => {
         onCreateNote();
         onClose();
@@ -100,7 +99,7 @@
       subtitle: 'Organizar documentos em pastas',
       category: 'actions',
       icon: FolderPlus,
-      accent: '#f59e0b',
+      accent: 'var(--accent)',
       run: () => {
         onCreateFolder();
         onClose();
@@ -113,7 +112,7 @@
       category: 'actions',
       icon: Sparkles,
       shortcut: 'Ctrl+J',
-      accent: '#a855f7',
+      accent: 'var(--accent)',
       run: () => {
         onToggleAi();
         onClose();
@@ -126,7 +125,7 @@
       category: 'actions',
       icon: Network,
       shortcut: 'Ctrl+G',
-      accent: '#3b82f6',
+      accent: 'var(--accent)',
       run: () => {
         onToggleGraph();
         onClose();
@@ -138,7 +137,7 @@
       subtitle: 'Sincronização P2P direta com Iroh',
       category: 'actions',
       icon: Share2,
-      accent: '#ec4899',
+      accent: 'var(--accent)',
       run: () => {
         onOpenPair();
         onClose();
@@ -151,7 +150,7 @@
       category: 'actions',
       icon: RefreshCw,
       shortcut: 'Ctrl+S',
-      accent: '#06b6d4',
+      accent: 'var(--accent)',
       run: () => {
         onSync();
         onClose();
@@ -205,11 +204,11 @@
     },
     {
       id: 'settings-themes',
-      title: `${$t('settings.themes')} - Paleta de Cores`,
-      subtitle: 'Apple macOS, Megumin, Rimuru ou crie a sua',
+      title: $t('settings.themes'),
+      subtitle: $t('settings.appleThemesHint'),
       category: 'system',
       icon: Palette,
-      accent: '#f43f5e',
+      accent: 'var(--accent)',
       run: () => {
         onOpenSettings('themes');
         onClose();
@@ -302,7 +301,7 @@
       aria-modal="true"
       aria-label="Paleta de Comandos"
     >
-      <BorderBeam size={180} duration={8} colorFrom="var(--accent)" colorTo="var(--accent-light)" borderWidth={1.5} />
+
 
       <!-- Top Search Input -->
       <div class="apple-command-header flex items-center gap-3 px-4 py-3.5 border-b border-white/[0.06] bg-black/20">
@@ -342,16 +341,16 @@
             <button
               type="button"
               class="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl text-left transition-all group {isSelected
-                ? 'bg-gradient-to-r from-[var(--accent)]/20 via-white/[0.06] to-transparent text-white border-l-2 border-[var(--accent)] shadow-sm'
-                : 'text-neutral-300 hover:bg-white/[0.04] hover:text-white'}"
+                ? 'text-[var(--text-main)]'
+                : 'text-[var(--text-muted)]'}"
               data-command-active={isSelected ? 'true' : 'false'}
               onmouseenter={() => selectedIndex = index}
               onclick={cmd.run}
             >
               <div class="flex items-center gap-3 min-w-0">
                 <div
-                  class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border border-white/[0.08] transition-transform group-hover:scale-105"
-                  style="background: {isSelected ? 'var(--accent)' : 'rgba(255, 255, 255, 0.05)'}; color: {isSelected ? 'var(--accent-contrast)' : (cmd.accent || 'currentColor')};"
+                  class="apple-command-icon w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                  style="background: {isSelected ? 'var(--accent)' : 'var(--material-field)'}; color: {isSelected ? 'var(--accent-contrast)' : (cmd.accent || 'currentColor')};"
                 >
                   <Icon size={16} />
                 </div>
@@ -374,7 +373,7 @@
                   </span>
                 {/if}
                 {#if isSelected}
-                  <CornerDownLeft size={13} class="text-[var(--accent)] animate-pulse" />
+                  <CornerDownLeft size={13} class="text-[var(--accent)]" />
                 {/if}
               </div>
             </button>

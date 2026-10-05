@@ -43,6 +43,8 @@
   let linkSource = $state<string | null>(null);
   let viewport = $state({ x: 0, y: 0, scale: 1 });
   let svg = $state<SVGSVGElement | null>(null);
+  let canvasSpan = $state(700);
+  const unitsPerPixel = $derived(100 / Math.max(1, canvasSpan));
   let gesture = $state<Gesture | null>(null);
   const storageKey = $derived(`lownotes:graph-positions:${vaultId}`);
 
@@ -64,6 +66,24 @@
     ? notes.filter((note: VaultItem) => `${note.title} ${note.name} ${note.path}`.toLocaleLowerCase().includes(searchQuery.trim().toLocaleLowerCase())).slice(0, 8)
     : []);
   const matches = $derived(new Set(searchResults.map((note: VaultItem) => note.path)));
+
+  $effect(() => {
+    const canvas = svg;
+    if (!canvas) return;
+    const measure = () => {
+      const span = Math.min(canvas.clientWidth, canvas.clientHeight);
+      if (span > 0) canvasSpan = span;
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  });
+
+  function labelFor(title: string) {
+    const limit = Math.max(12, Math.min(28, Math.floor(canvasSpan / 18)));
+    return title.length > limit ? `${title.slice(0, limit - 1)}…` : title;
+  }
 
   onMount(() => {
     try {
@@ -338,7 +358,7 @@
   <div class="flex-1 flex min-h-0 overflow-hidden relative">
     <div class="graph-area relative flex-1 min-w-0 overflow-hidden">
       <!-- Search Input in Graph -->
-      <div class="absolute top-4 left-4 z-10 w-64 max-w-[calc(100%-2rem)]">
+      <div class="absolute top-4 left-4 z-10 w-64 max-w-[calc(100%_-_2rem)]">
         <div class="relative">
           <Search size={13} class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)] pointer-events-none" />
           <input
@@ -373,6 +393,7 @@
       {:else}
         <svg
           bind:this={svg}
+          style:--graph-label-size="{12 * unitsPerPixel}px"
           viewBox="0 0 100 100"
           preserveAspectRatio="xMidYMid meet"
           class="w-full h-full touch-none select-none cursor-grab"
@@ -402,16 +423,16 @@
                 class:node-dimmed={searchQuery.trim().length > 0 && !matches.has(node.path)}
               >
                 <title>{node.path}</title>
-                <circle cx={node.x} cy={node.y} r={node.r + 1.4} class="node-hit" />
-                <circle cx={node.x} cy={node.y} r={node.r} class="node-circle" />
-                <text x={node.x} y={node.y + node.r + 2.5} text-anchor="middle" class="node-label">{node.title}</text>
+                <circle cx={node.x} cy={node.y} r={Math.max(node.r + 1.4, 22 * unitsPerPixel)} class="node-hit" />
+                <circle cx={node.x} cy={node.y} r={Math.max(node.r, 5 * unitsPerPixel)} class="node-circle" />
+                <text x={node.x} y={node.y + Math.max(node.r, 5 * unitsPerPixel) + 14 * unitsPerPixel} text-anchor="middle" class="node-label">{labelFor(node.title)}</text>
               </g>
             {/each}
           </g>
         </svg>
       {/if}
 
-      <!-- Floating Zoom Controls Dock -->
+      <!-- Zoom controls -->
       <div class="absolute bottom-5 right-5 z-10 flex items-center gap-1 rounded-2xl border border-[var(--border)] bg-[var(--bg-card)]/90 backdrop-blur-xl p-1.5 shadow-2xl">
         <button class="p-1.5 rounded-xl hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer" onclick={() => zoomAt(1.25, { x: 50, y: 50 })} title={$t('graph.zoomIn')} aria-label={$t('graph.zoomIn')}>
           <Plus size={14} />
@@ -431,6 +452,7 @@
     <!-- Selected Node Details Drawer -->
     {#if selected}
       <aside class="w-72 shrink-0 border-l border-[var(--border)] bg-[var(--bg-sidebar)]/95 backdrop-blur-xl flex flex-col overflow-y-auto p-5 gap-4 shadow-2xl">
+        <button class="self-end p-1.5 rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-hover)]" onclick={() => (selectedPath = '')} title={$t('ai.close')} aria-label={$t('ai.close')}><X size={16} /></button>
         <div>
           <span class="text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Nota Selecionada</span>
           <h3 class="text-sm font-bold text-[var(--text-main)] break-words mt-1 leading-tight">{selected.title || selected.name}</h3>
@@ -473,13 +495,13 @@
 </section>
 
 <style>
-  .graph-area { background-color: var(--bg-main); background-image: radial-gradient(var(--border) 0.6px, transparent 0.6px); background-size: 20px 20px; }
+  .graph-area { background: var(--reading-surface); }
   .edge-line { stroke: var(--text-dim); stroke-opacity: 0.58; stroke-width: 0.16; }
   .node-hit { fill: transparent; }
   .node-circle { fill: var(--accent); stroke: var(--accent-light); stroke-width: 0.12; transition: fill 120ms ease; }
   .graph-node:hover .node-circle, .node-selected .node-circle { fill: var(--accent-light); stroke-width: 0.3; }
   .node-link-source .node-circle { fill: var(--success); stroke: var(--success); }
-  .node-label { fill: var(--text-main); font-size: 1.45px; font-weight: 500; paint-order: stroke; stroke: var(--bg-main); stroke-width: 0.3px; pointer-events: none; }
+  .node-label { fill: var(--text-main); font-size: var(--graph-label-size, 1.45px); font-weight: 500; paint-order: stroke; stroke: var(--bg-main); stroke-width: 0.3px; pointer-events: none; }
   .node-dimmed { opacity: 0.2; }
   /* An outline on the SVG group scales with the viewBox and covers nearby nodes. */
   .graph-node:focus, .graph-node:focus-visible { outline: none; }

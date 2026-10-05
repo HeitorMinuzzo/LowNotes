@@ -242,10 +242,9 @@ impl WebSearchSettings {
     }
 }
 
-/// Palettes shipped with the app. They live in code (and in the frontend
-/// `themes.ts` mirror) so new defaults can be added in any version without
-/// touching user data; only `custom_palettes` below is persisted.
-pub const BUILTIN_PALETTE_IDS: [&str; 4] = ["lowbloat", "megumin", "rimuru", "apple"];
+/// The two selectable Apple designs, mirrored by the frontend `themes.ts`.
+/// Legacy custom color data remains stored for compatibility.
+pub const BUILTIN_PALETTE_IDS: [&str; 2] = ["apple", "apple-glass"];
 
 /// One color per UI token, stored as `#rrggbb`. Derived tokens
 /// (glow/selection/highlight) are computed by the frontend.
@@ -322,8 +321,7 @@ impl ThemePalettesSettings {
         });
         let mut seen = std::collections::HashSet::new();
         self.custom_palettes.retain(|palette| seen.insert(palette.id.clone()));
-        let known = self.custom_palettes.iter().any(|palette| palette.id == self.active_palette_id)
-            || BUILTIN_PALETTE_IDS.contains(&self.active_palette_id.as_str());
+        let known = BUILTIN_PALETTE_IDS.contains(&self.active_palette_id.as_str());
         if !known {
             self.active_palette_id = default_palette_id();
         }
@@ -337,7 +335,7 @@ fn is_hex_color(value: &str) -> bool {
 }
 
 fn default_palette_id() -> String {
-    "lowbloat".to_string()
+    "apple".to_string()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -627,14 +625,14 @@ mod tests {
     }
 
     #[test]
-    fn theme_palettes_default_to_lowbloat() {
+    fn theme_palettes_default_to_apple() {
         let settings = ThemePalettesSettings::default();
-        assert_eq!(settings.active_palette_id, "lowbloat");
+        assert_eq!(settings.active_palette_id, "apple");
         assert!(settings.custom_palettes.is_empty());
     }
 
     #[test]
-    fn normalize_keeps_valid_custom_palette_and_active_choice() {
+    fn normalize_preserves_legacy_color_data_but_selects_apple() {
         let mut settings = ThemePalettesSettings {
             active_palette_id: "custom_x".into(),
             custom_palettes: vec![ThemePalette {
@@ -643,7 +641,7 @@ mod tests {
             }],
         };
         settings.normalize();
-        assert_eq!(settings.active_palette_id, "custom_x");
+        assert_eq!(settings.active_palette_id, "apple");
         assert_eq!(settings.custom_palettes.len(), 1);
     }
 
@@ -652,7 +650,7 @@ mod tests {
         let mut settings = ThemePalettesSettings {
             active_palette_id: "megumin".into(),
             custom_palettes: vec![
-                ThemePalette { id: "rimuru".into(), name: "Clash".into(), dark: colors("#101010"), light: colors("#f0f0f0") },
+                ThemePalette { id: "apple".into(), name: "Clash".into(), dark: colors("#101010"), light: colors("#f0f0f0") },
                 ThemePalette { id: "custom_bad".into(), name: "Bad".into(), dark: colors("nope"), light: colors("#f0f0f0") },
                 ThemePalette { id: "".into(), name: "Empty".into(), dark: colors("#101010"), light: colors("#f0f0f0") },
             ],
@@ -662,32 +660,46 @@ mod tests {
     }
 
     #[test]
-    fn normalize_falls_back_to_lowbloat_for_unknown_active() {
+    fn normalize_falls_back_to_apple_for_unknown_active() {
         let mut settings = ThemePalettesSettings {
             active_palette_id: "custom_gone".into(),
             custom_palettes: vec![],
         };
         settings.normalize();
-        assert_eq!(settings.active_palette_id, "lowbloat");
+        assert_eq!(settings.active_palette_id, "apple");
     }
 
     #[test]
-    fn existing_settings_without_theme_palettes_default_to_lowbloat() {
+    fn existing_settings_without_theme_palettes_default_to_apple() {
         let mut saved = serde_json::to_value(AppSettings::default()).unwrap();
         saved.as_object_mut().unwrap().remove("theme_palettes");
         let restored = AppSettings::from_saved_value(saved).unwrap();
-        assert_eq!(restored.theme_palettes.active_palette_id, "lowbloat");
+        assert_eq!(restored.theme_palettes.active_palette_id, "apple");
         assert!(restored.theme_palettes.custom_palettes.is_empty());
     }
 
     #[test]
-    fn saved_legacy_palette_and_mode_remain_selected() {
+    fn saved_legacy_palette_migrates_to_apple_and_keeps_mode() {
         let mut saved = serde_json::to_value(AppSettings::default()).unwrap();
         saved["theme"] = "dark".into();
         saved["theme_palettes"]["active_palette_id"] = "megumin".into();
         let restored = AppSettings::from_saved_value(saved).unwrap();
         assert_eq!(restored.theme, "dark");
-        assert_eq!(restored.theme_palettes.active_palette_id, "megumin");
+        assert_eq!(restored.theme_palettes.active_palette_id, "apple");
+    }
+
+    #[test]
+    fn saved_apple_designs_survive_reload_in_both_appearances() {
+        for design in super::BUILTIN_PALETTE_IDS {
+            for mode in ["light", "dark"] {
+                let mut saved = serde_json::to_value(AppSettings::default()).unwrap();
+                saved["theme"] = mode.into();
+                saved["theme_palettes"]["active_palette_id"] = design.into();
+                let restored = AppSettings::from_saved_value(saved).unwrap();
+                assert_eq!(restored.theme_palettes.active_palette_id, design);
+                assert_eq!(restored.theme, mode);
+            }
+        }
     }
 
     #[test]

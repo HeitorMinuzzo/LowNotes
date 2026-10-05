@@ -7,6 +7,7 @@
     Columns,
     Edit3,
     Eye,
+    FileText,
     Heading1,
     Heading2,
     Italic,
@@ -20,7 +21,8 @@
     Sparkles,
     Strikethrough,
   } from 'lucide-svelte';
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
+  import { Spring, prefersReducedMotion } from 'svelte/motion';
   import { EditorView, basicSetup } from 'codemirror';
   import { markdown } from '@codemirror/lang-markdown';
   import { Compartment, EditorState } from '@codemirror/state';
@@ -52,7 +54,6 @@
     targetLine,
     theme,
     viewMode,
-    isAppleTheme = false,
     lineWrapping = true,
     imageUploadProvider = 'local',
     vaultId = '',
@@ -73,7 +74,6 @@
     targetLine?: number;
     theme: AppTheme;
     viewMode: ViewMode;
-    isAppleTheme?: boolean;
     lineWrapping?: boolean;
     imageUploadProvider?: ImageUploadProvider;
     vaultId?: string;
@@ -89,6 +89,24 @@
     deviceId?: string;
   }>();
 
+  const pane = new Spring(.5, { stiffness: .2, damping: .95, precision: .001 });
+  const paneRatio = $derived(Math.max(0, Math.min(1, pane.current)));
+  let paneContainer = $state<HTMLElement | null>(null);
+  let paneWidth = $state(0);
+  let sourceLayoutRatio = $state(.5);
+  let previewLayoutRatio = $state(.5);
+  let paneObserver: ResizeObserver | null = null;
+  let paneInitialized = false;
+  $effect(() => {
+    const ratio = viewMode === 'edit' ? 1 : viewMode === 'preview' ? 0 : .5;
+    // Lay text out once at its destination width; only the surrounding reveal animates.
+    // This prevents CodeMirror and paragraphs from rewrapping on every spring frame.
+    if (viewMode !== 'preview') sourceLayoutRatio = ratio;
+    if (viewMode !== 'edit') previewLayoutRatio = 1 - ratio;
+    void pane.set(ratio, { instant: !paneInitialized || prefersReducedMotion.current });
+    paneInitialized = true;
+    void tick().then(() => editorView?.requestMeasure());
+  });
   let editorContainer: HTMLDivElement | null = $state(null);
   let previewContainer: HTMLDivElement | null = $state(null);
   let saveStatus = $state<'saved' | 'error'>('saved');
@@ -120,28 +138,15 @@
 
   function codeMirrorTheme() {
     const isDark = theme === 'dark';
-    const linkColor = isAppleTheme ? (isDark ? '#2997ff' : '#0066cc') : isDark ? '#7dd3fc' : '#0284c7';
-    const linkHover = isAppleTheme ? (isDark ? '#70baff' : '#0071e3') : isDark ? '#bae6fd' : '#0369a1';
-
-    const highlight = syntaxHighlighting(
-      HighlightStyle.define(isAppleTheme ? [
-        { tag: [tags.link, tags.url], color: linkColor, textDecoration: 'underline' },
-        { tag: [tags.atom, tags.bool, tags.labelName, tags.keyword], color: linkColor },
-        { tag: [tags.definition(tags.variableName), tags.local(tags.variableName), tags.definition(tags.propertyName)], color: 'var(--text-main)' },
-        { tag: tags.comment, color: 'var(--text-dim)', fontStyle: 'italic' },
-        { tag: tags.string, color: 'var(--text-main)' },
-      ] : [
-        { tag: tags.link, color: linkColor, textDecoration: 'underline' },
-        { tag: tags.url, color: linkColor, textDecoration: 'underline' },
-        { tag: [tags.atom, tags.bool, tags.labelName], color: isDark ? '#f7c65d' : '#d97706' },
-        { tag: tags.keyword, color: isDark ? '#f472b6' : '#be185d' },
-        { tag: [tags.definition(tags.variableName), tags.local(tags.variableName)], color: isDark ? '#93c5fd' : '#1d4ed8' },
-        { tag: tags.definition(tags.propertyName), color: isDark ? '#7dd3fc' : '#0284c7' },
-        { tag: tags.comment, color: isDark ? '#ae9293' : '#6b586b', fontStyle: 'italic' },
-        { tag: tags.string, color: isDark ? '#b9c978' : '#4d7c0f' },
-      ])
-    );
-
+    const linkColor = 'var(--editor-link)';
+    const linkHover = 'var(--editor-link-hover)';
+    const highlight = syntaxHighlighting(HighlightStyle.define([
+      { tag: [tags.link, tags.url], color: linkColor, textDecoration: 'underline' },
+      { tag: [tags.atom, tags.bool, tags.labelName, tags.keyword], color: 'var(--accent)' },
+      { tag: [tags.definition(tags.variableName), tags.local(tags.variableName), tags.definition(tags.propertyName)], color: 'var(--text-main)' },
+      { tag: tags.comment, color: 'var(--text-dim)', fontStyle: 'italic' },
+      { tag: tags.string, color: 'var(--text-main)' },
+    ]));
     const baseTheme = EditorView.theme({
       '&': { height: '100%', outline: 'none' },
       '.cm-scroller': { overflow: 'auto' },
@@ -160,38 +165,25 @@
     return [baseTheme, highlight];
   }
 
-  async function renderMermaidBlocks(activeTheme: AppTheme, appleTheme: boolean) {
+  async function renderMermaidBlocks(activeTheme: AppTheme) {
     if (!previewContainer) return;
     const blocks = previewContainer.querySelectorAll<HTMLDivElement>('.mermaid-block');
     if (blocks.length === 0) return;
 
+    const colors = getComputedStyle(document.documentElement);
     const config = {
       startOnLoad: false,
       theme: activeTheme === 'dark' ? 'dark' as const : 'default' as const,
-      ...(appleTheme ? {
-        themeVariables: {
-          darkMode: activeTheme === 'dark',
-          background: activeTheme === 'dark' ? '#272729' : '#f5f5f7',
-          primaryColor: activeTheme === 'dark' ? '#2997ff' : '#0066cc',
-          primaryTextColor: activeTheme === 'dark' ? '#f5f5f7' : '#1d1d1f',
-          primaryBorderColor: activeTheme === 'dark' ? '#38383a' : '#e0e0e0',
-          lineColor: activeTheme === 'dark' ? '#a1a1a6' : '#7a7a7a',
-          secondaryColor: activeTheme === 'dark' ? '#2a2a2c' : '#fafafc',
-          tertiaryColor: activeTheme === 'dark' ? '#252527' : '#ffffff',
-        },
-      } : activeTheme === 'dark' ? {
-        themeVariables: {
-          darkMode: true,
-          background: '#151b26',
-          primaryColor: '#d97706',
-          primaryTextColor: '#f1f5f9',
-          primaryBorderColor: '#232d3d',
-          lineColor: '#8e9bb0',
-          secondaryColor: '#1c2433',
-          tertiaryColor: '#0f141c',
-        },
-      } : {}),
-      fontFamily: 'inherit',
+      themeVariables: {
+        darkMode: activeTheme === 'dark',
+        background: colors.getPropertyValue('--bg-card').trim(),
+        primaryColor: colors.getPropertyValue('--bg-active').trim(),
+        primaryTextColor: colors.getPropertyValue('--text-main').trim(),
+        primaryBorderColor: colors.getPropertyValue('--border').trim(),
+        lineColor: colors.getPropertyValue('--text-muted').trim(),
+        secondaryColor: colors.getPropertyValue('--bg-sidebar').trim(),
+        tertiaryColor: colors.getPropertyValue('--bg-main').trim(),
+      },      fontFamily: 'inherit',
       securityLevel: 'strict' as const,
     };
 
@@ -207,7 +199,7 @@
         const svg = await renderMermaidSvg(id, code, config);
         svgTarget.innerHTML = svg;
       } catch {
-        svgTarget.innerHTML = `<pre class="text-xs text-amber-400/90 font-mono text-left w-full p-2 bg-[var(--bg-main)] rounded border border-amber-900/40 overflow-x-auto whitespace-pre-wrap">${code}</pre>`;
+        svgTarget.innerHTML = `<pre class="text-xs text-[var(--text-muted)] font-mono text-left w-full p-2 bg-[var(--bg-main)] rounded border border-[var(--border)] overflow-x-auto whitespace-pre-wrap">${code}</pre>`;
       }
     }
   }
@@ -417,6 +409,11 @@
   }
 
   onMount(async () => {
+    if (paneContainer) {
+      paneWidth = paneContainer.clientWidth;
+      paneObserver = new ResizeObserver(([entry]) => { paneWidth = entry.contentRect.width; });
+      paneObserver.observe(paneContainer);
+    }
     const stopCrdt = await listen<{ note_path: string; update: number[] }>(
       'p2p:crdt-update',
       (event) => {
@@ -464,6 +461,7 @@
   });
 
   onDestroy(() => {
+    paneObserver?.disconnect();
     imagePaste?.destroy();
     disposed = true;
     if (editorView) editorView.destroy();
@@ -496,10 +494,9 @@
     if ((viewMode === 'split' || viewMode === 'preview') && previewContainer && currentContent) {
       imageRevision;
       const activeTheme = theme;
-      const activePalette = isAppleTheme;
       if (mermaidDebounce) clearTimeout(mermaidDebounce);
       mermaidDebounce = setTimeout(() => {
-        renderMermaidBlocks(activeTheme, activePalette);
+        renderMermaidBlocks(activeTheme);
       }, 60);
     }
   });
@@ -507,175 +504,24 @@
 
 <div class="apple-editor flex flex-col h-full w-full bg-[var(--bg-main)]">
   <!-- Top Editor Toolbar (Glassmorphic Bar) -->
-  <header class="apple-editor-toolbar h-11 flex items-center justify-between gap-2 px-3 border-b border-[var(--border)] bg-[var(--bg-sidebar)]/80 backdrop-blur-xl select-none shrink-0">
-    <!-- Left Formatting Actions -->
-    <div class="flex items-center gap-1.5 overflow-x-auto py-0.5">
-      <div class="h-7 flex items-center gap-0.5 p-0.5 rounded-md bg-[var(--bg-card)]/70 border border-[var(--border)] shadow-sm">
-        <button
-          onclick={() => applyFormatting('**', '**')}
-          class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
-          title={$t('editor.bold')}
-          aria-label={$t('editor.bold')}
-        >
-          <Bold size={13} />
-        </button>
-        <button
-          onclick={() => applyFormatting('*', '*')}
-          class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
-          title={$t('editor.italic')}
-          aria-label={$t('editor.italic')}
-        >
-          <Italic size={13} />
-        </button>
-        <button
-          onclick={() => applyFormatting('~~', '~~')}
-          class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
-          title={$t('editor.strikethrough')}
-          aria-label={$t('editor.strikethrough')}
-        >
-          <Strikethrough size={13} />
-        </button>
-      </div>
-
-      <div class="h-7 flex items-center gap-0.5 p-0.5 rounded-md bg-[var(--bg-card)]/70 border border-[var(--border)] shadow-sm">
-        <button
-          onclick={() => applyFormatting('# ')}
-          class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
-          title={$t('editor.heading1')}
-          aria-label={$t('editor.heading1')}
-        >
-          <Heading1 size={13} />
-        </button>
-        <button
-          onclick={() => applyFormatting('## ')}
-          class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
-          title={$t('editor.heading2')}
-          aria-label={$t('editor.heading2')}
-        >
-          <Heading2 size={13} />
-        </button>
-      </div>
-
-      <div class="h-7 flex items-center gap-0.5 p-0.5 rounded-md bg-[var(--bg-card)]/70 border border-[var(--border)] shadow-sm">
-        <button
-          onclick={() => applyFormatting('- ')}
-          class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
-          title={$t('editor.list')}
-          aria-label={$t('editor.list')}
-        >
-          <List size={13} />
-        </button>
-        <button
-          onclick={() => applyFormatting('- [ ] ')}
-          class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
-          title={$t('editor.checklist')}
-          aria-label={$t('editor.checklist')}
-        >
-          <ListTodo size={13} />
-        </button>
-        <button
-          onclick={() => applyFormatting('`', '`')}
-          class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
-          title={$t('editor.code')}
-          aria-label={$t('editor.code')}
-        >
-          <Code size={13} />
-        </button>
-        <button
-          onclick={() => applyFormatting('> ')}
-          class="w-6 h-6 flex items-center justify-center rounded hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition cursor-pointer"
-          title={$t('editor.quote')}
-          aria-label={$t('editor.quote')}
-        >
-          <Quote size={13} />
-        </button>
-      </div>
-
-      {#if !isAppleTheme}
-      <button
-        onclick={() => onOpenGraph?.()}
-        class="h-7 flex items-center gap-1.5 px-2.5 rounded-md border border-[var(--border)] bg-[var(--bg-card)]/70 hover:bg-[var(--bg-hover)] text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-main)] transition shadow-sm cursor-pointer"
-        title={$t('graph.toolbarTitle')}
-        aria-label={$t('graph.toolbarTitle')}
-      >
-        <Network size={13} class="text-[var(--accent)]" />
-        <span>{$t('graph.button')}</span>
-      </button>
-      {/if}
-    </div>
-
-    <!-- Right Controls: Save Status, View Mode, Export, AI Chat -->
-    <div class="flex shrink-0 items-center gap-1.5 ml-auto">
-      <!-- Presence Avatars -->
-      {#if remoteUsers.length > 0}
-        <div
-          class="flex items-center -space-x-1.5 mr-1"
-          title={remoteUsers.map((u) => u.name).join(', ')}
-        >
-          {#each remoteUsers as user (user.deviceId)}
-            <span
-              class="w-5 h-5 rounded-full border border-[var(--bg-sidebar)] flex items-center justify-center text-[9px] font-extrabold text-black select-none shadow-sm"
-              style="background: {user.color}; box-shadow: 0 0 6px {user.color}88"
-            >
-              {user.name.slice(0, 1).toUpperCase()}
-            </span>
-          {/each}
-        </div>
-      {/if}
-
-      <!-- Save Status Pill -->
-      <div class="h-7 flex items-center gap-1.5 px-2 rounded-md bg-[var(--bg-card)]/70 border border-[var(--border)] text-xs font-medium text-[var(--text-muted)] shadow-sm">
-        {#if saveStatus === 'error'}
-          <AlertCircle size={12} class="text-[var(--danger)]" />
-          <span class="text-[var(--danger)]">{$t('editor.saveError')}</span>
-        {:else}
-          <span class="w-1.5 h-1.5 rounded-full bg-[var(--success)] shadow-[0_0_5px_var(--success)]"></span>
-          <span>{$t('editor.saved')}</span>
-        {/if}
-      </div>
-
-      <!-- Segmented View Mode Switcher -->
-      {#if !isAppleTheme}<div class="h-7 flex items-center p-0.5 rounded-md bg-[var(--bg-card)]/70 border border-[var(--border)] shadow-sm">
-        <button
-          onclick={() => onViewModeChange('edit')}
-          class="h-6 px-2 text-xs font-medium rounded transition-all duration-150 cursor-pointer {viewMode === 'edit' ? 'bg-[var(--bg-active)] text-[var(--text-main)] font-semibold shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
-          title={$t('editor.modeEdit')}
-        >
-          {$t('editor.modeEdit')}
-        </button>
-        <button
-          onclick={() => onViewModeChange('split')}
-          class="h-6 px-2 text-xs font-medium rounded transition-all duration-150 cursor-pointer {viewMode === 'split' ? 'bg-[var(--bg-active)] text-[var(--text-main)] font-semibold shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
-          title={$t('editor.modeSplit')}
-        >
-          {$t('editor.modeSplit')}
-        </button>
-        <button
-          onclick={() => onViewModeChange('preview')}
-          class="h-6 px-2 text-xs font-medium rounded transition-all duration-150 cursor-pointer {viewMode === 'preview' ? 'bg-[var(--bg-active)] text-[var(--text-main)] font-semibold shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
-          title={$t('editor.modePreview')}
-        >
-          {$t('editor.modePreview')}
-        </button>
-      </div>{/if}
-
-      <!-- Document Word / PDF Exports -->
+  <header class="apple-note-header">
+    <div class="apple-note-heading"><span class="apple-document-icon"><FileText size={20} strokeWidth={1.6} /></span><div><strong>{notePath.split('/').at(-1)?.replace(/\.md$/i, '')}</strong><span>{notePath.includes('/') ? notePath.slice(0, notePath.lastIndexOf('/')) : 'LowNotes'}</span></div></div>
+    <div class="apple-note-header-actions">
+      <span class="apple-save-state" role="status">{#if saveStatus === 'error'}<AlertCircle size={13} /><span>{$t('editor.saveError')}</span>{:else}<CheckCircle2 size={13} /><span>{$t('editor.saved')}</span>{/if}</span>
+      {#if remoteUsers.length > 0}<div class="apple-editor-presence">{#each remoteUsers as user (user.deviceId)}<span style:background={user.color} title={user.name}>{user.name.slice(0, 1).toUpperCase()}</span>{/each}</div>{/if}
       <DocumentActions content={currentContent} path={notePath} />
-
-      <!-- AI Assistant Toggle Button -->
-      {#if onToggleAiChat && !isAppleTheme}
-        <button
-          onclick={onToggleAiChat}
-          class="h-7 flex items-center gap-1.5 px-2.5 rounded-md border text-xs font-medium transition-all duration-150 shadow-sm cursor-pointer {isAiChatOpen ? 'border-[var(--accent)] bg-[var(--accent)]/15 text-[var(--accent)] font-semibold shadow-[0_0_10px_var(--accent-glow)]' : 'border-[var(--border)] bg-[var(--bg-card)]/70 hover:bg-[var(--bg-hover)] text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
-          title={$t('editor.openAiAssistant')}
-        >
-          <Sparkles size={13} class={isAiChatOpen ? 'text-[var(--accent)] animate-pulse' : 'text-[var(--accent)]'} />
-          <span>{$t('editor.assistant')}</span>
-        </button>
-      {/if}
     </div>
   </header>
-
+  <div class="apple-formatting-toolbar" role="toolbar" aria-label={$t('editor.formatting')}>
+    {#each [
+      [{ icon: Bold, label: $t('editor.bold'), prefix: '**', suffix: '**' }, { icon: Italic, label: $t('editor.italic'), prefix: '*', suffix: '*' }, { icon: Strikethrough, label: $t('editor.strikethrough'), prefix: '~~', suffix: '~~' }],
+      [{ icon: Heading1, label: $t('editor.heading1'), prefix: '# ', suffix: '' }, { icon: Heading2, label: $t('editor.heading2'), prefix: '## ', suffix: '' }],
+      [{ icon: List, label: $t('editor.list'), prefix: '- ', suffix: '' }, { icon: ListTodo, label: $t('editor.checklist'), prefix: '- [ ] ', suffix: '' }, { icon: Code, label: $t('editor.code'), prefix: '`', suffix: '`' }, { icon: Quote, label: $t('editor.quote'), prefix: '> ', suffix: '' }],
+    ] as group}
+      <div class="apple-formatting-group">{#each group as tool}<button type="button" disabled={viewMode === 'preview'} onclick={() => applyFormatting(tool.prefix, tool.suffix)} title={tool.label} aria-label={tool.label}><tool.icon size={16} strokeWidth={1.7} /></button>{/each}</div>
+    {/each}
+    <span class="apple-formatting-caption">Markdown</span>
+  </div>
   <!-- Editor & Preview Body -->
   {#if imageUploads.length}
     <div class="border-b border-[var(--border)] bg-[var(--bg-card)] px-4 py-2 text-xs space-y-2">
@@ -698,29 +544,17 @@
       {/each}
     </div>
   {/if}
-  <main class="flex-1 flex min-w-0 min-h-0 overflow-hidden relative">
-    <!-- CodeMirror Container -->
-    <div
-      bind:this={editorContainer}
-      class="min-w-0 h-full overflow-hidden transition-all duration-200 {viewMode === 'edit' ? 'w-full' : viewMode === 'split' ? 'w-1/2 border-r border-[var(--border)]' : 'hidden'}"
-    ></div>
-
-    <!-- Rendered Markdown Container -->
-    {#if viewMode === 'split' || viewMode === 'preview'}
+  <main bind:this={paneContainer} class="apple-editor-panes" style:grid-template-columns="{paneRatio}fr {1 - paneRatio}fr">
+    <div bind:this={editorContainer} class="apple-source-pane" inert={viewMode === 'preview'} aria-hidden={viewMode === 'preview'} style:--source-width={paneWidth ? `${paneWidth * sourceLayoutRatio}px` : '100%'} style:opacity={Math.min(1, paneRatio * 5)}></div>
+    <div class="apple-preview-pane" inert={viewMode === 'edit'} aria-hidden={viewMode === 'edit'} style:--preview-width={paneWidth ? `${paneWidth * previewLayoutRatio}px` : '100%'} style:opacity={Math.min(1, (1 - paneRatio) * 5)}>
       <!-- svelte-ignore a11y_click_events_have_key_events -->
-      <div
-        bind:this={previewContainer}
-        role="presentation"
-        onclick={handlePreviewClick}
-        class="apple-editor-preview min-w-0 h-full overflow-y-auto px-10 py-8 select-text {viewMode === 'preview' ? 'w-full max-w-4xl mx-auto' : 'w-1/2'}"
-      >
+      <div bind:this={previewContainer} role="presentation" onclick={handlePreviewClick} class="apple-editor-preview select-text">
         <article class="prose max-w-none text-[var(--text-main)]">
           {@html renderMarkdown(currentContent, (src) => localImageUrl(src, vaultId, imageRevision))}
         </article>
       </div>
-    {/if}
+    </div>
   </main>
-
   <!-- Status Bar Footer -->
   <footer class="flex items-center justify-between px-5 py-2 border-t border-[var(--border)] bg-[var(--bg-sidebar)]/80 backdrop-blur-md text-xs text-[var(--text-dim)] select-none">
     <div class="flex items-center gap-2">
@@ -730,11 +564,6 @@
       <span>{$t('editor.words', { count: wordCount })}</span>
       <span>•</span>
       <span>{$t('editor.chars', { count: charCount })}</span>
-      <span>•</span>
-      <span class="inline-flex items-center gap-1.5 text-[var(--accent)] font-semibold font-mono text-[11px]">
-        <span class="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse"></span>
-        <span>{$t('editor.p2pRealtime')}</span>
-      </span>
     </div>
   </footer>
 

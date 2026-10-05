@@ -1,16 +1,6 @@
 import { expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
-import {
-  BUILTIN_PALETTES,
-  DEFAULT_PALETTE_ID,
-  TOKEN_GROUPS,
-  isHexColor,
-  lighten,
-  newCustomPalette,
-  resolvePalette,
-  themeVarsStyle,
-  withAlpha,
-} from '../src/lib/themes';
+import { BUILTIN_PALETTES, DEFAULT_PALETTE_ID, isHexColor, lighten, resolvePalette, themeVarsStyle, withAlpha } from '../src/lib/themes';
 import type { ThemeColors, ThemePalette } from '../src/lib/types';
 
 const TOKENS: (keyof ThemeColors)[] = [
@@ -19,92 +9,30 @@ const TOKENS: (keyof ThemeColors)[] = [
   'accent_contrast', 'success', 'danger',
 ];
 
-test('isHexColor accepts only #rrggbb', () => {
-  expect(isHexColor('#f7c65d')).toBe(true);
-  expect(isHexColor('#ABCDEF')).toBe(true);
-  expect(isHexColor('#fff')).toBe(false);
-  expect(isHexColor('f7c65d')).toBe(false);
-  expect(isHexColor('#gggggg')).toBe(false);
-  expect(isHexColor('')).toBe(false);
-});
-
-test('withAlpha and lighten compute expected colors', () => {
-  expect(withAlpha('#f7c65d', 0.3)).toBe('rgba(247, 198, 93, 0.3)');
-  expect(lighten('#000000', 0.5)).toBe('#808080');
-  expect(lighten('#ffffff', 0.5)).toBe('#ffffff');
-});
-
-test('resolvePalette finds builtin, custom, then falls back to default', () => {
-  const custom: ThemePalette = { id: 'custom_x', name: 'X', dark: {} as ThemeColors, light: {} as ThemeColors };
-  expect(resolvePalette('megumin', []).id).toBe('megumin');
-  expect(resolvePalette('rimuru', []).id).toBe('rimuru');
-  expect(resolvePalette('lowbloat', []).id).toBe('lowbloat');
-  expect(resolvePalette('custom_x', [custom]).id).toBe('custom_x');
-  expect(resolvePalette('does-not-exist', []).id).toBe(DEFAULT_PALETTE_ID);
-});
-
-test('builtin palettes are complete, valid hex, and correctly identified', () => {
-  expect(BUILTIN_PALETTES.map((p) => p.id)).toEqual(['lowbloat', 'megumin', 'rimuru', 'apple']);
-  expect(DEFAULT_PALETTE_ID).toBe('lowbloat');
+test('only Apple and Apple Liquid Glass are available, with Apple as default', () => {
+  expect(BUILTIN_PALETTES.map((p) => p.id)).toEqual(['apple', 'apple-glass']);
+  expect(DEFAULT_PALETTE_ID).toBe('apple');
   for (const palette of BUILTIN_PALETTES) {
-    expect(palette.name.length).toBeGreaterThan(0);
     for (const mode of ['dark', 'light'] as const) {
-      for (const token of TOKENS) {
-        expect(isHexColor(palette[mode][token])).toBe(true);
-      }
+      expect(Object.keys(palette[mode]).sort()).toEqual([...TOKENS].sort());
+      for (const token of TOKENS) expect(isHexColor(palette[mode][token])).toBe(true);
     }
   }
 });
 
-test('LowBloat uses the site and helpdesk colors in both modes', () => {
-  const lowbloat = resolvePalette('lowbloat', []);
-  expect(lowbloat.name).toBe('LowBloat');
-  expect(lowbloat.light.bg_main).toBe('#f1f3ee');
-  expect(lowbloat.light.bg_card).toBe('#fbfcf8');
-  expect(lowbloat.light.text_main).toBe('#171a17');
-  expect(lowbloat.light.accent).toBe('#b8f238');
-  expect(lowbloat.light.accent_contrast).toBe('#1a2700');
-  expect(lowbloat.dark.bg_main).toBe('#171a17');
-  expect(lowbloat.dark.accent).toBe('#b8f238');
-});
-
-test('static pre-JS colors mirror the default palette', () => {
-  const css = readFileSync(new URL('../src/app.css', import.meta.url), 'utf8');
-  const light = css.match(/:root\s*\{([^}]+)\}/)?.[1];
-  const dark = css.match(/:root\[data-theme="dark"\]\s*\{([^}]+)\}/)?.[1];
-  const palette = resolvePalette(DEFAULT_PALETTE_ID, []);
-  expect(light).toBeDefined();
-  expect(dark).toBeDefined();
-  for (const mode of ['light', 'dark'] as const) {
-    const block = mode === 'light' ? light : dark;
-    expect(block).toContain(`color-scheme: ${mode}`);
-    for (const token of TOKENS) {
-      expect(block).toContain(`--${token.replaceAll('_', '-')}: ${palette[mode][token]}`);
-    }
+test('former and custom themes resolve to Apple without changing archived data', () => {
+  const custom: ThemePalette = { ...resolvePalette('apple'), id: 'custom_x', name: 'Archived' };
+  const archive = [custom];
+  const before = JSON.stringify(archive);
+  for (const id of ['lowbloat', 'megumin', 'rimuru', 'custom_x', 'unknown', '']) {
+    expect(resolvePalette(id, archive).id).toBe('apple');
   }
+  expect(resolvePalette('apple-glass', archive).id).toBe('apple-glass');
+  expect(JSON.stringify(archive)).toBe(before);
 });
 
-test('Megumin keeps its original colors', () => {
-  const megumin = resolvePalette('megumin', []);
-  expect(megumin.name).toBe('Megumin');
-  expect(megumin.dark.bg_main).toBe('#241d24');
-  expect(megumin.dark.accent).toBe('#f7c65d');
-  expect(megumin.light.bg_main).toBe('#fbf5ed');
-  expect(megumin.light.accent).toBe('#f7c65d');
-});
-
-test('Rimuru palette uses the requested blue family', () => {
-  const rimuru = resolvePalette('rimuru', []);
-  expect(rimuru.name).toBe('Rimuru Tempest');
-  expect(rimuru.dark.accent).toBe('#93b9e8');
-  expect(rimuru.dark.text_main).toBe('#f7fcfc');
-  expect(rimuru.light.bg_active).toBe('#cce9f6');
-  expect(rimuru.light.text_muted).toBe('#3a71a4');
-});
-
-test('Apple palette matches Apple Design System tokens', () => {
-  const apple = resolvePalette('apple', []);
-  expect(apple.name).toBe('Apple macOS');
+test('Apple keeps the system canvas and action colors', () => {
+  const apple = resolvePalette('apple');
   expect(apple.light.accent).toBe('#0066cc');
   expect(apple.dark.accent).toBe('#2997ff');
   expect(apple.light.bg_main).toBe('#ffffff');
@@ -113,34 +41,61 @@ test('Apple palette matches Apple Design System tokens', () => {
   expect(apple.dark.text_main).toBe('#f5f5f7');
 });
 
-test('themeVarsStyle emits base and derived tokens plus color-scheme', () => {
-  const colors = resolvePalette('rimuru', []).dark;
-  const style = themeVarsStyle(colors, 'dark');
-  expect(style).toContain('color-scheme: dark');
-  expect(style).toContain(`--bg-main: ${colors.bg_main}`);
-  expect(style).toContain(`--accent: ${colors.accent}`);
-  expect(style).toContain(`--accent-glow: ${withAlpha(colors.accent, 0.17)}`);
-  expect(style).toContain(`--accent-hover: ${lighten(colors.accent, 0.25)}`);
-  expect(style).toContain(`--selection: ${withAlpha(colors.accent, 0.3)}`);
-  expect(style).toContain('--line-highlight: rgba(255,255,255,0.02)');
-  // Light and dark modes both use the palette accent for selection.
-  const lightStyle = themeVarsStyle(resolvePalette('rimuru', []).light, 'light');
-  expect(lightStyle).toContain('color-scheme: light');
-  expect(lightStyle).toContain(`--selection: ${withAlpha(resolvePalette('rimuru', []).light.accent, 0.3)}`);
+test('pre-JS colors match Apple in both appearances', () => {
+  const css = readFileSync(new URL('../src/app.css', import.meta.url), 'utf8');
+  const blocks = {
+    light: css.match(/:root\s*\{([^}]+)\}/)?.[1],
+    dark: css.match(/:root\[data-theme="dark"\]\s*\{([^}]+)\}/)?.[1],
+  };
+  for (const mode of ['light', 'dark'] as const) {
+    expect(blocks[mode]).toContain(`color-scheme: ${mode}`);
+    for (const token of TOKENS) {
+      expect(blocks[mode]).toContain(`--${token.replaceAll('_', '-')}: ${resolvePalette('apple')[mode][token]}`);
+    }
+  }
 });
 
-test('every picker token is covered by a group exactly once', () => {
-  const grouped = TOKEN_GROUPS.flatMap((g) => g.tokens.map((t) => t.token));
-  expect([...grouped].sort()).toEqual([...TOKENS].sort());
-  expect(new Set(grouped).size).toBe(grouped.length);
+function luminance(hex: string) {
+  const channels = hex.slice(1).match(/../g)!.map((part) => {
+    const value = parseInt(part, 16) / 255;
+    return value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4;
+  });
+  return .2126 * channels[0] + .7152 * channels[1] + .0722 * channels[2];
+}
+function contrast(a: string, b: string) {
+  const values = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (values[0] + .05) / (values[1] + .05);
+}
+
+test('both materials retain readable main and secondary text in light and dark', () => {
+  for (const palette of BUILTIN_PALETTES) {
+    for (const mode of ['light', 'dark'] as const) {
+      const colors = palette[mode];
+      for (const surface of [colors.bg_main, colors.bg_sidebar, colors.bg_card]) {
+        expect(contrast(colors.text_main, surface)).toBeGreaterThanOrEqual(7);
+        expect(contrast(colors.text_muted, surface)).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+  }
 });
 
-test('newCustomPalette clones base colors under a fresh custom id', () => {
-  const base = resolvePalette('rimuru', []);
-  const custom = newCustomPalette(base);
-  expect(custom.id.startsWith('custom_')).toBe(true);
-  expect(custom.name).toBe('');
-  expect(custom.dark).toEqual(base.dark);
-  expect(custom.dark).not.toBe(base.dark);
-  expect(custom.light).not.toBe(base.light);
+test('scoped previews use each palette accent for links and subtle selection', () => {
+  for (const palette of BUILTIN_PALETTES) {
+    for (const mode of ['dark', 'light'] as const) {
+      const colors = palette[mode];
+      const style = themeVarsStyle(colors, mode);
+      expect(style).toContain(`color-scheme: ${mode}`);
+      expect(style).toContain(`--accent-glow: ${withAlpha(colors.accent, .12)}`);
+      expect(style).toContain(`--selection: ${withAlpha(colors.accent, .18)}`);
+      expect(style).toContain(`--editor-link: ${colors.accent}`);
+      expect(style).toContain(`--editor-link-hover: ${colors.accent_light}`);
+    }
+  }
+});
+
+test('color utilities accept only six-digit hex and compute colors', () => {
+  expect(isHexColor('#ABCDEF')).toBe(true);
+  for (const invalid of ['#fff', 'ffffff', '#gggggg', '']) expect(isHexColor(invalid)).toBe(false);
+  expect(withAlpha('#0066cc', .12)).toBe('rgba(0, 102, 204, 0.12)');
+  expect(lighten('#000000', .5)).toBe('#808080');
 });

@@ -4,7 +4,6 @@
   import { t, locale, LOCALE_LABELS, SUPPORTED_LOCALES } from '$lib/i18n';
   import logoUrl from '../../../assets/brand/lownotes_logo.png';
   import { dismissibleModal } from '$lib/modal-dismiss';
-  import BorderBeam from './ui/BorderBeam.svelte';
 
   let {
     isOpen = $bindable(false),
@@ -35,15 +34,15 @@
   >
     <div
       class="relative bg-[var(--bg-card)]/95 backdrop-blur-2xl border border-[var(--border)] rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col"
-      role="dialog"
+      role="dialog" aria-label={$t('welcome.title')}
       aria-modal="true"
       tabindex="-1"
     >
-      <BorderBeam size={240} duration={10} borderWidth={1.5} colorFrom="var(--accent)" colorTo="var(--accent-light)" />
+
 
       <!-- Hero Header -->
-      <div class="px-8 pt-8 pb-6 text-center border-b border-[var(--border)] bg-gradient-to-b from-[var(--bg-hover)]/40 to-transparent">
-        <div class="relative w-16 h-16 mx-auto mb-4 p-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border)] shadow-xl flex items-center justify-center">
+      <div class="px-8 pt-8 pb-6 text-center border-b border-[var(--border)]">
+        <div class="relative w-16 h-16 mx-auto mb-4 p-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border)] flex items-center justify-center">
           <img src={logoUrl} alt="" class="w-full h-full object-contain" style="image-rendering: pixelated" />
         </div>
         <h2 class="text-2xl font-extrabold text-[var(--text-main)] mb-1.5 tracking-tight">{$t('welcome.title')}</h2>
@@ -74,7 +73,7 @@
       <!-- Feature Pillars Bento -->
       <div class="p-6 md:p-8 flex flex-col gap-3">
         <!-- Feature 1 -->
-        <div class="flex items-start gap-3.5 p-3.5 rounded-2xl bg-[var(--bg-main)]/70 border border-[var(--border)] glow-card-hover">
+        <div class="flex items-start gap-3.5 p-3.5 rounded-2xl bg-[var(--bg-main)]/70 border border-[var(--border)]">
           <div class="w-9 h-9 rounded-xl bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/30 flex items-center justify-center shrink-0">
             <FileText size={16} />
           </div>
@@ -87,8 +86,8 @@
         </div>
 
         <!-- Feature 2 -->
-        <div class="flex items-start gap-3.5 p-3.5 rounded-2xl bg-[var(--bg-main)]/70 border border-[var(--border)] glow-card-hover">
-          <div class="w-9 h-9 rounded-xl bg-blue-500/15 text-blue-400 border border-blue-500/30 flex items-center justify-center shrink-0">
+        <div class="flex items-start gap-3.5 p-3.5 rounded-2xl bg-[var(--bg-main)]/70 border border-[var(--border)]">
+          <div class="w-9 h-9 rounded-xl bg-[var(--accent)]/10 text-[var(--accent)] flex items-center justify-center shrink-0">
             <Link2 size={16} />
           </div>
           <div>
@@ -100,7 +99,7 @@
         </div>
 
         <!-- Feature 3 -->
-        <div class="flex items-start gap-3.5 p-3.5 rounded-2xl bg-[var(--bg-main)]/70 border border-[var(--accent)]/40 glow-card-hover">
+        <div class="flex items-start gap-3.5 p-3.5 rounded-2xl bg-[var(--bg-main)]/70 border border-[var(--border)]">
           <div class="w-9 h-9 rounded-xl bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/30 flex items-center justify-center shrink-0">
             <Sparkles size={16} />
           </div>

@@ -63,6 +63,7 @@ const enUS = {
     syncError: 'Last synchronization failed',
   },
   editor: {
+    formatting: 'Text formatting',
     imageUploading: 'Uploading to {provider}: {name} ({uploaded}/{count})…',
     imageSavingLocal: "Compressing and saving: {name} ({uploaded}/{count})…",
     imageRetry: 'Retry',
@@ -206,6 +207,7 @@ const enUS = {
     rememberMessage: 'Add to memory',
   },
   export: {
+    menu: 'Export',
     word: 'Export to Word (.docx)',
     pdf: 'Export to PDF',
     exporting: 'Exporting...',
@@ -316,6 +318,9 @@ const enUS = {
     active: '{count} devices editing',
   },
   settings: {
+    appleThemesHint: 'Two Apple designs, the same space for your ideas.',
+    appleThemeDescription: 'Clean surfaces, precise controls and a calm, familiar feel.',
+    glassThemeDescription: 'Luminous glass, soft reflections and serene blue and green tones.',
     pastedImages: 'Pasted images',
     pastedImagesHint: "Paste an image anywhere in the editor to save it and insert its Markdown reference.",
     imageUploadProvider: "Image hosting service",

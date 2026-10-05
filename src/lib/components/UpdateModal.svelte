@@ -7,7 +7,6 @@
   import { t } from '$lib/i18n';
   import { dismissibleModal } from '$lib/modal-dismiss';
   import { Loader2, AlertCircle } from 'lucide-svelte';
-  import BorderBeam from './ui/BorderBeam.svelte';
 
   let {
     isOpen = $bindable(false),
@@ -109,7 +108,7 @@
       aria-labelledby="update-dialog-title"
       tabindex="-1"
     >
-      <BorderBeam size={200} duration={10} borderWidth={1.5} colorFrom="var(--accent)" colorTo="var(--accent-light)" />
+
 
       <!-- Modal Header -->
       <div class="px-6 pt-5 pb-4 border-b border-[var(--border)] bg-[var(--bg-sidebar)]/60">
@@ -159,7 +158,7 @@
       <div class="px-6 py-4 border-t border-[var(--border)] bg-[var(--bg-sidebar)]/80 flex flex-col gap-3">
         <label class="flex items-center gap-2 text-xs text-[var(--text-muted)] cursor-pointer select-none">
           <input
-            type="checkbox"
+            type="checkbox" role="switch"
             checked={autoCheck}
             onchange={handleAutoCheckChange}
             class="accent-[var(--accent)] w-3.5 h-3.5 rounded"

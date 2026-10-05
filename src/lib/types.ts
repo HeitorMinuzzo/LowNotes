@@ -131,8 +131,8 @@ export interface ThemePalette {
   light: ThemeColors;
 }
 
-/** Only user-created palettes are persisted; built-ins ship in code so new
- *  defaults can be added in any version. */
+/** The selected Apple design is persisted. Legacy custom color data is archived
+ *  for compatibility and is no longer selectable. */
 export interface ThemePalettesSettings {
   active_palette_id: string;
   custom_palettes: ThemePalette[];

@@ -65,6 +65,7 @@ const esES: Dictionary = {
     syncError: 'La última sincronización falló',
   },
   editor: {
+    formatting: 'Formato de texto',
     imageUploading: 'Subiendo a {provider}: {name} ({uploaded}/{count})…',
     imageSavingLocal: "Comprimiendo y guardando: {name} ({uploaded}/{count})…",
     imageRetry: 'Reintentar',
@@ -208,6 +209,7 @@ const esES: Dictionary = {
     rememberMessage: 'Añadir a la memoria',
   },
   export: {
+    menu: 'Exportar',
     word: 'Exportar a Word (.docx)',
     pdf: 'Exportar a PDF',
     exporting: 'Exportando...',
@@ -318,6 +320,9 @@ const esES: Dictionary = {
     active: '{count} dispositivos editando',
   },
   settings: {
+    appleThemesHint: 'Dos estilos Apple, el mismo espacio para tus ideas.',
+    appleThemeDescription: 'Superficies limpias, controles precisos y una experiencia tranquila y familiar.',
+    glassThemeDescription: 'Vidrio luminoso, reflejos suaves y tonos serenos de azul y verde.',
     pastedImages: 'Imágenes pegadas',
     pastedImagesHint: "Pega una imagen en cualquier parte del editor para guardarla e insertar su referencia Markdown.",
     imageUploadProvider: "Servicio de imágenes",

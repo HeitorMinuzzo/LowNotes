@@ -4,7 +4,6 @@
   import { networkAnswerPair } from '../api';
   import { t } from '$lib/i18n';
   import { dismissibleModal } from '$lib/modal-dismiss';
-  import BorderBeam from './ui/BorderBeam.svelte';
 
   let {
     request = null,
@@ -37,11 +36,11 @@
   >
     <div
       class="relative bg-[var(--bg-card)]/95 backdrop-blur-xl border border-[var(--accent)] rounded-3xl w-full max-w-md shadow-2xl p-6 flex flex-col gap-4 overflow-hidden"
-      role="dialog"
+      role="dialog" aria-label={$t('incoming.title')}
       aria-modal="true"
       tabindex="-1"
     >
-      <BorderBeam size={160} duration={8} borderWidth={1.5} colorFrom="var(--accent)" colorTo="var(--accent-light)" />
+
 
       <div class="flex items-center gap-3.5">
         <div class="w-10 h-10 rounded-2xl bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/30 flex items-center justify-center text-lg shadow-sm">

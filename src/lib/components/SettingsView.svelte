@@ -5,8 +5,9 @@
   import { ArrowLeft, Bot, Check, Download, Globe2, Monitor, NotebookPen, Palette, Pencil, Plus, Settings2, Sparkles, Trash2 } from 'lucide-svelte';
   import { fetchAiModels, saveAiSettings, saveCloseToTray, saveImageUploadSettings, saveLanguage, saveLineWrapping, saveTheme, saveThemePalettes, saveUpdatePrefs, saveViewMode, saveWebSearchSettings } from '$lib/api';
   import { LOCALE_LABELS, SUPPORTED_LOCALES, t, trError, type LocaleCode } from '$lib/i18n';
-  import { BUILTIN_PALETTES, DEFAULT_PALETTE_ID, TOKEN_GROUPS, applyTheme, isHexColor, newCustomPalette, resolvePalette, themeVarsStyle, type ThemeToken } from '$lib/themes';
-  import type { AiProviderConfig, AiSettings, AppSettings, AppTheme, ImageUploadProvider, ThemePalette, ThemePalettesSettings, ViewMode, WebSearchSettings } from '$lib/types';
+  import { BUILTIN_PALETTES, applyTheme, themeVarsStyle } from '$lib/themes';
+  import type { AiProviderConfig, AiSettings, AppSettings, AppTheme, ImageUploadProvider, ThemePalettesSettings, ViewMode, WebSearchSettings } from '$lib/types';
+  import SegmentedControl from './ui/SegmentedControl.svelte';
   import { version as packageVersion } from '../../../package.json';
 
   type Tab = 'general' | 'themes' | 'ai' | 'providers' | 'web' | 'about';
@@ -44,10 +45,7 @@
   let newName = $state('');
   let newUrl = $state('');
   let palettes = $state<ThemePalettesSettings>(untrack(() => $state.snapshot(settings.theme_palettes)));
-  let editingPalette = $state<ThemePalette | null>(null);
-  let editingIsNew = $state(false);
-  let editMode = $state<AppTheme>(untrack(() => settings.theme));
-  const allPalettes = $derived([...BUILTIN_PALETTES, ...palettes.custom_palettes]);
+  const allPalettes = BUILTIN_PALETTES;
   const appMode = $derived<AppTheme>(settings.theme);
 
   onMount(() => {
@@ -135,51 +133,22 @@
     models = [];
   }
 
-  function persistPalettes(next: ThemePalettesSettings) {
-    applyTheme(next.active_palette_id, settings.theme, next.custom_palettes);
-    void persist(saveThemePalettes(next), { ...settings, theme_palettes: next });
-  }
-  function selectPalette(id: string) {
-    if (id === palettes.active_palette_id) return;
+  async function selectPalette(id: string) {
+    if (busy || id === palettes.active_palette_id) return;
+    const previous = palettes.active_palette_id;
     palettes.active_palette_id = id;
-    persistPalettes({ active_palette_id: id, custom_palettes: $state.snapshot(palettes.custom_palettes) });
-  }
-  function startNewPalette() {
-    editingPalette = newCustomPalette(resolvePalette(palettes.active_palette_id, palettes.custom_palettes));
-    editingIsNew = true;
-    editMode = settings.theme;
-  }
-  function editPalette(palette: ThemePalette) {
-    editingPalette = { id: palette.id, name: palette.name, dark: { ...palette.dark }, light: { ...palette.light } };
-    editingIsNew = false;
-    editMode = settings.theme;
-  }
-  function savePalette() {
-    if (!editingPalette) return;
-    const draft = $state.snapshot(editingPalette);
-    const name = draft.name.trim();
-    if (!name) return;
-    const customs = $state.snapshot(palettes.custom_palettes);
-    const nextPalette = { ...draft, name };
-    const index = customs.findIndex((item) => item.id === draft.id);
-    if (index >= 0) customs[index] = nextPalette; else customs.push(nextPalette);
-    const activate = editingIsNew || palettes.active_palette_id === draft.id;
-    editingPalette = null;
-    palettes.custom_palettes = customs;
-    if (activate) palettes.active_palette_id = draft.id;
-    persistPalettes({ active_palette_id: palettes.active_palette_id, custom_palettes: customs });
-  }
-  function deletePalette(id: string) {
-    if (editingPalette?.id === id) editingPalette = null;
-    palettes.custom_palettes = $state.snapshot(palettes.custom_palettes).filter((item) => item.id !== id);
-    if (palettes.active_palette_id === id) palettes.active_palette_id = DEFAULT_PALETTE_ID;
-    persistPalettes({ active_palette_id: palettes.active_palette_id, custom_palettes: $state.snapshot(palettes.custom_palettes) });
-  }
-  function commitHex(token: ThemeToken, value: string) {
-    if (!editingPalette) return;
-    const trimmed = value.trim();
-    const normalized = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
-    if (isHexColor(normalized)) editingPalette[editMode][token] = normalized.toLowerCase();
+    applyTheme(id, settings.theme);
+    busy = true;
+    error = '';
+    try {
+      const next = { active_palette_id: id, custom_palettes: $state.snapshot(palettes.custom_palettes) };
+      await saveThemePalettes(next);
+      onChange({ ...settings, theme_palettes: next });
+    } catch (reason) {
+      palettes.active_palette_id = previous;
+      applyTheme(previous, settings.theme);
+      error = trError(String(reason));
+    } finally { busy = false; }
   }
   async function loadModels() {
     if (!provider) return;
@@ -223,7 +192,7 @@
           <section class="settings-section">
             <h2>{$t('settings.appearance')}</h2><p>{$t('settings.appearanceHint')}</p>
             <div class="setting-row"><div><strong>{$t('settings.theme')}</strong><small>{$t('settings.themeHint')}</small></div>
-              <div class="settings-segment"><button class:active={settings.theme === 'dark'} onclick={() => changeTheme('dark')}>{$t('settings.dark')}</button><button class:active={settings.theme === 'light'} onclick={() => changeTheme('light')}>{$t('settings.light')}</button></div></div>
+              <SegmentedControl label={$t('settings.theme')} value={settings.theme} onchange={changeTheme} options={[{ id: 'light', label: $t('settings.light') }, { id: 'dark', label: $t('settings.dark') }]} /></div>
             <div class="setting-row"><div><strong>{$t('settings.language')}</strong><small>{$t('settings.languageHint')}</small></div>
               <select value={settings.language || 'en-US'} onchange={(event) => changeLanguage(event.currentTarget.value as LocaleCode)}>
                 {#each SUPPORTED_LOCALES as code}<option value={code}>{LOCALE_LABELS[code]}</option>{/each}
@@ -232,11 +201,11 @@
               <select value={settings.view_mode} onchange={(event) => changeViewMode(event.currentTarget.value as ViewMode)}>
                 <option value="edit">{$t('editor.modeEdit')}</option><option value="split">{$t('editor.modeSplit')}</option><option value="preview">{$t('editor.modePreview')}</option>
               </select></div>
-            <label class="setting-row setting-toggle"><div><strong>{$t('settings.lineWrapping')}</strong><small>{$t('settings.lineWrappingHint')}</small></div><input type="checkbox" checked={settings.line_wrapping ?? true} disabled={busy} onchange={(event) => void changeLineWrapping(event.currentTarget)} /></label>
+            <label class="setting-row setting-toggle"><div><strong>{$t('settings.lineWrapping')}</strong><small>{$t('settings.lineWrappingHint')}</small></div><input type="checkbox" role="switch" checked={settings.line_wrapping ?? true} disabled={busy} onchange={(event) => void changeLineWrapping(event.currentTarget)} /></label>
           </section>
           <section class="settings-section">
             <h2>{$t('settings.behavior')}</h2><p>{$t('settings.behaviorHint')}</p>
-            <label class="setting-row setting-toggle"><div><strong>{$t('settings.closeToTray')}</strong><small>{$t('settings.closeToTrayHint')}</small></div><input type="checkbox" checked={settings.close_to_tray} onchange={(event) => changeTray(event.currentTarget.checked)} /></label>
+            <label class="setting-row setting-toggle"><div><strong>{$t('settings.closeToTray')}</strong><small>{$t('settings.closeToTrayHint')}</small></div><input type="checkbox" role="switch" checked={settings.close_to_tray} onchange={(event) => changeTray(event.currentTarget.checked)} /></label>
           </section>
           <section class="settings-section">
             <h2>{$t('settings.pastedImages')}</h2><p>{$t('settings.pastedImagesHint')}</p>
@@ -252,99 +221,31 @@
             {/if}
           </section>
         {:else if tab === 'themes'}
-          <section class="settings-section">
-            <div class="settings-section-title">
-              <div><h2>{$t('settings.colorTheme')}</h2><p>{$t('settings.colorThemeHint')}</p></div>
-              <button class="settings-primary" onclick={startNewPalette}><Plus size={16} /> {$t('settings.addTheme')}</button>
-            </div>
-            <div class="palette-grid">
+          <section class="settings-section apple-appearance-section">
+            <h2>{$t('settings.colorTheme')}</h2><p>{$t('settings.appleThemesHint')}</p>
+            <div class="apple-theme-grid">
               {#each allPalettes as palette (palette.id)}
-                {@const custom = !BUILTIN_PALETTES.some((builtin) => builtin.id === palette.id)}
-                {@const colors = palette[appMode]}
-                <div class="palette-card" class:active={palettes.active_palette_id === palette.id}>
-                  <button class="palette-select" onclick={() => selectPalette(palette.id)} aria-pressed={palettes.active_palette_id === palette.id}>
-                    <span class="palette-swatches">
-                      {#each [colors.bg_sidebar, colors.bg_card, colors.accent, colors.text_main, colors.danger] as swatch}<span style="background: {swatch}"></span>{/each}
-                    </span>
-                    <span class="palette-meta">
-                      <span><span class="palette-name">{palette.name}</span><span class="palette-sub">{custom ? $t('settings.paletteCustom') : $t('settings.paletteBuiltIn')}</span></span>
-                      {#if palette.id === DEFAULT_PALETTE_ID}<span class="palette-badge accent">{$t('settings.paletteDefault')}</span>{:else if palettes.active_palette_id === palette.id}<span class="palette-badge">{$t('settings.inUse')}</span>{/if}
-                    </span>
-                  </button>
-                  {#if custom}
-                    <span class="palette-tools">
-                      <button onclick={() => editPalette(palette)} title={$t('settings.editTheme')} aria-label={$t('settings.editTheme')}><Pencil size={14} /></button>
-                      <button class="danger" onclick={() => deletePalette(palette.id)} title={$t('settings.deleteTheme')} aria-label={$t('settings.deleteTheme')}><Trash2 size={14} /></button>
-                    </span>
-                  {/if}
-                </div>
+                <button class="apple-theme-card" class:chosen={palettes.active_palette_id === palette.id} disabled={busy} aria-pressed={palettes.active_palette_id === palette.id} onclick={() => void selectPalette(palette.id)}>
+                  <span class="apple-theme-preview" class:liquid={palette.id === 'apple-glass'} style={themeVarsStyle(palette[appMode], appMode)} aria-hidden="true">
+                    <span class="apple-preview-sidebar"><i></i><i></i><i></i><i></i></span>
+                    <span class="apple-preview-document"><i></i><i></i><i></i><i></i><i></i></span>
+                    <span class="apple-preview-control"><i></i><i></i><i></i></span>
+                  </span>
+                  <span class="apple-theme-card-title"><strong>{palette.name}</strong><span class="apple-theme-check">{#if palettes.active_palette_id === palette.id}<Check size={14} />{/if}</span></span>
+                  <span class="apple-theme-description">{$t(palette.id === 'apple' ? 'settings.appleThemeDescription' : 'settings.glassThemeDescription')}</span>
+                </button>
               {/each}
             </div>
-            {#if editingPalette}
-              <div class="palette-editor">
-                <div class="palette-editor-head">
-                  <div><h3>{editingIsNew ? $t('settings.addTheme') : $t('settings.editTheme')}</h3><small>{$t('settings.editColorsHint')}</small></div>
-                  <div class="settings-segment">
-                    <button class:active={editMode === 'dark'} onclick={() => editMode = 'dark'}>{$t('settings.dark')}</button>
-                    <button class:active={editMode === 'light'} onclick={() => editMode = 'light'}>{$t('settings.light')}</button>
-                  </div>
-                </div>
-                <label class="setting-field palette-field-name">{$t('settings.themeName')}<input bind:value={editingPalette.name} placeholder={$t('settings.themeNamePlaceholder')} maxlength="40" /></label>
-                <div class="palette-editor-body">
-                  <div>
-                    {#each TOKEN_GROUPS as group (group.group)}
-                      <div class="palette-group">
-                        <h4>{$t(group.group)}</h4>
-                        <div class="palette-picker-grid">
-                          {#each group.tokens as item (item.token)}
-                            <div class="palette-picker">
-                              <input type="color" aria-label={$t(item.labelKey)} bind:value={editingPalette[editMode][item.token]} />
-                              <span class="palette-picker-label">
-                                <strong>{$t(item.labelKey)}</strong>
-                                <input value={editingPalette[editMode][item.token]} onchange={(event) => commitHex(item.token, event.currentTarget.value)} spellcheck="false" />
-                              </span>
-                            </div>
-                          {/each}
-                        </div>
-                      </div>
-                    {/each}
-                  </div>
-                  <div class="palette-demo" style={themeVarsStyle(editingPalette[editMode], editMode)}>
-                    <div class="palette-demo-bar"><span>LowNotes</span><NotebookPen size={13} /></div>
-                    <div class="palette-demo-body">
-                      <div class="palette-demo-side">
-                        <span class="palette-demo-item active">{$t('settings.demoNote')}</span>
-                        <span class="palette-demo-item">Explosion!</span>
-                        <span class="palette-demo-item">Slime</span>
-                      </div>
-                      <div class="palette-demo-main">
-                        <div class="palette-demo-note">
-                          <h5>{$t('settings.demoNote')}</h5>
-                          <p>{$t('settings.demoBody')} <span class="palette-demo-link">{$t('settings.demoLink')}</span></p>
-                          <div class="palette-demo-row">
-                            <span class="palette-demo-btn">{$t('settings.demoButton')}</span>
-                            <span class="palette-demo-chip ok">{$t('settings.demoSuccess')}</span>
-                            <span class="palette-demo-chip bad">{$t('settings.demoDanger')}</span>
-                            <span class="palette-demo-swatch"></span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="settings-actions">
-                  <button onclick={() => editingPalette = null}>{$t('ai.cancel')}</button>
-                  <button class="settings-primary" onclick={savePalette} disabled={busy || !editingPalette.name.trim()}><Check size={15} /> {$t('settings.saveTheme')}</button>
-                </div>
-              </div>
-            {/if}
+            <div class="setting-row"><div><strong>{$t('settings.theme')}</strong><small>{$t('settings.themeHint')}</small></div>
+              <SegmentedControl label={$t('settings.theme')} value={settings.theme} onchange={changeTheme} options={[{ id: 'light', label: $t('settings.light') }, { id: 'dark', label: $t('settings.dark') }]} />
+            </div>
           </section>
         {:else if tab === 'ai'}
           <section class="settings-section">
             <h2>{$t('settings.ai')}</h2><p>{$t('settings.aiHint')}</p>
             <div class="setting-row"><div><strong>{$t('settings.activeProvider')}</strong><small>{$t('settings.activeProviderHint')}</small></div>
               <select bind:value={aiDraft.active_provider_id}>{#each aiDraft.providers as item}<option value={item.id}>{item.name}</option>{/each}</select></div>
-            <label class="setting-row setting-toggle"><div><strong>{$t('ai.autoLink')}</strong><small>{$t('ai.autoLinkHint')}</small></div><input type="checkbox" bind:checked={aiDraft.auto_link_notes} /></label>
+            <label class="setting-row setting-toggle"><div><strong>{$t('ai.autoLink')}</strong><small>{$t('ai.autoLinkHint')}</small></div><input type="checkbox" role="switch" bind:checked={aiDraft.auto_link_notes} /></label>
             <div class="settings-actions"><button class="settings-primary" onclick={saveAi} disabled={busy}>{$t('settings.saveAi')}</button></div>
           </section>
         {:else if tab === 'providers'}
@@ -375,7 +276,7 @@
                 {@const info = webSources[source.id]}
                 {#if info}
                   <div class="web-source-row">
-                    <label class="web-source-head"><span class="web-source-title"><strong>{info.name}</strong><small>{info.keyless ? $t('settings.keyless') : $t('settings.requiresKey')}</small></span><input type="checkbox" bind:checked={source.enabled} /></label>
+                    <label class="web-source-head"><span class="web-source-title"><strong>{info.name}</strong><small>{info.keyless ? $t('settings.keyless') : $t('settings.requiresKey')}</small></span><input type="checkbox" role="switch" bind:checked={source.enabled} /></label>
                     {#if source.id === 'searxng'}
                       <label class="setting-field">{$t('settings.publicInstance')}<input type="url" bind:value={webDraft.searxng_url} placeholder="https://search.lumy.live/" /><small>{$t('settings.publicInstanceHint')}</small></label>
                     {/if}
@@ -393,7 +294,7 @@
           <section class="settings-section">
             <h2>{$t('settings.about')}</h2><p>{$t('settings.aboutHint')}</p>
             <div class="settings-about"><div class="settings-about-mark"><NotebookPen size={26} /></div><div><strong>LowNotes</strong><span>{$t('settings.version')} {version}</span></div></div>
-            <label class="setting-row setting-toggle"><div><strong>{$t('update.autoCheck')}</strong><small>{$t('settings.updateHint')}</small></div><input type="checkbox" checked={settings.update_check} onchange={(event) => changeUpdates(event.currentTarget.checked)} /></label>
+            <label class="setting-row setting-toggle"><div><strong>{$t('update.autoCheck')}</strong><small>{$t('settings.updateHint')}</small></div><input type="checkbox" role="switch" checked={settings.update_check} onchange={(event) => changeUpdates(event.currentTarget.checked)} /></label>
             <div class="setting-row"><div><strong>{$t('settings.device')}</strong><small>{settings.device_name}</small></div></div>
           </section>
         {/if}

@@ -6,7 +6,7 @@
   import { onDestroy, onMount } from 'svelte';
   import { t, trError, ts } from '$lib/i18n';
   import { dismissibleModal } from '$lib/modal-dismiss';
-  import BorderBeam from './ui/BorderBeam.svelte';
+  import SegmentedControl from './ui/SegmentedControl.svelte';
 
   let {
     isOpen = $bindable(false),
@@ -32,6 +32,8 @@
 
   let isLoadingCode = $state(false);
   let loadError = $state<string | null>(null);
+  let removingPeer = $state('');
+  let removalBusy = $state(false);
 
   async function fetchPairInfo() {
     if (pairCode) return;
@@ -91,13 +93,16 @@
   }
 
   async function handleRemove(peerId: string) {
-    if (confirm(ts('pair.confirmRemove'))) {
+    if (!removalBusy) {
+      removalBusy = true;
       try {
         await networkRemovePeer(peerId);
+        removingPeer = '';
         onPeersChange?.();
       } catch (e) {
         console.error('Failed to remove peer:', e);
-      }
+        statusMessage = { type: 'error', text: trError(String(e)) };
+      } finally { removalBusy = false; }
     }
   }
 
@@ -128,11 +133,11 @@
     <!-- Modal Dialog -->
     <div
       class="relative bg-[var(--bg-card)]/95 backdrop-blur-xl border border-[var(--border)] rounded-3xl w-full max-w-lg shadow-2xl flex flex-col overflow-hidden"
-      role="dialog"
+      role="dialog" aria-label={$t('pair.title')}
       aria-modal="true"
       tabindex="-1"
     >
-      <BorderBeam size={220} duration={12} borderWidth={1.5} colorFrom="var(--accent)" colorTo="var(--accent-light)" />
+
 
       <!-- Header -->
       <div class="flex items-center justify-between px-6 py-4.5 border-b border-[var(--border)] bg-[var(--bg-sidebar)]/80 backdrop-blur-md">
@@ -155,31 +160,14 @@
         </button>
       </div>
 
-      <!-- Tabs Navigation -->
-      <div class="flex border-b border-[var(--border)] bg-[var(--bg-sidebar)]/40 px-6 gap-2 pt-2">
-        <button
-          onclick={() => { activeTab = 'share'; statusMessage = null; }}
-          class="flex items-center gap-1.5 py-2.5 px-3.5 text-xs font-semibold border-b-2 transition-all cursor-pointer {activeTab === 'share' ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
-        >
-          <Share2 size={13} />
-          <span>{$t('pair.tabShare')}</span>
-        </button>
-        <button
-          onclick={() => { activeTab = 'join'; statusMessage = null; }}
-          class="flex items-center gap-1.5 py-2.5 px-3.5 text-xs font-semibold border-b-2 transition-all cursor-pointer {activeTab === 'join' ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
-        >
-          <Link size={13} />
-          <span>{$t('pair.tabJoin')}</span>
-        </button>
-        <button
-          onclick={() => { activeTab = 'devices'; statusMessage = null; }}
-          class="flex items-center gap-1.5 py-2.5 px-3.5 text-xs font-semibold border-b-2 transition-all cursor-pointer {activeTab === 'devices' ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
-        >
-          <Laptop size={13} />
-          <span>{$t('pair.tabDevices', { count: peers.length })}</span>
-        </button>
+      <div class="px-6 pt-4">
+        <SegmentedControl
+          label={$t('pair.title')}
+          value={activeTab}
+          options={[{ id: 'share', label: $t('pair.tabShare') }, { id: 'join', label: $t('pair.tabJoin') }, { id: 'devices', label: $t('pair.tabDevices', { count: peers.length }) }]}
+          onchange={(next) => { activeTab = next; statusMessage = null; removingPeer = ''; }}
+        />
       </div>
-
       <!-- Tab Content -->
       <div class="p-6 flex-1 overflow-y-auto">
         {#if activeTab === 'share'}
@@ -294,13 +282,23 @@
                       </div>
                     </div>
                     <button
-                      onclick={() => handleRemove(peer.endpoint_id)}
+                      onclick={() => (removingPeer = peer.endpoint_id)}
                       class="flex items-center gap-1 px-3 py-1.5 text-xs text-[var(--danger)] hover:bg-[var(--danger)]/10 rounded-xl border border-transparent hover:border-[var(--danger)]/30 transition cursor-pointer"
                     >
                       <Trash2 size={12} />
                       <span>{$t('pair.remove')}</span>
                     </button>
                   </div>
+                  {#if removingPeer === peer.endpoint_id}
+                    <div class="apple-peer-confirm" role="alert">
+                      <p>{$t('pair.confirmRemove')}</p>
+                      <div class="apple-dialog-actions">
+                        <button type="button" class="apple-secondary-button" disabled={removalBusy} onclick={() => (removingPeer = '')}>{$t('sidebar.cancel')}</button>
+                        <button type="button" class="apple-danger-button" disabled={removalBusy} onclick={() => handleRemove(peer.endpoint_id)}>{$t('pair.remove')}</button>
+                      </div>
+                      {#if statusMessage?.type === 'error'}<p class="text-[var(--danger)]">{statusMessage.text}</p>{/if}
+                    </div>
+                  {/if}
                 {/each}
               </div>
             {/if}

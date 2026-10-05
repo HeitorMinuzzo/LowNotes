@@ -1,4 +1,6 @@
 <script lang="ts">
+  import SegmentedControl from './ui/SegmentedControl.svelte';
+  import { dismissibleModal } from '$lib/modal-dismiss';
   import {
     Bot,
     Brain,
@@ -43,7 +45,6 @@
     saveAiSettings,
   } from '../api';
   import { locale, t, trError, ts } from '$lib/i18n';
-  import BorderBeam from './ui/BorderBeam.svelte';
 
   let {
     isOpen = $bindable(false),
@@ -77,6 +78,8 @@
   let historySearch = $state('');
   let memoryDraft = $state('');
   let historyReady = $state(false);
+  let historyDialog = $state<{ kind: 'rename' | 'delete'; id: string } | null>(null);
+  let historyTitle = $state('');
   let archive = $state<ChatHistory>(emptyChatHistory());
   let currentChat = $derived(activeConversation(archive));
   let messages = $derived(currentChat?.messages ?? []);
@@ -147,20 +150,31 @@
   }
 
   function deleteChat(id: string) {
-    if (!confirm(ts('ai.deleteChatConfirm'))) return;
+    historyDialog = { kind: 'delete', id };
+  }
+
+  function confirmHistoryAction() {
+    if (!historyDialog) return;
+    const { id, kind } = historyDialog;
+    if (kind === 'rename') {
+      const chat = archive.conversations.find((item) => item.id === id);
+      const title = historyTitle.trim();
+      if (!chat || !title) return;
+      chat.title = title.slice(0, 100);
+      chat.updatedAt = Date.now();
+    } else {
     archive.conversations = archive.conversations.filter((chat) => chat.id !== id);
     if (archive.activeConversationId === id) archive.activeConversationId = null;
+    }
+    historyDialog = null;
     void persistHistory();
   }
 
   function renameChat(id: string) {
     const chat = archive.conversations.find((item) => item.id === id);
     if (!chat) return;
-    const title = prompt(ts('ai.renameChatPrompt'), chat.title)?.trim();
-    if (!title || title === chat.title) return;
-    chat.title = title.slice(0, 100);
-    chat.updatedAt = Date.now();
-    void persistHistory();
+    historyTitle = chat.title;
+    historyDialog = { kind: 'rename', id };
   }
 
   async function saveMemory() {
@@ -348,7 +362,7 @@
         <Bot size={16} class="text-[var(--accent)] shrink-0" />
         <div class="flex flex-col min-w-0">
           <h3 class="text-xs font-bold text-[var(--text-main)] truncate tracking-tight">{$t('ai.title')}</h3>
-          <span class="text-[10px] text-[var(--text-dim)] truncate">Local RAG & Assistente</span>
+          <span class="text-[10px] text-[var(--text-dim)] truncate">{$t('ai.scopeVault')}</span>
         </div>
       </div>
 
@@ -411,24 +425,12 @@
 
       <!-- Scope & Skill Selector -->
       <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-[var(--border)]/50">
-        <!-- Scope Switcher -->
-        <div class="h-7 flex items-center p-0.5 rounded-md bg-[var(--bg-card)] border border-[var(--border)] shadow-sm shrink-0">
-          <button
-            onclick={() => (scope = 'vault')}
-            class="h-6 px-2.5 rounded text-[11px] font-medium whitespace-nowrap transition-all cursor-pointer {scope === 'vault' ? 'bg-[var(--bg-active)] text-[var(--text-main)] font-semibold shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
-          >
-            {$t('ai.scopeVault')}
-          </button>
-          <button
-            onclick={() => (scope = 'note')}
-            disabled={!currentNotePath}
-            class="h-6 px-2.5 rounded text-[11px] font-medium whitespace-nowrap transition-all disabled:opacity-40 cursor-pointer {scope === 'note' ? 'bg-[var(--bg-active)] text-[var(--text-main)] font-semibold shadow-sm' : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'}"
-            title={currentNotePath ? currentNotePath : $t('ai.scopeNoteHint')}
-          >
-            {$t('ai.scopeNote')}
-          </button>
-        </div>
-
+        <SegmentedControl
+          label={$t('ai.scopeVault')}
+          value={scope}
+          options={[{ id: 'vault', label: $t('ai.scopeVault') }, { id: 'note', label: $t('ai.scopeNote'), disabled: !currentNotePath }]}
+          onchange={(next) => (scope = next)}
+        />
         <!-- Skill Select -->
         <select bind:value={skill} disabled={isLoading}
           class="h-7 rounded-md border border-[var(--border)] bg-[var(--bg-card)] px-2 text-[11px] font-medium text-[var(--text-main)] focus:outline-none shadow-sm cursor-pointer truncate max-w-[170px]">
@@ -520,19 +522,19 @@
           <div class="flex flex-col gap-2 w-full max-w-[320px]">
             <button
               onclick={() => sendMessage(ts('ai.suggestionCreate'), 'write')}
-              class="p-2.5 text-xs text-left rounded-md bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all shadow-sm cursor-pointer"
+              class="apple-chat-suggestion p-2.5 text-xs text-left rounded-md bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all shadow-sm cursor-pointer"
             >
               {$t('ai.suggestionCreate')}
             </button>
             <button
               onclick={() => sendMessage(ts('ai.suggestionSummary'))}
-              class="p-2.5 text-xs text-left rounded-md bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all shadow-sm cursor-pointer"
+              class="apple-chat-suggestion p-2.5 text-xs text-left rounded-md bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all shadow-sm cursor-pointer"
             >
               {$t('ai.suggestionSummary')}
             </button>
             <button
               onclick={() => sendMessage(ts('ai.suggestionResearch'), 'research')}
-              class="p-2.5 text-xs text-left rounded-md bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all shadow-sm cursor-pointer"
+              class="apple-chat-suggestion p-2.5 text-xs text-left rounded-md bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] border border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-main)] transition-all shadow-sm cursor-pointer"
             >
               {$t('ai.suggestionResearch')}
             </button>
@@ -687,7 +689,7 @@
     <footer class="p-3 border-t border-[var(--border)] bg-[var(--bg-card)]/90 backdrop-blur-xl">
       <form
         onsubmit={(e) => { e.preventDefault(); sendMessage(); }}
-        class="flex flex-col gap-2"
+        class="apple-chat-composer flex flex-col gap-2 p-2"
       >
         <div class="relative">
           <textarea
@@ -719,4 +721,20 @@
     </footer>
     {/if}
   </aside>
+  {#if historyDialog}
+    <div class="apple-dialog-backdrop" role="presentation" use:dismissibleModal={() => (historyDialog = null)}>
+      <div class="apple-new-note-dialog" role="dialog" aria-modal="true" aria-labelledby="apple-history-title" tabindex="-1">
+        <form onsubmit={(event) => { event.preventDefault(); confirmHistoryAction(); }}>
+          <span class="apple-dialog-eyebrow">{$t('ai.history')}</span>
+          <h2 id="apple-history-title">{$t(historyDialog.kind === 'rename' ? 'ai.renameChat' : 'ai.deleteChat')}</h2>
+          <p>{$t(historyDialog.kind === 'rename' ? 'ai.renameChatPrompt' : 'ai.deleteChatConfirm')}</p>
+          {#if historyDialog.kind === 'rename'}<input bind:value={historyTitle} maxlength="100" aria-label={$t('ai.renameChatPrompt')} required />{/if}
+          <div class="apple-dialog-actions">
+            <button type="button" class="apple-secondary-button" onclick={() => (historyDialog = null)}>{$t('sidebar.cancel')}</button>
+            <button type="submit" class={historyDialog.kind === 'delete' ? 'apple-danger-button' : 'apple-primary-button'} disabled={historyDialog.kind === 'rename' && !historyTitle.trim()}>{$t(historyDialog.kind === 'rename' ? 'sidebar.rename' : 'sidebar.delete')}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  {/if}
 {/if}
