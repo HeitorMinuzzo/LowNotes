@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { liquidGlass } from '$lib/liquid-glass';
   import { Check, FileDown, FileText, Loader2, ChevronDown } from 'lucide-svelte';
   import { t, trError } from '$lib/i18n';
   import type { ExportFormat } from '../document-export';
@@ -32,7 +33,7 @@
 <div class="apple-export relative inline-flex items-center gap-1.5">
   <details bind:this={menu}>
     <summary class="apple-secondary-button" aria-label={$t('export.menu')} aria-busy={busy}><FileDown size={16} /><span>{$t('export.menu')}</span><ChevronDown size={12} /></summary>
-    <div class="apple-export-menu">
+    <div class="apple-export-menu" use:liquidGlass>
     <button
       onclick={() => handleExport('docx')}
       disabled={busy || !content.trim()}

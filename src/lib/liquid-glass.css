@@ -1,0 +1,330 @@
+/* Material adapted from the theme switcher supplied by the user, by Vadik Matveev.
+ * Original: https://vadik.design — reference linked at https://freefrontend.com/css-liquid-glass/
+ * Keep the original 8px blur, 12% silver tint and directional inset shadows.
+ */
+:root[data-palette="liquid-glass"] {
+  --lg-glass: #bbbbbc;
+  --lg-light: #fff;
+  --lg-dark: #000;
+  --lg-reflex-light: var(--lg-rim, 1);
+  --lg-reflex-dark: 1;
+  --lg-blur: 8px;
+  --lg-sidebar-alpha: .12;
+  --lg-rim: 1;
+  --lg-saturation: 150%;
+  --lg-alpha: .12;
+  --lg-refraction: 5;
+  --lg-solid: #e8e8e9;
+  --apple-hairline: #22224414;
+  --apple-overlay: #16162330;
+  --material-field: #bbbbbc1f;
+  --material-card: #f5f5f7;
+  --material-sidebar: #bbbbbc1f;
+  --material-toolbar: #bbbbbc1f;
+  --control-track: #bbbbbc1f;
+  --control-selected: #bbbbbc5c;
+  --reading-surface: #f5f5f7;
+  --material-blur: 8px;
+  --control-primary-text: #fff;
+  --control-primary: #0052f5;
+  --control-hover: #0045d1;
+  --lg-surface-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lg-light) calc(var(--lg-reflex-light) * 10%), transparent),
+    inset 1.8px 3px 0px -2px color-mix(in srgb, var(--lg-light) calc(var(--lg-reflex-light) * 90%), transparent),
+    inset -2px -2px 0px -2px color-mix(in srgb, var(--lg-light) calc(var(--lg-reflex-light) * 80%), transparent),
+    inset -3px -8px 1px -6px color-mix(in srgb, var(--lg-light) calc(var(--lg-reflex-light) * 60%), transparent),
+    inset -0.3px -1px 4px 0px color-mix(in srgb, var(--lg-dark) calc(var(--lg-reflex-dark) * 12%), transparent),
+    inset -1.5px 2.5px 0px -2px color-mix(in srgb, var(--lg-dark) calc(var(--lg-reflex-dark) * 20%), transparent),
+    inset 0px 3px 4px -2px color-mix(in srgb, var(--lg-dark) calc(var(--lg-reflex-dark) * 20%), transparent),
+    inset 2px -6.5px 1px -4px color-mix(in srgb, var(--lg-dark) calc(var(--lg-reflex-dark) * 10%), transparent),
+    0px 1px 5px 0px color-mix(in srgb, var(--lg-dark) calc(var(--lg-reflex-dark) * 10%), transparent),
+    0px 6px 16px 0px color-mix(in srgb, var(--lg-dark) calc(var(--lg-reflex-dark) * 8%), transparent);
+  --lg-selection-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lg-light) calc(var(--lg-reflex-light) * 10%), transparent),
+    inset 2px 1px 0px -1px color-mix(in srgb, var(--lg-light) calc(var(--lg-reflex-light) * 90%), transparent),
+    inset -1.5px -1px 0px -1px color-mix(in srgb, var(--lg-light) calc(var(--lg-reflex-light) * 80%), transparent),
+    inset -2px -6px 1px -5px color-mix(in srgb, var(--lg-light) calc(var(--lg-reflex-light) * 60%), transparent),
+    inset -1px 2px 3px -1px color-mix(in srgb, var(--lg-dark) calc(var(--lg-reflex-dark) * 20%), transparent),
+    inset 0px -4px 1px -2px color-mix(in srgb, var(--lg-dark) calc(var(--lg-reflex-dark) * 10%), transparent),
+    0px 3px 6px 0px color-mix(in srgb, var(--lg-dark) calc(var(--lg-reflex-dark) * 8%), transparent);
+}
+:root[data-palette="liquid-glass"][data-theme="dark"] {
+  --lg-reflex-light: calc(var(--lg-rim, 1) * .3);
+  --lg-reflex-dark: 2;
+  --lg-solid: #272729;
+  --apple-hairline: #ffffff14;
+  --apple-overlay: #0005;
+  --material-card: #242426;
+  --reading-surface: #242426;
+  --control-primary: #9cdcff;
+  --control-hover: #c4eaff;
+  --control-primary-text: #112234;
+}
+
+/* The reference uses a neutral backdrop. Refraction samples the real content. */
+:root[data-palette="liquid-glass"] .apple-app-shell {
+  background: var(--bg-main);
+}
+:root[data-palette="liquid-glass"] .apple-app-shell::before { display: none; }
+
+/* Three soft glows; the upper-left glow stays visible behind the glass controls. */
+[data-lg-backdrop] {
+  --lg-wallpaper-light: var(--bg-main);
+  --lg-wallpaper-dark: var(--bg-main);
+  --lg-wallpaper: var(--lg-wallpaper-light);
+}
+[data-lg-backdrop="aurora"] {
+  --lg-wallpaper-light: radial-gradient(ellipse 38% 46% at 8% 90%, #9fbdb473 0%, #9fbdb42e 35%, transparent 75%), radial-gradient(ellipse 36% 44% at 88% 10%, #b4abca5c 0%, #b4abca26 35%, transparent 75%), radial-gradient(ellipse 38% 44% at 24% 14%, #b0c9dc8c 0%, #b0c9dc38 35%, transparent 75%), var(--bg-main);
+  --lg-wallpaper-dark: radial-gradient(ellipse 38% 46% at 8% 90%, #62807939 0%, #62807917 35%, transparent 75%), radial-gradient(ellipse 36% 44% at 88% 10%, #80759033 0%, #80759014 35%, transparent 75%), radial-gradient(ellipse 38% 44% at 24% 14%, #759bb142 0%, #759bb11c 35%, transparent 75%), var(--bg-main);
+}
+[data-lg-backdrop="ocean"] {
+  --lg-wallpaper-light: radial-gradient(ellipse 38% 46% at 8% 90%, #9eb1c773 0%, #9eb1c72e 35%, transparent 75%), radial-gradient(ellipse 36% 44% at 88% 10%, #adc3c55c 0%, #adc3c526 35%, transparent 75%), radial-gradient(ellipse 38% 44% at 24% 14%, #b4cdda8c 0%, #b4cdda38 35%, transparent 75%), var(--bg-main);
+  --lg-wallpaper-dark: radial-gradient(ellipse 38% 46% at 8% 90%, #687b9439 0%, #687b9417 35%, transparent 75%), radial-gradient(ellipse 36% 44% at 88% 10%, #6d858933 0%, #6d858914 35%, transparent 75%), radial-gradient(ellipse 38% 44% at 24% 14%, #7497ad42 0%, #7497ad1c 35%, transparent 75%), var(--bg-main);
+}
+[data-lg-backdrop="sunset"] {
+  --lg-wallpaper-light: radial-gradient(ellipse 38% 46% at 8% 90%, #c6b0a573 0%, #c6b0a52e 35%, transparent 75%), radial-gradient(ellipse 36% 44% at 88% 10%, #bcb0c45c 0%, #bcb0c426 35%, transparent 75%), radial-gradient(ellipse 38% 44% at 24% 14%, #dfc4b58c 0%, #dfc4b538 35%, transparent 75%), var(--bg-main);
+  --lg-wallpaper-dark: radial-gradient(ellipse 38% 46% at 8% 90%, #927d7139 0%, #927d7117 35%, transparent 75%), radial-gradient(ellipse 36% 44% at 88% 10%, #8b7d9333 0%, #8b7d9314 35%, transparent 75%), radial-gradient(ellipse 38% 44% at 24% 14%, #b8948042 0%, #b894801c 35%, transparent 75%), var(--bg-main);
+}
+:root[data-theme="dark"][data-lg-backdrop], :root[data-theme="dark"] [data-lg-backdrop] {
+  --lg-wallpaper: var(--lg-wallpaper-dark);
+}
+:root[data-palette="liquid-glass"][data-lg-backdrop]:not([data-lg-backdrop="none"]) .apple-app-shell {
+  background: var(--lg-wallpaper);
+}
+
+/* The reading sheet is the clipped scroll viewport, below the floating chrome. */
+:root[data-palette="liquid-glass"][data-lg-backdrop]:not([data-lg-backdrop="none"]) .apple-editor {
+  background: transparent;
+}
+:root[data-palette="liquid-glass"][data-lg-backdrop]:not([data-lg-backdrop="none"]) .apple-editor-panes {
+  margin: 144px 14px 8px; border-radius: 22px;
+  background: color-mix(in srgb, var(--reading-surface) 95%, transparent);
+  overflow: hidden;
+}
+:root[data-palette="liquid-glass"][data-lg-backdrop]:not([data-lg-backdrop="none"]) .apple-editor-preview {
+  padding-top: 12px;
+}
+:root[data-palette="liquid-glass"][data-lg-backdrop]:not([data-lg-backdrop="none"]) .apple-source-pane .cm-scroller {
+  padding-top: 10px;
+}
+:root[data-palette="liquid-glass"][data-lg-backdrop]:not([data-lg-backdrop="none"]) .apple-editor footer {
+  background: color-mix(in srgb, var(--reading-surface) 95%, transparent);
+}
+
+.apple-glass-background-setting { padding-block: 20px; border-bottom: 1px solid var(--apple-hairline); }
+.apple-glass-background-setting h3 { font-size: 13px; font-weight: 550; letter-spacing: 0; }
+.apple-glass-background-setting > p { margin-block: 5px 14px; font-size: 11px; line-height: 1.5; color: var(--text-muted); }
+.apple-glass-background-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.apple-glass-background-card { padding: 6px; border: 1px solid var(--apple-hairline); border-radius: 16px; text-align: left; background: var(--material-field); }
+.apple-glass-background-card.chosen { outline: 2px solid var(--accent); outline-offset: 2px; }
+.apple-glass-background-swatch { position: relative; display: block; height: 80px; border-radius: 11px; background: var(--lg-wallpaper); overflow: hidden; }
+.apple-glass-background-swatch i { position: absolute; inset: 10px auto 10px 10px; width: 25%; border-radius: 10px; background: #bbbbbc1f; box-shadow: var(--lg-surface-shadow); backdrop-filter: blur(8px); }
+.apple-glass-background-swatch i + i { inset: 14px 10px auto auto; width: 47%; height: 18px; border-radius: 999px; }
+.apple-glass-background-label { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 10px 3px 4px; font-size: 12px; color: var(--text-main); }
+.apple-glass-background-label .apple-theme-check { width: 18px; height: 18px; flex-shrink: 0; }
+:root[data-palette="liquid-glass"] [data-lg-surface] {
+  background: color-mix(in srgb, var(--lg-glass) calc(var(--lg-alpha) * 100%), transparent) !important;
+  border: 0 !important;
+  box-shadow: var(--lg-surface-shadow) !important;
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturation)) !important;
+  backdrop-filter: blur(var(--lg-blur)) var(--lg-lens, ) saturate(var(--lg-saturation)) !important;
+  transition: background-color 400ms cubic-bezier(1,0,.4,1), box-shadow 400ms cubic-bezier(1,0,.4,1);
+}
+:root[data-palette="liquid-glass"] [data-lg-surface]::after { display: none; }
+
+/* Menus need a denser material so labels behind them cannot compete with their rows. */
+:root[data-palette="liquid-glass"] .apple-vault-menu[data-lg-surface] {
+  --lg-glass: var(--material-card);
+  --lg-alpha: .96;
+  --lg-blur: 24px;
+  --lg-saturation: 120%;
+  /* Nested surfaces must not reuse the sidebar's displacement map. */
+  --lg-lens: ;
+  box-shadow: var(--lg-surface-shadow), 0 12px 32px color-mix(in srgb, var(--lg-dark) 18%, transparent) !important;
+}
+
+/* Float the sidebar so its full glass contour is visible. */
+:root[data-palette="liquid-glass"] .apple-sidebar-frame {
+  background: transparent !important; border: 0 !important; box-shadow: none;
+}
+:root[data-palette="liquid-glass"] :is(.apple-sidebar-panel, .apple-sidebar-rail) {
+  --lg-alpha: var(--lg-sidebar-alpha, .12);
+  --lg-refraction: 6;
+}
+:root[data-palette="liquid-glass"] .apple-sidebar-panel {
+  inset: 12px auto 12px 12px; width: 260px; border-radius: 26px;
+  --sidebar-selection: #bbbbbc5c;
+  --sidebar-wash: transparent;
+}
+:root[data-palette="liquid-glass"] .apple-sidebar-panel::before { display: none !important; }
+:root[data-palette="liquid-glass"] .apple-sidebar-panel.mobile {
+  position: fixed; z-index: 80; width: min(260px, calc(100vw - 32px)); transform-origin: top left;
+}
+:root[data-palette="liquid-glass"] .apple-sidebar-scrim {
+  position: fixed; inset: 0; z-index: 75; background: var(--apple-overlay);
+  border: 0; border-radius: 0;
+}
+:root[data-palette="liquid-glass"] .apple-sidebar-rail {
+  inset: 12px auto 12px 12px; width: 56px; border-radius: 28px;
+}
+:root[data-palette="liquid-glass"] .apple-sidebar-rail.desktop {
+  background: transparent !important; box-shadow: none !important;
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+}
+
+/* Every navigation capsule uses the reference's silver fill and bevel. */
+:root[data-palette="liquid-glass"] :is(
+  .apple-vault-button, .apple-sidebar-search, .apple-compose, .apple-sync-status,
+  .apple-settings-link, .apple-theme-toggle, .apple-secondary-button,
+  .apple-secondary-action, .apple-primary-button, .apple-primary-action, .settings-primary,
+  .apple-export summary
+) {
+  background: color-mix(in srgb, var(--lg-glass) 12%, transparent) !important;
+  border: 0 !important; border-radius: 999px;
+  color: var(--text-main); box-shadow: var(--lg-surface-shadow) !important;
+  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturation));
+  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturation));
+  transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+:root[data-palette="liquid-glass"] :is(.apple-compose, .apple-primary-button, .apple-primary-action, .settings-primary) {
+  color: var(--accent); font-weight: 600;
+}
+:root[data-palette="liquid-glass"] .apple-compose.destructive {
+  background: #c8323a !important; color: #fff !important;
+}
+:root[data-palette="liquid-glass"] :is(
+  .apple-vault-button, .apple-sidebar-search, .apple-compose, .apple-sync-status,
+  .apple-settings-link, .apple-theme-toggle, .apple-secondary-button,
+  .apple-secondary-action, .apple-primary-button, .apple-primary-action, .settings-primary,
+  .apple-export summary
+):hover {
+  background: color-mix(in srgb, var(--lg-glass) 24%, transparent) !important;
+  color: var(--accent);
+}
+:root[data-palette="liquid-glass"] :is(.apple-compose-badge, .apple-vault-icon, .apple-document-icon) {
+  background: color-mix(in srgb, var(--lg-glass) 24%, transparent) !important;
+  color: var(--text-main); border: 0; box-shadow: var(--lg-selection-shadow);
+}
+:root[data-palette="liquid-glass"] :is(.apple-sidebar-navigation > button, .apple-note-row, .settings-nav button) {
+  background: transparent; border: 0 !important; box-shadow: none; backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+:root[data-palette="liquid-glass"] .apple-sidebar-navigation > button { border-radius: 999px; }
+:root[data-palette="liquid-glass"] :is(.apple-sidebar-navigation > button, .apple-note-row, .settings-nav button):hover {
+  background: color-mix(in srgb, var(--lg-glass) 20%, transparent); color: var(--text-main);
+}
+:root[data-palette="liquid-glass"] :is(.apple-sidebar-navigation > button.current, .apple-sidebar-navigation > button.assistant-active, .apple-note-row.selected, .settings-nav button.active) {
+  background: color-mix(in srgb, var(--lg-glass) 36%, transparent) !important;
+  color: var(--text-main); box-shadow: var(--lg-selection-shadow) !important;
+}
+:root[data-palette="liquid-glass"] :is(.apple-sidebar-navigation small, kbd) {
+  border: 0 !important; background: color-mix(in srgb, var(--lg-glass) 24%, transparent) !important;
+  color: var(--text-muted); box-shadow: none;
+}
+
+/* Responsive version of the supplied switcher. Its thumb is driven by a spring. */
+:root[data-palette="liquid-glass"] .apple-segmented {
+  --lg-refraction: 0;
+  --segment-overlap: 8px;
+  border-radius: 999px; padding: 8px 12px 10px; gap: 8px; min-height: 50px;
+  background: transparent;
+  box-shadow: none; border: 0;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+:root[data-palette="liquid-glass"] .apple-segment-material[data-lg-surface] {
+  --lg-alpha: .12;
+  clip-path: inset(0 round 999px);
+  box-shadow: none !important;
+}
+/* Draw the bevel above the optical layer so refraction never blurs the rim. */
+:root[data-palette="liquid-glass"] .apple-segment-rim {
+  box-shadow: var(--lg-surface-shadow);
+}
+:root[data-palette="liquid-glass"] .apple-segment-indicator {
+  inset: 4px auto 6px 4px; width: calc((100% - 16px) / var(--segments) + 8px);
+  border-radius: 999px; background: color-mix(in srgb, var(--lg-glass) 36%, transparent);
+  box-shadow: var(--lg-selection-shadow);
+}
+:root[data-palette="liquid-glass"] .apple-segmented button { border-radius: 999px; color: var(--text-main); }
+:root[data-palette="liquid-glass"] .apple-segmented button:not(.active):hover { color: var(--accent); }
+:root[data-palette="liquid-glass"] .apple-segmented button svg {
+  transition: scale 200ms cubic-bezier(.5,0,0,1);
+}
+:root[data-palette="liquid-glass"] .apple-segmented button:not(.active):hover svg { scale: 1.15; }
+:root[data-palette="liquid-glass"] .apple-segmented.vertical { min-height: 52px; padding: 4px 12px; }
+:root[data-palette="liquid-glass"] .apple-segmented.vertical .apple-segment-indicator { bottom: 4px; }
+:root[data-palette="liquid-glass"] .apple-segmented.vertical button { min-height: 44px; padding: 0 2px; gap: 3px; }
+
+/* One glass surface contains the editor header and formatting toolbar. */
+.apple-editor-chrome { display: contents; }
+:root[data-palette="liquid-glass"] .apple-editor { position: relative; background: var(--reading-surface); box-shadow: none; }
+:root[data-palette="liquid-glass"] .apple-editor-chrome {
+  display: block; position: absolute; inset: 12px 14px auto; z-index: 30;
+  border-radius: 26px;
+}
+:root[data-palette="liquid-glass"] :is(.apple-note-header, .apple-formatting-toolbar) {
+  background: transparent !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+}
+:root[data-palette="liquid-glass"] .apple-note-header { min-height: 56px; padding: 10px 18px; border-bottom: 1px solid var(--apple-hairline); }
+:root[data-palette="liquid-glass"] .apple-formatting-toolbar { min-height: 40px; padding: 4px 18px; border: 0; }
+:root[data-palette="liquid-glass"] .apple-formatting-group { background: transparent; border: 0; border-right: 1px solid var(--apple-hairline); border-radius: 0; padding-right: 8px; }
+:root[data-palette="liquid-glass"] .apple-formatting-group button { border-radius: 999px; }
+:root[data-palette="liquid-glass"] :is(.apple-editor-panes, .graph-area) { background: var(--reading-surface); backdrop-filter: none; }
+:root[data-palette="liquid-glass"] .apple-editor-preview { padding-top: 156px; }
+:root[data-palette="liquid-glass"] .apple-source-pane .cm-scroller { padding-top: 154px; }
+:root[data-palette="liquid-glass"] .apple-editor footer { background: var(--reading-surface); backdrop-filter: none; }
+
+:root[data-palette="liquid-glass"] :is(.apple-export-menu, .apple-vault-menu, .apple-note-menu, [role="dialog"]:not(.apple-sidebar-panel)) { border-radius: 24px; }
+:root[data-palette="liquid-glass"] :is(.apple-ai-sidebar, .settings-section, .apple-chat-suggestion, .apple-chat-context, .apple-chat-footer, .settings-topbar) {
+  background: var(--reading-surface); backdrop-filter: none; -webkit-backdrop-filter: none;
+  border-color: var(--apple-hairline); box-shadow: none;
+}
+:root[data-palette="liquid-glass"] .apple-ai-sidebar-content > header { position: relative; border-radius: 24px; margin: 10px; }
+:root[data-palette="liquid-glass"] .apple-chat-composer { position: relative; border-radius: 24px; }
+:root[data-palette="liquid-glass"] :is(.fixed.inset-0:has(> [role="dialog"]), [data-modal-backdrop], .apple-dialog-backdrop, .apple-sidebar-scrim) {
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+:root[data-palette="liquid-glass"] .apple-graph { box-shadow: none; }
+
+/* Solid variants preserve the same layout and control feedback. */
+:root[data-palette="liquid-glass"][data-lg-fallback="true"] [data-lg-surface] {
+  background: var(--lg-solid) !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+  transition: none;
+}
+:root[data-palette="liquid-glass"][data-lg-fallback="true"] :is(
+  .apple-vault-button, .apple-sidebar-search, .apple-compose, .apple-sync-status,
+  .apple-settings-link, .apple-theme-toggle, .apple-secondary-button,
+  .apple-secondary-action, .apple-primary-button, .apple-primary-action, .settings-primary,
+  .apple-export summary
+) { backdrop-filter: none; -webkit-backdrop-filter: none; }
+@supports not ((backdrop-filter: blur(8px)) or (-webkit-backdrop-filter: blur(8px))) {
+  :root[data-palette="liquid-glass"] [data-lg-surface] { background: var(--lg-solid) !important; }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  :root[data-palette="liquid-glass"] [data-lg-surface] { background: var(--lg-solid) !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  :root[data-palette="liquid-glass"] :is(.apple-vault-button, .apple-sidebar-search, .apple-compose, .apple-sync-status, .apple-settings-link, .apple-theme-toggle, .apple-secondary-button, .apple-secondary-action, .apple-primary-button, .apple-primary-action, .settings-primary, .apple-export summary) { backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  :root[data-palette="liquid-glass"] button[aria-pressed="true"] { outline: 1px solid currentColor; outline-offset: -3px; }
+}
+@media (forced-colors: active) {
+  :root[data-palette="liquid-glass"] .apple-app-shell * { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  :root[data-palette="liquid-glass"] [data-lg-surface] { background: Canvas !important; color: CanvasText; box-shadow: none !important; border: 1px solid CanvasText !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+  :root[data-palette="liquid-glass"] .apple-segment-indicator { background: Highlight; box-shadow: none; }
+  :root[data-palette="liquid-glass"] .apple-segment-rim { box-shadow: none; }
+  :root[data-palette="liquid-glass"] .apple-segmented button.active { color: HighlightText; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-palette="liquid-glass"] [data-lg-surface], :root[data-palette="liquid-glass"] .apple-segmented button svg,
+  :root[data-palette="liquid-glass"] .apple-segment-indicator { transition: none; }
+}
+@media (max-width: 620px) {
+  .apple-glass-background-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :root[data-palette="liquid-glass"][data-lg-backdrop]:not([data-lg-backdrop="none"]) .apple-editor-panes { margin: 132px 8px 8px; border-radius: 18px; }
+  :root[data-palette="liquid-glass"] .apple-editor-chrome { inset: 8px 8px auto; border-radius: 22px; }
+  :root[data-palette="liquid-glass"] .apple-note-header { padding: 10px; }
+  :root[data-palette="liquid-glass"] .apple-formatting-toolbar { padding-inline: 8px; }
+  :root[data-palette="liquid-glass"] .apple-editor-preview { padding-top: 144px; }
+  :root[data-palette="liquid-glass"] .apple-source-pane .cm-scroller { padding-top: 142px; }
+}
+@media (max-width: 760px) {
+  :root[data-palette="liquid-glass"] .apple-sidebar-rail { inset: 8px auto 8px 8px; width: 48px; border-radius: 24px; }
+}

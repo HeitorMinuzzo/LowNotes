@@ -131,7 +131,7 @@ export interface ThemePalette {
   light: ThemeColors;
 }
 
-/** The selected Apple design is persisted. Legacy custom color data is archived
+/** Liquid Glass is persisted as the only design. Legacy custom color data is archived
  *  for compatibility and is no longer selectable. */
 export interface ThemePalettesSettings {
   active_palette_id: string;

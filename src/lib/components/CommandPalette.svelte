@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { liquidGlass } from '$lib/liquid-glass';
   import { tick } from 'svelte';
   import {
     Search, FileText, FolderPlus, FilePlus, Share2, Settings,
@@ -205,7 +206,7 @@
     {
       id: 'settings-themes',
       title: $t('settings.themes'),
-      subtitle: $t('settings.appleThemesHint'),
+      subtitle: $t('settings.appearanceOptionsHint'),
       category: 'system',
       icon: Palette,
       accent: 'var(--accent)',
@@ -297,7 +298,7 @@
     <!-- Modal Dialog -->
     <div
       class="apple-command relative w-full max-w-xl rounded-2xl glass-panel border border-white/10 dark:border-white/[0.08] shadow-2xl overflow-hidden flex flex-col max-h-[70vh] animate-scale-in"
-      role="dialog"
+      use:liquidGlass role="dialog"
       aria-modal="true"
       aria-label="Paleta de Comandos"
     >

@@ -31,6 +31,7 @@
   import { locale, resolveLocale, t, trError } from '$lib/i18n';
   import { resolveNoteLink } from '$lib/note-links';
   import { DEFAULT_PALETTE_ID, applyTheme } from '$lib/themes';
+  import { liquidGlass } from '$lib/liquid-glass';
   import Sidebar from '$lib/components/AppleSidebar.svelte';
   import * as Y from 'yjs';
   import {
@@ -65,6 +66,7 @@
   let settings = $state<AppSettings | null>(null);
   let theme = $state<AppTheme>('light');
   let viewMode = $state<ViewMode>('split');
+  let sidebarVisible = $state(true);
   let appleNewNoteOpen = $state(false);
   let appleNewNoteName = $state('');
   let appleNewNoteError = $state('');
@@ -563,7 +565,7 @@
   });
 </script>
 
-<div class="apple-app-shell flex h-screen w-screen overflow-hidden bg-[var(--bg-main)] text-[var(--text-main)]">
+<div class="apple-app-shell flex h-screen w-screen overflow-hidden text-[var(--text-main)]">
   {#if isSettingsOpen && settings}
     <SettingsView {settings} initialTab={settingsTab} onClose={() => void closeSettings()} onChange={handleSettingsChange} />
   {:else if !activeVault}
@@ -623,6 +625,7 @@
       onToggleAi={() => (isAiChatOpen = !isAiChatOpen)}
       onToggleTheme={toggleTheme}
       onViewModeChange={handleViewModeChange}
+      onPanelVisibilityChange={(visible) => sidebarVisible = visible}
     />
 
     <!-- Editor Surface -->
@@ -654,6 +657,7 @@
           {targetLine}
           {theme}
           {viewMode}
+          showFloatingViewModes={!sidebarVisible}
           lineWrapping={settings?.line_wrapping ?? true}
           imageUploadProvider={settings?.image_upload?.provider ?? 'local'}
           vaultId={settings?.active_vault_id ?? ''}
@@ -707,7 +711,7 @@
       <div
         bind:this={appleDialogElement}
         class="apple-new-note-dialog"
-        role="dialog"
+        use:liquidGlass role="dialog"
         tabindex="-1"
         aria-modal="true"
         aria-labelledby="apple-new-note-title"

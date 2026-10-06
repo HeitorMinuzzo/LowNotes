@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { liquidGlass } from '$lib/liquid-glass';
   import {
     AlertCircle,
     Bold,
@@ -21,8 +22,10 @@
     Sparkles,
     Strikethrough,
   } from 'lucide-svelte';
-  import { onMount, onDestroy, tick } from 'svelte';
-  import { Spring, prefersReducedMotion } from 'svelte/motion';
+  import { onMount, onDestroy, untrack } from 'svelte';
+  import { Tween, prefersReducedMotion } from 'svelte/motion';
+  import { cubicInOut, cubicOut } from 'svelte/easing';
+  import { fly } from 'svelte/transition';
   import { EditorView, basicSetup } from 'codemirror';
   import { markdown } from '@codemirror/lang-markdown';
   import { Compartment, EditorState } from '@codemirror/state';
@@ -36,6 +39,7 @@
   import { crdtApplyClientUpdate, readNote, broadcastAwareness, uploadClipboardImage, localImageUrl } from '../api';
   import { renderMarkdown } from '../markdown';
   import DocumentActions from './DocumentActions.svelte';
+  import ViewModeControl from './ui/ViewModeControl.svelte';
   import type { AppTheme, ViewMode, ImageUploadProvider } from '../types';
   import { t, ts, trError } from '$lib/i18n';
   import {
@@ -58,6 +62,7 @@
     imageUploadProvider = 'local',
     vaultId = '',
     onViewModeChange,
+    showFloatingViewModes = false,
     isAiChatOpen = false,
     onToggleAiChat,
     onContentChange,
@@ -78,6 +83,7 @@
     imageUploadProvider?: ImageUploadProvider;
     vaultId?: string;
     onViewModeChange: (mode: ViewMode) => void;
+    showFloatingViewModes?: boolean;
     isAiChatOpen?: boolean;
     onToggleAiChat?: () => void;
     onContentChange?: (path: string, newContent: string) => void;
@@ -89,23 +95,31 @@
     deviceId?: string;
   }>();
 
-  const pane = new Spring(.5, { stiffness: .2, damping: .95, precision: .001 });
-  const paneRatio = $derived(Math.max(0, Math.min(1, pane.current)));
+  const paneLayout = new Tween(untrack(() => ({
+    position: viewMode === 'edit' ? 1 : viewMode === 'preview' ? 0 : .5,
+    sourceWidth: viewMode === 'edit' ? 1 : .5,
+    previewWidth: viewMode === 'preview' ? 1 : .5,
+  })));
+  const paneRatio = $derived(paneLayout.current.position);
   let paneContainer = $state<HTMLElement | null>(null);
   let paneWidth = $state(0);
-  let sourceLayoutRatio = $state(.5);
-  let previewLayoutRatio = $state(.5);
+  const sourceLayoutRatio = $derived(paneLayout.current.sourceWidth);
+  const previewLayoutRatio = $derived(paneLayout.current.previewWidth);
   let paneObserver: ResizeObserver | null = null;
   let paneInitialized = false;
   $effect(() => {
-    const ratio = viewMode === 'edit' ? 1 : viewMode === 'preview' ? 0 : .5;
-    // Lay text out once at its destination width; only the surrounding reveal animates.
-    // This prevents CodeMirror and paragraphs from rewrapping on every spring frame.
-    if (viewMode !== 'preview') sourceLayoutRatio = ratio;
-    if (viewMode !== 'edit') previewLayoutRatio = 1 - ratio;
-    void pane.set(ratio, { instant: !paneInitialized || prefersReducedMotion.current });
+    const next = viewMode;
+    const instant = !paneInitialized || prefersReducedMotion.current;
     paneInitialized = true;
-    void tick().then(() => editorView?.requestMeasure());
+    untrack(() => {
+      // Move the divider and resize visible documents together; retain hidden documents' readable widths.
+      // Retarget from the current geometry so rapid reversals never jump to an old mode.
+      void paneLayout.set({
+        position: next === 'edit' ? 1 : next === 'preview' ? 0 : .5,
+        sourceWidth: next === 'preview' ? paneLayout.current.sourceWidth : next === 'edit' ? 1 : .5,
+        previewWidth: next === 'edit' ? paneLayout.current.previewWidth : next === 'preview' ? 1 : .5,
+      }, { duration: instant ? 0 : 1100, easing: cubicInOut });
+    });
   });
   let editorContainer: HTMLDivElement | null = $state(null);
   let previewContainer: HTMLDivElement | null = $state(null);
@@ -321,6 +335,11 @@
         imagePaste.extension,
         editorTheme.of(codeMirrorTheme()),
         editorWrapping.of(lineWrapping ? EditorView.lineWrapping : []),
+        EditorView.scrollMargins.of((view) => {
+          if (document.documentElement.dataset.palette !== 'liquid-glass') return { top: 0 };
+          const chrome = view.dom.closest('.apple-editor')?.querySelector('.apple-editor-chrome');
+          return { top: chrome ? Math.max(0, chrome.getBoundingClientRect().bottom - view.scrollDOM.getBoundingClientRect().top + 10) : 0 };
+        }),
       ],
     });
 
@@ -462,6 +481,7 @@
 
   onDestroy(() => {
     paneObserver?.disconnect();
+    void paneLayout.set(paneLayout.current, { duration: 0 });
     imagePaste?.destroy();
     disposed = true;
     if (editorView) editorView.destroy();
@@ -502,8 +522,9 @@
   });
 </script>
 
-<div class="apple-editor flex flex-col h-full w-full bg-[var(--bg-main)]">
+<div class="apple-editor flex flex-col h-full w-full" class:has-floating-view-modes={showFloatingViewModes}>
   <!-- Top Editor Toolbar (Glassmorphic Bar) -->
+  <div use:liquidGlass={{ kind: 'clear' }} class="apple-editor-chrome">
   <header class="apple-note-header">
     <div class="apple-note-heading"><span class="apple-document-icon"><FileText size={20} strokeWidth={1.6} /></span><div><strong>{notePath.split('/').at(-1)?.replace(/\.md$/i, '')}</strong><span>{notePath.includes('/') ? notePath.slice(0, notePath.lastIndexOf('/')) : 'LowNotes'}</span></div></div>
     <div class="apple-note-header-actions">
@@ -521,6 +542,7 @@
       <div class="apple-formatting-group">{#each group as tool}<button type="button" disabled={viewMode === 'preview'} onclick={() => applyFormatting(tool.prefix, tool.suffix)} title={tool.label} aria-label={tool.label}><tool.icon size={16} strokeWidth={1.7} /></button>{/each}</div>
     {/each}
     <span class="apple-formatting-caption">Markdown</span>
+  </div>
   </div>
   <!-- Editor & Preview Body -->
   {#if imageUploads.length}
@@ -545,8 +567,10 @@
     </div>
   {/if}
   <main bind:this={paneContainer} class="apple-editor-panes" style:grid-template-columns="{paneRatio}fr {1 - paneRatio}fr">
-    <div bind:this={editorContainer} class="apple-source-pane" inert={viewMode === 'preview'} aria-hidden={viewMode === 'preview'} style:--source-width={paneWidth ? `${paneWidth * sourceLayoutRatio}px` : '100%'} style:opacity={Math.min(1, paneRatio * 5)}></div>
-    <div class="apple-preview-pane" inert={viewMode === 'edit'} aria-hidden={viewMode === 'edit'} style:--preview-width={paneWidth ? `${paneWidth * previewLayoutRatio}px` : '100%'} style:opacity={Math.min(1, (1 - paneRatio) * 5)}>
+    <div class="apple-source-pane" inert={viewMode === 'preview'} aria-hidden={viewMode === 'preview'} style:--source-width={paneWidth ? `${paneWidth * sourceLayoutRatio}px` : '100%'}>
+      <div bind:this={editorContainer} class="apple-source-content"></div>
+    </div>
+    <div class="apple-preview-pane" inert={viewMode === 'edit'} aria-hidden={viewMode === 'edit'} style:--preview-width={paneWidth ? `${paneWidth * previewLayoutRatio}px` : '100%'}>
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div bind:this={previewContainer} role="presentation" onclick={handlePreviewClick} class="apple-editor-preview select-text">
         <article class="prose max-w-none text-[var(--text-main)]">
@@ -554,9 +578,16 @@
         </article>
       </div>
     </div>
+    <div class="apple-floating-view-modes-anchor" inert={!showFloatingViewModes} aria-hidden={!showFloatingViewModes}>
+      {#if showFloatingViewModes}
+        <div class="apple-floating-view-modes" transition:fly={{ y: 108, opacity: 1, duration: prefersReducedMotion.current ? 0 : 700, easing: cubicOut }}>
+          <ViewModeControl value={viewMode} onchange={onViewModeChange} />
+        </div>
+      {/if}
+    </div>
   </main>
   <!-- Status Bar Footer -->
-  <footer class="flex items-center justify-between px-5 py-2 border-t border-[var(--border)] bg-[var(--bg-sidebar)]/80 backdrop-blur-md text-xs text-[var(--text-dim)] select-none">
+  <footer class="apple-editor-footer flex items-center justify-between px-5 py-2 text-xs text-[var(--text-dim)] select-none">
     <div class="flex items-center gap-2">
       <span class="font-mono text-[11px] text-[var(--text-muted)] truncate max-w-md">{notePath}</span>
     </div>
@@ -570,6 +601,14 @@
 </div>
 
 <style>
+  .apple-source-content { height: 100%; }
+  .apple-editor-panes { position: relative; }
+  .apple-floating-view-modes-anchor { position: absolute; inset: auto 12px 12px; z-index: 35; display: flex; justify-content: center; pointer-events: none; }
+  /* Keep the glass in the same compositing context after fly removes its animation. */
+  .apple-floating-view-modes { width: min(252px, 100%); pointer-events: auto; transform: translate3d(0, 0, 0); }
+  .has-floating-view-modes .apple-editor-preview { padding-bottom: 132px; }
+  .has-floating-view-modes :global(.cm-scroller) { padding-bottom: 124px; }
+
   :global(.prose) {
     line-height: 1.7;
     font-size: 15px;

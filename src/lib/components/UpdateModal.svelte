@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { liquidGlass } from '$lib/liquid-glass';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { relaunch } from '@tauri-apps/plugin-process';
   import type { DownloadEvent } from '@tauri-apps/plugin-updater';
@@ -103,7 +104,7 @@
   >
     <div
       class="relative bg-[var(--bg-card)]/95 backdrop-blur-2xl border border-[var(--border)] rounded-2xl w-full max-w-[560px] shadow-2xl overflow-hidden flex flex-col"
-      role="dialog"
+      use:liquidGlass role="dialog"
       aria-modal="true"
       aria-labelledby="update-dialog-title"
       tabindex="-1"

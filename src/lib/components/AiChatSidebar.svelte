@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { liquidGlass } from '$lib/liquid-glass';
   import SegmentedControl from './ui/SegmentedControl.svelte';
   import { dismissibleModal } from '$lib/modal-dismiss';
   import {
@@ -23,6 +24,8 @@
     X,
   } from 'lucide-svelte';
   import { onDestroy, onMount, tick } from 'svelte';
+  import { MediaQuery } from 'svelte/reactivity';
+  import { Spring, prefersReducedMotion } from 'svelte/motion';
   import { openUrl } from '@tauri-apps/plugin-opener';
   import { renderChatMarkdown } from '../markdown';
   import { connectDraftCollection, groupDraftPaths } from '$lib/draft-paths';
@@ -67,6 +70,16 @@
     onNotesCreated: () => Promise<void>;
     onOpenSettings: (tab?: 'ai' | 'providers' | 'web') => void;
   }>();
+
+  const overlay = new MediaQuery('(max-width: 850px)');
+  const reveal = new Spring(0, { stiffness: .075, damping: .8, precision: .001 });
+  const revealRatio = $derived(Math.max(0, Math.min(1, reveal.current)));
+  const contentOpacity = $derived(Math.max(0, (revealRatio - .6) / .4));
+  let motionInitialized = false;
+  $effect(() => {
+    void reveal.set(isOpen ? 1 : 0, { instant: !motionInitialized || prefersReducedMotion.current });
+    motionInitialized = true;
+  });
 
   let scope = $state<'vault' | 'note'>('vault');
   let skill = $state<AssistantSkill>('auto');
@@ -352,12 +365,19 @@
   }
 </script>
 
-{#if isOpen}
+{#if isOpen || revealRatio > .001}
+  <div class="apple-ai-sidebar-frame" class:overlay={overlay.current}
+    style:width={overlay.current ? undefined : `${412 * revealRatio}px`}
+    inert={!isOpen} aria-hidden={!isOpen}>
   <aside
-    class="apple-ai-sidebar w-100 h-full flex flex-col border-l border-[var(--border)] bg-[var(--bg-sidebar)] z-30 select-none shadow-2xl relative transition-all"
+    class="apple-ai-sidebar w-100 h-full flex flex-col border-l border-[var(--border)] bg-[var(--bg-sidebar)] z-30 select-none shadow-2xl relative"
+    aria-label={$t('ai.title')}
+    style:opacity={overlay.current ? revealRatio : 1}
+    style:transform={overlay.current ? `translateX(${(1 - revealRatio) * -8}px) scale(${.97 + .03 * revealRatio})` : undefined}
   >
+    <div class="apple-ai-sidebar-content" style:opacity={overlay.current ? 1 : contentOpacity}>
     <!-- Top Header -->
-    <header class="app-topbar h-11 shrink-0 flex items-center justify-between gap-2 px-4 border-b border-[var(--border)] bg-[var(--bg-card)]/90 backdrop-blur-xl min-w-0">
+    <header use:liquidGlass class="app-topbar h-11 shrink-0 flex items-center justify-between gap-2 px-4 border-b border-[var(--border)] bg-[var(--bg-card)]/90 backdrop-blur-xl min-w-0">
       <div class="flex items-center gap-2 min-w-0">
         <Bot size={16} class="text-[var(--accent)] shrink-0" />
         <div class="flex flex-col min-w-0">
@@ -401,7 +421,7 @@
     </header>
 
     <!-- Provider and Scope Bar -->
-    <div class="px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-sidebar)]/90 backdrop-blur-md flex flex-col gap-2 min-w-0">
+    <div class="apple-chat-context px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-sidebar)]/90 backdrop-blur-md flex flex-col gap-2 min-w-0">
       <!-- Provider Selector -->
       <div class="flex items-center justify-between gap-2">
         <span class="text-[11px] font-semibold text-[var(--text-dim)]">Modelo / Provedor:</span>
@@ -686,10 +706,10 @@
     </div>
 
     <!-- Chat Input Footer -->
-    <footer class="p-3 border-t border-[var(--border)] bg-[var(--bg-card)]/90 backdrop-blur-xl">
+    <footer class="apple-chat-footer p-3 border-t border-[var(--border)] bg-[var(--bg-card)]/90 backdrop-blur-xl">
       <form
         onsubmit={(e) => { e.preventDefault(); sendMessage(); }}
-        class="apple-chat-composer flex flex-col gap-2 p-2"
+        use:liquidGlass class="apple-chat-composer flex flex-col gap-2 p-2"
       >
         <div class="relative">
           <textarea
@@ -720,10 +740,12 @@
       </form>
     </footer>
     {/if}
+    </div>
   </aside>
-  {#if historyDialog}
+  </div>
+  {#if isOpen && historyDialog}
     <div class="apple-dialog-backdrop" role="presentation" use:dismissibleModal={() => (historyDialog = null)}>
-      <div class="apple-new-note-dialog" role="dialog" aria-modal="true" aria-labelledby="apple-history-title" tabindex="-1">
+      <div class="apple-new-note-dialog" use:liquidGlass role="dialog" aria-modal="true" aria-labelledby="apple-history-title" tabindex="-1">
         <form onsubmit={(event) => { event.preventDefault(); confirmHistoryAction(); }}>
           <span class="apple-dialog-eyebrow">{$t('ai.history')}</span>
           <h2 id="apple-history-title">{$t(historyDialog.kind === 'rename' ? 'ai.renameChat' : 'ai.deleteChat')}</h2>
@@ -738,3 +760,12 @@
     </div>
   {/if}
 {/if}
+
+<style>
+  /* Mirror the sidebar's anchored width reveal; the chat keeps its readable width. */
+  .apple-ai-sidebar-frame { position: relative; flex: 0 0 auto; height: 100%; overflow: clip; }
+  .apple-ai-sidebar-frame .apple-ai-sidebar { position: absolute; inset: 0 0 0 auto; width: 400px; height: calc(100% - 24px); margin: 12px 12px 12px 0; flex: none; border-radius: 22px; overflow: hidden; transform-origin: center right; }
+  .apple-ai-sidebar-content { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  .apple-ai-sidebar-frame.overlay { position: fixed; inset: 0 0 0 auto; width: min(412px, calc(100vw - 52px)); z-index: 50; }
+  .apple-ai-sidebar-frame.overlay .apple-ai-sidebar { width: calc(100% - 12px); }
+</style>

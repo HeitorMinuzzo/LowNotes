@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { liquidGlass } from '$lib/liquid-glass';
   import { Check, Laptop, Link2, X } from 'lucide-svelte';
   import type { PeerConfig } from '../types';
   import { networkAnswerPair } from '../api';
@@ -36,7 +37,7 @@
   >
     <div
       class="relative bg-[var(--bg-card)]/95 backdrop-blur-xl border border-[var(--accent)] rounded-3xl w-full max-w-md shadow-2xl p-6 flex flex-col gap-4 overflow-hidden"
-      role="dialog" aria-label={$t('incoming.title')}
+      use:liquidGlass role="dialog" aria-label={$t('incoming.title')}
       aria-modal="true"
       tabindex="-1"
     >

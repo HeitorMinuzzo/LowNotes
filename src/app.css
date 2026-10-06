@@ -27,26 +27,26 @@
 :root {
   color-scheme: light;
   --app-toolbar-height: 60px;
-  --bg-main: #ffffff; --bg-sidebar: #f5f5f7; --bg-card: #ffffff;
-  --bg-hover: #e8e8ed; --bg-active: #d2d2d7; --border: #e0e0e0;
-  --text-main: #1d1d1f; --text-muted: #62626a; --text-dim: #73737b;
-  --accent: #0066cc; --accent-light: #0071e3; --accent-contrast: #ffffff;
-  --accent-hover: #0071e3; --accent-glow: rgba(0,102,204,.12);
-  --success: #248a3d; --danger: #d93025;
-  --line-highlight: rgba(0,102,204,.04); --selection: rgba(0,102,204,.18);
-  --editor-link: #0066cc; --editor-link-hover: #0071e3;
+  --bg-main: #e8e8e9; --bg-sidebar: #e5e5e7; --bg-card: #f5f5f7;
+  --bg-hover: #dddddf; --bg-active: #d6d6da; --border: #cfcfd4;
+  --text-main: #222244; --text-muted: #525268; --text-dim: #626276;
+  --accent: #0052f5; --accent-light: #0045d1; --accent-contrast: #ffffff;
+  --accent-hover: #0045d1; --accent-glow: rgba(0,82,245,.12);
+  --success: #287852; --danger: #c8323a;
+  --line-highlight: rgba(0,82,245,.04); --selection: rgba(0,82,245,.18);
+  --editor-link: #0052f5; --editor-link-hover: #0045d1;
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --bg-main: #1d1d1f; --bg-sidebar: #161617; --bg-card: #272729;
-  --bg-hover: #333336; --bg-active: #424245; --border: #38383a;
-  --text-main: #f5f5f7; --text-muted: #b1b1b8; --text-dim: #96969f;
-  --accent: #2997ff; --accent-light: #70baff; --accent-contrast: #ffffff;
-  --accent-hover: #70baff; --accent-glow: rgba(41,151,255,.12);
-  --success: #30d158; --danger: #ff6961;
-  --line-highlight: rgba(41,151,255,.04); --selection: rgba(41,151,255,.18);
-  --editor-link: #2997ff; --editor-link-hover: #70baff;
+  --bg-main: #1b1b1d; --bg-sidebar: #202022; --bg-card: #242426;
+  --bg-hover: #343437; --bg-active: #414146; --border: #444449;
+  --text-main: #e1e1e1; --text-muted: #bdbdc8; --text-dim: #a5a5b5;
+  --accent: #9cdcff; --accent-light: #c4eaff; --accent-contrast: #112234;
+  --accent-hover: #c4eaff; --accent-glow: rgba(156,220,255,.12);
+  --success: #81d4a5; --danger: #ffa3a7;
+  --line-highlight: rgba(156,220,255,.04); --selection: rgba(156,220,255,.18);
+  --editor-link: #9cdcff; --editor-link-hover: #c4eaff;
 }
 
 * {

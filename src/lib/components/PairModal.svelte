@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { liquidGlass } from '$lib/liquid-glass';
   import { Check, Copy, Laptop, Link, RefreshCw, Share2, Trash2, X } from 'lucide-svelte';
   import type { NetworkEventPayload, PeerConfig } from '../types';
   import { networkRequestPair, networkRemovePeer, networkGetPairInfo } from '../api';
@@ -133,7 +134,7 @@
     <!-- Modal Dialog -->
     <div
       class="relative bg-[var(--bg-card)]/95 backdrop-blur-xl border border-[var(--border)] rounded-3xl w-full max-w-lg shadow-2xl flex flex-col overflow-hidden"
-      role="dialog" aria-label={$t('pair.title')}
+      use:liquidGlass role="dialog" aria-label={$t('pair.title')}
       aria-modal="true"
       tabindex="-1"
     >

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { liquidGlass } from '$lib/liquid-glass';
   import { ArrowRight, Bot, FileText, Link2, MessageSquare, Sparkles } from 'lucide-svelte';
   import { markWelcomeSeen, saveLanguage } from '../api';
   import { t, locale, LOCALE_LABELS, SUPPORTED_LOCALES } from '$lib/i18n';
@@ -34,7 +35,7 @@
   >
     <div
       class="relative bg-[var(--bg-card)]/95 backdrop-blur-2xl border border-[var(--border)] rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col"
-      role="dialog" aria-label={$t('welcome.title')}
+      use:liquidGlass role="dialog" aria-label={$t('welcome.title')}
       aria-modal="true"
       tabindex="-1"
     >

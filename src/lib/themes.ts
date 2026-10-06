@@ -1,66 +1,28 @@
 
 import type { AppTheme, ThemeColors, ThemePalette } from './types';
 
-/** The two Apple designs share system colors, typography and components. */
-
-export const DEFAULT_PALETTE_ID = 'apple';
-
-const APPLE_PALETTE: ThemePalette = {
-  id: 'apple',
-  name: 'Apple',
-  dark: {
-    bg_main: '#1d1d1f',      // Near-black ink canvas (apple.design.md)
-    bg_sidebar: '#161617',   // Frosted sub-surface sidebar
-    bg_card: '#272729',      // surface-tile-1
-    bg_hover: '#333336',     // surface-tile-2
-    bg_active: '#424245',    // active tile
-    border: '#38383a',       // hairline border
-    text_main: '#f5f5f7',    // canvas-parchment text
-    text_muted: '#b1b1b8',   // body-muted
-    text_dim: '#96969f',     // ink-muted-48
-    accent: '#2997ff',       // Sky Link Blue (Action Blue on dark)
-    accent_light: '#70baff', // focus ring / hover
-    accent_contrast: '#ffffff',
-    success: '#30d158',      // Apple system green
-    danger: '#ff6961',       // Apple system red
-  },
-  light: {
-    bg_main: '#ffffff',      // Pure white canvas
-    bg_sidebar: '#f5f5f7',   // Canvas parchment (signature Apple off-white)
-    bg_card: '#ffffff',      // Utility card canvas
-    bg_hover: '#e8e8ed',     // Soft hover
-    bg_active: '#d2d2d7',    // Translucent chip base
-    border: '#e0e0e0',       // Hairline border
-    text_main: '#1d1d1f',    // Near-black ink
-    text_muted: '#62626a',   // Ink muted 80
-    text_dim: '#73737b',     // Ink muted 48
-    accent: '#0066cc',       // Action Blue (#0066cc)
-    accent_light: '#0071e3', // Focus Blue (#0071e3)
-    accent_contrast: '#ffffff',
-    success: '#248a3d',      // Apple system green
-    danger: '#d93025',       // Apple system red
-  },
-};
+/** Liquid Glass is the app's only design, with light and dark appearances. */
+export const DEFAULT_PALETTE_ID = 'liquid-glass';
 
 const GLASS_PALETTE: ThemePalette = {
-  id: 'apple-glass', name: 'Apple Liquid Glass',
+  id: 'liquid-glass', name: 'Liquid Glass',
   light: {
-    bg_main: '#edf4f7', bg_sidebar: '#e5f0f2', bg_card: '#f9fcfd',
-    bg_hover: '#dcebee', bg_active: '#d1e9ef', border: '#cadce3',
-    text_main: '#172d38', text_muted: '#48626f', text_dim: '#58717d',
-    accent: '#006b99', accent_light: '#007fb5', accent_contrast: '#ffffff',
-    success: '#227c62', danger: '#ce3d42',
+    bg_main: '#e8e8e9', bg_sidebar: '#e5e5e7', bg_card: '#f5f5f7',
+    bg_hover: '#dddddf', bg_active: '#d6d6da', border: '#cfcfd4',
+    text_main: '#222244', text_muted: '#525268', text_dim: '#626276',
+    accent: '#0052f5', accent_light: '#0045d1', accent_contrast: '#ffffff',
+    success: '#287852', danger: '#c8323a',
   },
   dark: {
-    bg_main: '#15242d', bg_sidebar: '#13252d', bg_card: '#243b46',
-    bg_hover: '#314c58', bg_active: '#24536a', border: '#3e5865',
-    text_main: '#eff8fa', text_muted: '#b6ccd4', text_dim: '#a2bcc7',
-    accent: '#70c9ee', accent_light: '#a1e2fa', accent_contrast: '#102630',
-    success: '#77d8b4', danger: '#ff979a',
+    bg_main: '#1b1b1d', bg_sidebar: '#202022', bg_card: '#242426',
+    bg_hover: '#343437', bg_active: '#414146', border: '#444449',
+    text_main: '#e1e1e1', text_muted: '#bdbdc8', text_dim: '#a5a5b5',
+    accent: '#9cdcff', accent_light: '#c4eaff', accent_contrast: '#112234',
+    success: '#81d4a5', danger: '#ffa3a7',
   },
 };
 
-export const BUILTIN_PALETTES: ThemePalette[] = [APPLE_PALETTE, GLASS_PALETTE];
+export const BUILTIN_PALETTES: ThemePalette[] = [GLASS_PALETTE];
 
 export type ThemeToken = keyof ThemeColors;
 
@@ -120,9 +82,9 @@ export function themeVarsStyle(colors: ThemeColors, mode: AppTheme): string {
   return parts.map((part) => `${part};`).join(' ');
 }
 
-/** Legacy palettes remain stored for compatibility, but only the two Apple designs are selectable. */
+/** Former theme IDs resolve to Liquid Glass without altering archived color data. */
 export function resolvePalette(id: string, _legacy: ThemePalette[] = []): ThemePalette {
-  return BUILTIN_PALETTES.find((palette) => palette.id === id) ?? APPLE_PALETTE;
+  return BUILTIN_PALETTES.find((palette) => palette.id === id) ?? GLASS_PALETTE;
 }
 
 export function applyTheme(id: string, mode: AppTheme, legacy: ThemePalette[] = []): void {

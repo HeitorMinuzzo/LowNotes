@@ -9,9 +9,9 @@ const TOKENS: (keyof ThemeColors)[] = [
   'accent_contrast', 'success', 'danger',
 ];
 
-test('only Apple and Apple Liquid Glass are available, with Apple as default', () => {
-  expect(BUILTIN_PALETTES.map((p) => p.id)).toEqual(['apple', 'apple-glass']);
-  expect(DEFAULT_PALETTE_ID).toBe('apple');
+test('Liquid Glass is the only available and default theme', () => {
+  expect(BUILTIN_PALETTES.map((p) => [p.id, p.name])).toEqual([['liquid-glass', 'Liquid Glass']]);
+  expect(DEFAULT_PALETTE_ID).toBe('liquid-glass');
   for (const palette of BUILTIN_PALETTES) {
     for (const mode of ['dark', 'light'] as const) {
       expect(Object.keys(palette[mode]).sort()).toEqual([...TOKENS].sort());
@@ -20,28 +20,18 @@ test('only Apple and Apple Liquid Glass are available, with Apple as default', (
   }
 });
 
-test('former and custom themes resolve to Apple without changing archived data', () => {
-  const custom: ThemePalette = { ...resolvePalette('apple'), id: 'custom_x', name: 'Archived' };
+test('former and custom themes resolve to Liquid Glass without changing archived data', () => {
+  const custom: ThemePalette = { ...resolvePalette('liquid-glass'), id: 'custom_x', name: 'Archived' };
   const archive = [custom];
   const before = JSON.stringify(archive);
-  for (const id of ['lowbloat', 'megumin', 'rimuru', 'custom_x', 'unknown', '']) {
-    expect(resolvePalette(id, archive).id).toBe('apple');
+  for (const id of ['apple', 'apple-glass', 'lowbloat', 'megumin', 'rimuru', 'custom_x', 'unknown', '']) {
+    expect(resolvePalette(id, archive).id).toBe('liquid-glass');
   }
-  expect(resolvePalette('apple-glass', archive).id).toBe('apple-glass');
+  expect(resolvePalette('liquid-glass', archive).id).toBe('liquid-glass');
   expect(JSON.stringify(archive)).toBe(before);
 });
 
-test('Apple keeps the system canvas and action colors', () => {
-  const apple = resolvePalette('apple');
-  expect(apple.light.accent).toBe('#0066cc');
-  expect(apple.dark.accent).toBe('#2997ff');
-  expect(apple.light.bg_main).toBe('#ffffff');
-  expect(apple.dark.bg_main).toBe('#1d1d1f');
-  expect(apple.light.text_main).toBe('#1d1d1f');
-  expect(apple.dark.text_main).toBe('#f5f5f7');
-});
-
-test('pre-JS colors match Apple in both appearances', () => {
+test('pre-JS colors match Liquid Glass in both appearances', () => {
   const css = readFileSync(new URL('../src/app.css', import.meta.url), 'utf8');
   const blocks = {
     light: css.match(/:root\s*\{([^}]+)\}/)?.[1],
@@ -50,7 +40,7 @@ test('pre-JS colors match Apple in both appearances', () => {
   for (const mode of ['light', 'dark'] as const) {
     expect(blocks[mode]).toContain(`color-scheme: ${mode}`);
     for (const token of TOKENS) {
-      expect(blocks[mode]).toContain(`--${token.replaceAll('_', '-')}: ${resolvePalette('apple')[mode][token]}`);
+      expect(blocks[mode]).toContain(`--${token.replaceAll('_', '-')}: ${resolvePalette('liquid-glass')[mode][token]}`);
     }
   }
 });
@@ -67,7 +57,7 @@ function contrast(a: string, b: string) {
   return (values[0] + .05) / (values[1] + .05);
 }
 
-test('both materials retain readable main and secondary text in light and dark', () => {
+test('Liquid Glass retains readable main and secondary text in light and dark', () => {
   for (const palette of BUILTIN_PALETTES) {
     for (const mode of ['light', 'dark'] as const) {
       const colors = palette[mode];

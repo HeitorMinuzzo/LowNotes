@@ -1,12 +1,12 @@
 <script lang="ts">
+  import { liquidGlass, GLASS_BACKDROPS, getGlassBackdrop, setGlassBackdrop, type GlassBackdrop } from '$lib/liquid-glass';
   import { onMount, untrack } from 'svelte';
   import { getVersion } from '@tauri-apps/api/app';
   import { openUrl } from '@tauri-apps/plugin-opener';
-  import { ArrowLeft, Bot, Check, Download, Globe2, Monitor, NotebookPen, Palette, Pencil, Plus, Settings2, Sparkles, Trash2 } from 'lucide-svelte';
-  import { fetchAiModels, saveAiSettings, saveCloseToTray, saveImageUploadSettings, saveLanguage, saveLineWrapping, saveTheme, saveThemePalettes, saveUpdatePrefs, saveViewMode, saveWebSearchSettings } from '$lib/api';
+  import { ArrowLeft, Bot, Check, Download, Globe2, Monitor, NotebookPen, Palette, Plus, Settings2, Sparkles, Trash2 } from 'lucide-svelte';
+  import { fetchAiModels, saveAiSettings, saveCloseToTray, saveImageUploadSettings, saveLanguage, saveLineWrapping, saveTheme, saveUpdatePrefs, saveViewMode, saveWebSearchSettings } from '$lib/api';
   import { LOCALE_LABELS, SUPPORTED_LOCALES, t, trError, type LocaleCode } from '$lib/i18n';
-  import { BUILTIN_PALETTES, applyTheme, themeVarsStyle } from '$lib/themes';
-  import type { AiProviderConfig, AiSettings, AppSettings, AppTheme, ImageUploadProvider, ThemePalettesSettings, ViewMode, WebSearchSettings } from '$lib/types';
+  import type { AiProviderConfig, AiSettings, AppSettings, AppTheme, ImageUploadProvider, ViewMode, WebSearchSettings } from '$lib/types';
   import SegmentedControl from './ui/SegmentedControl.svelte';
   import { version as packageVersion } from '../../../package.json';
 
@@ -19,6 +19,11 @@
   }>();
 
   let tab = $state<Tab>(untrack(() => initialTab));
+  let glassBackdrop = $state(getGlassBackdrop());
+  const backdropLabels = {
+    none: 'settings.glassBackgroundNone', aurora: 'settings.glassBackgroundAurora',
+    ocean: 'settings.glassBackgroundOcean', sunset: 'settings.glassBackgroundSunset',
+  } as const satisfies Record<GlassBackdrop, string>;
   let aiDraft = $state<AiSettings>(untrack(() => $state.snapshot(settings.ai)));
   let webDraft = $state<WebSearchSettings>(untrack(() => $state.snapshot(settings.web_search)));
   let imgurClientId = $state(untrack(() => settings.image_upload?.imgur_client_id ?? ''));
@@ -44,9 +49,6 @@
   let addingProvider = $state(false);
   let newName = $state('');
   let newUrl = $state('');
-  let palettes = $state<ThemePalettesSettings>(untrack(() => $state.snapshot(settings.theme_palettes)));
-  const allPalettes = BUILTIN_PALETTES;
-  const appMode = $derived<AppTheme>(settings.theme);
 
   onMount(() => {
     getVersion().then((value) => version = value).catch(() => {});
@@ -133,23 +135,6 @@
     models = [];
   }
 
-  async function selectPalette(id: string) {
-    if (busy || id === palettes.active_palette_id) return;
-    const previous = palettes.active_palette_id;
-    palettes.active_palette_id = id;
-    applyTheme(id, settings.theme);
-    busy = true;
-    error = '';
-    try {
-      const next = { active_palette_id: id, custom_palettes: $state.snapshot(palettes.custom_palettes) };
-      await saveThemePalettes(next);
-      onChange({ ...settings, theme_palettes: next });
-    } catch (reason) {
-      palettes.active_palette_id = previous;
-      applyTheme(previous, settings.theme);
-      error = trError(String(reason));
-    } finally { busy = false; }
-  }
   async function loadModels() {
     if (!provider) return;
     error = '';
@@ -178,7 +163,7 @@
     </div>
 
     <div class="settings-layout">
-      <nav class="settings-nav" aria-label={$t('settings.title')}>
+      <nav use:liquidGlass class="settings-nav" aria-label={$t('settings.title')}>
         <button class:active={tab === 'general'} onclick={() => tab = 'general'}><Monitor size={18} /> {$t('settings.general')}</button>
         <button class:active={tab === 'themes'} onclick={() => tab = 'themes'}><Palette size={18} /> {$t('settings.themes')}</button>
         <button class:active={tab === 'ai'} onclick={() => tab = 'ai'}><Sparkles size={18} /> {$t('settings.ai')}</button>
@@ -222,22 +207,22 @@
           </section>
         {:else if tab === 'themes'}
           <section class="settings-section apple-appearance-section">
-            <h2>{$t('settings.colorTheme')}</h2><p>{$t('settings.appleThemesHint')}</p>
-            <div class="apple-theme-grid">
-              {#each allPalettes as palette (palette.id)}
-                <button class="apple-theme-card" class:chosen={palettes.active_palette_id === palette.id} disabled={busy} aria-pressed={palettes.active_palette_id === palette.id} onclick={() => void selectPalette(palette.id)}>
-                  <span class="apple-theme-preview" class:liquid={palette.id === 'apple-glass'} style={themeVarsStyle(palette[appMode], appMode)} aria-hidden="true">
-                    <span class="apple-preview-sidebar"><i></i><i></i><i></i><i></i></span>
-                    <span class="apple-preview-document"><i></i><i></i><i></i><i></i><i></i></span>
-                    <span class="apple-preview-control"><i></i><i></i><i></i></span>
-                  </span>
-                  <span class="apple-theme-card-title"><strong>{palette.name}</strong><span class="apple-theme-check">{#if palettes.active_palette_id === palette.id}<Check size={14} />{/if}</span></span>
-                  <span class="apple-theme-description">{$t(palette.id === 'apple' ? 'settings.appleThemeDescription' : 'settings.glassThemeDescription')}</span>
-                </button>
-              {/each}
-            </div>
+            <h2>Liquid Glass</h2><p>{$t('settings.appearanceOptionsHint')}</p>
             <div class="setting-row"><div><strong>{$t('settings.theme')}</strong><small>{$t('settings.themeHint')}</small></div>
               <SegmentedControl label={$t('settings.theme')} value={settings.theme} onchange={changeTheme} options={[{ id: 'light', label: $t('settings.light') }, { id: 'dark', label: $t('settings.dark') }]} />
+            </div>
+            <div class="apple-glass-background-setting">
+              <h3 id="glass-background-title">{$t('settings.glassBackground')}</h3>
+              <p id="glass-background-hint">{$t('settings.glassBackgroundHint')}</p>
+              <div class="apple-glass-background-options" role="group" aria-labelledby="glass-background-title" aria-describedby="glass-background-hint">
+                {#each GLASS_BACKDROPS as backdrop}
+                  <button type="button" class="apple-glass-background-card" class:chosen={glassBackdrop === backdrop} data-lg-backdrop={backdrop}
+                    aria-pressed={glassBackdrop === backdrop} onclick={() => { glassBackdrop = backdrop; setGlassBackdrop(backdrop); }}>
+                    <span class="apple-glass-background-swatch" aria-hidden="true"><i></i><i></i></span>
+                    <span class="apple-glass-background-label">{$t(backdropLabels[backdrop])}<span class="apple-theme-check" aria-hidden="true">{#if glassBackdrop === backdrop}<Check size={12} />{/if}</span></span>
+                  </button>
+                {/each}
+              </div>
             </div>
           </section>
         {:else if tab === 'ai'}
